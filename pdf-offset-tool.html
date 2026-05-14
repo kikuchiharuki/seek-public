@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF オフセット印刷ツール</title>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', sans-serif;
+    background: #f0f2f5;
+    color: #1a1a2e;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px 16px;
+  }
+  .container {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    max-width: 560px;
+    width: 100%;
+    padding: 32px;
+  }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+
+  .drop-zone {
+    border: 2px dashed #c0c6d0;
+    border-radius: 8px;
+    padding: 36px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    margin-bottom: 20px;
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: #4a6cf7; background: #f5f7ff; }
+  .drop-zone.has-file { border-style: solid; border-color: #4a6cf7; background: #f5f7ff; }
+  .drop-zone p { font-size: 14px; color: #555; }
+  .drop-zone .filename { font-weight: 600; color: #1a1a2e; margin-top: 8px; word-break: break-all; }
+  .drop-zone input[type="file"] { display: none; }
+
+  .settings { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .field { flex: 1; min-width: 140px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 600; color: #555;
+    margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px;
+  }
+  .field input, .field select {
+    width: 100%; padding: 8px 10px; border: 1px solid #d0d5dd;
+    border-radius: 6px; font-size: 14px; outline: none; transition: border-color .2s;
+  }
+  .field input:focus, .field select:focus { border-color: #4a6cf7; }
+  .unit { font-size: 12px; color: #888; margin-top: 2px; }
+
+  .diagram {
+    background: #fafbfc; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 16px; margin-bottom: 20px; text-align: center;
+  }
+  .diagram svg { max-width: 100%; height: auto; }
+  .diagram-caption { font-size: 11px; color: #888; margin-top: 8px; }
+
+  .btn {
+    display: block; width: 100%; padding: 12px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 600; cursor: pointer; transition: background .2s, opacity .2s;
+  }
+  .btn-primary { background: #4a6cf7; color: #fff; }
+  .btn-primary:hover { background: #3b5de7; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+  .status { margin-top: 12px; padding: 10px 12px; border-radius: 6px; font-size: 13px; display: none; }
+  .status.success { display: block; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+  .status.error { display: block; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  .status.processing { display: block; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+  .debug-info {
+    margin-top: 12px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #e5e7eb;
+    border-radius: 6px; font-size: 11px; color: #666; font-family: monospace;
+    white-space: pre-wrap; display: none;
+  }
+
+  .note {
+    margin-top: 20px; padding: 12px; background: #fffbeb; border: 1px solid #fde68a;
+    border-radius: 6px; font-size: 12px; color: #92400e; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>PDF オフセット印刷ツール</h1>
+  <p class="subtitle">ラベル用紙の再利用 — PDFの内容を右にずらして出力</p>
+
+  <div class="drop-zone" id="dropZone">
+    <p>PDFファイルをドラッグ＆ドロップ<br>またはクリックして選択</p>
+    <input type="file" id="fileInput" accept=".pdf">
+    <div class="filename" id="fileName"></div>
+  </div>
+
+  <div class="settings">
+    <div class="field">
+      <label>オフセット量</label>
+      <input type="number" id="offsetMm" value="110" step="1" min="0" max="297">
+      <div class="unit">mm（右方向）</div>
+    </div>
+    <div class="field">
+      <label>対象ページ</label>
+      <select id="pageTarget">
+        <option value="all">全ページ</option>
+        <option value="first">1ページ目のみ</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 420 160" xmlns="http://www.w3.org/2000/svg">
+      <text x="105" y="14" text-anchor="middle" font-size="11" fill="#666">元のPDF</text>
+      <rect x="5" y="20" width="200" height="130" rx="3" fill="#fff" stroke="#ccc" stroke-width="1"/>
+      <rect x="12" y="28" width="80" height="114" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+      <text x="52" y="88" text-anchor="middle" font-size="11" fill="#3b82f6">伝票</text>
+      <line x1="105" y1="28" x2="105" y2="142" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+      <text x="245" y="80" text-anchor="middle" font-size="20" fill="#4a6cf7">→</text>
+      <text x="245" y="98" text-anchor="middle" font-size="10" fill="#4a6cf7" id="arrowLabel">110mm</text>
+      <text x="355" y="14" text-anchor="middle" font-size="11" fill="#666">変換後</text>
+      <rect x="255" y="20" width="200" height="130" rx="3" fill="#fff" stroke="#ccc" stroke-width="1"/>
+      <line x1="355" y1="28" x2="355" y2="142" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+      <rect x="362" y="28" width="80" height="114" rx="2" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
+      <text x="402" y="88" text-anchor="middle" font-size="11" fill="#16a34a">伝票</text>
+      <text x="310" y="88" text-anchor="middle" font-size="10" fill="#aaa">剥がし済み</text>
+    </svg>
+    <div class="diagram-caption">左側を剥がした用紙の右側に印刷できるようにずらします</div>
+  </div>
+
+  <button class="btn btn-primary" id="convertBtn" disabled>変換してダウンロード</button>
+  <div class="status" id="status"></div>
+  <div class="debug-info" id="debugInfo"></div>
+
+  <div class="note">
+    <strong>使い方:</strong> 1件分の伝票が左詰めで入ったPDFを選択 → オフセット量を確認（既定110mm）→ 変換ボタンで右にずらしたPDFをダウンロード。そのまま印刷すれば右側のラベルに印刷されます。
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileNameEl = document.getElementById('fileName');
+const offsetMm = document.getElementById('offsetMm');
+const convertBtn = document.getElementById('convertBtn');
+const statusEl = document.getElementById('status');
+const debugEl = document.getElementById('debugInfo');
+const arrowLabel = document.getElementById('arrowLabel');
+
+let selectedFile = null;
+
+offsetMm.addEventListener('input', () => { arrowLabel.textContent = offsetMm.value + 'mm'; });
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') handleFile(file);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  selectedFile = file;
+  fileNameEl.textContent = file.name;
+  dropZone.classList.add('has-file');
+  convertBtn.disabled = false;
+  statusEl.className = 'status'; statusEl.style.display = 'none';
+  debugEl.style.display = 'none';
+}
+
+function showStatus(msg, type) { statusEl.textContent = msg; statusEl.className = 'status ' + type; }
+function showDebug(msg) { debugEl.textContent = msg; debugEl.style.display = 'block'; }
+
+convertBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  convertBtn.disabled = true;
+  showStatus('変換中...', 'processing');
+
+  try {
+    const arrayBuffer = await selectedFile.arrayBuffer();
+    const { PDFDocument, PDFName, PDFArray } = PDFLib;
+
+    const srcDoc = await PDFDocument.load(arrayBuffer);
+    const newDoc = await PDFDocument.create();
+
+    const offset = parseFloat(offsetMm.value);
+    const offsetPt = offset * (72 / 25.4);
+    const pageTarget = document.getElementById('pageTarget').value;
+
+    // copyPages: ページ構造・フォント・Rotation 等を完全に保持
+    const pageIndices = srcDoc.getPageIndices();
+    const copiedPages = await newDoc.copyPages(srcDoc, pageIndices);
+
+    let debugLog = '';
+
+    for (let i = 0; i < copiedPages.length; i++) {
+      const page = copiedPages[i];
+      newDoc.addPage(page);
+
+      const shouldOffset = !(pageTarget === 'first' && i > 0);
+      if (!shouldOffset) continue;
+
+      // Rotation 取得
+      const rotateObj = page.node.get(PDFName.of('Rotate'));
+      const rotation = rotateObj ? (typeof rotateObj.asNumber === 'function' ? rotateObj.asNumber() : Number(rotateObj)) : 0;
+
+      // Rotation に応じた translate 方向
+      // PDF座標系 → 見た目の「右」方向への移動
+      //   Rotate=0:   右 = +x
+      //   Rotate=90:  右 = +y  (座標系が90度回転)
+      //   Rotate=180: 右 = -x
+      //   Rotate=270: 右 = -y
+      let tx = 0, ty = 0;
+      switch (rotation) {
+        case 0:   tx = offsetPt;  ty = 0;         break;
+        case 90:  tx = 0;         ty = offsetPt;  break;
+        case 180: tx = -offsetPt; ty = 0;         break;
+        case 270: tx = 0;         ty = -offsetPt; break;
+      }
+
+      debugLog += `Page ${i + 1}: Rotate=${rotation}, tx=${tx.toFixed(1)}pt, ty=${ty.toFixed(1)}pt\n`;
+
+      // Contents ストリームの前後に q/cm/Q を注入
+      const ctx = newDoc.context;
+      const prefix = `q 1 0 0 1 ${tx.toFixed(4)} ${ty.toFixed(4)} cm\n`;
+      const suffix = `\nQ\n`;
+
+      const prefixRef = ctx.register(ctx.stream(new TextEncoder().encode(prefix)));
+      const suffixRef = ctx.register(ctx.stream(new TextEncoder().encode(suffix)));
+
+      // 既存 Contents を取得（単体 or 配列）
+      const contentsEntry = page.node.get(PDFName.of('Contents'));
+      if (!contentsEntry) continue;
+
+      let existingRefs = [];
+      const resolved = ctx.lookup(contentsEntry);
+      if (resolved instanceof PDFLib.PDFArray) {
+        for (let j = 0; j < resolved.size(); j++) {
+          existingRefs.push(resolved.get(j));
+        }
+      } else {
+        // 単体の stream reference
+        existingRefs.push(contentsEntry);
+      }
+
+      // [prefix, ...existing, suffix]
+      const newArray = ctx.obj([prefixRef, ...existingRefs, suffixRef]);
+      page.node.set(PDFName.of('Contents'), newArray);
+    }
+
+    showDebug(debugLog || 'No pages processed');
+
+    const pdfBytes = await newDoc.save();
+
+    // ダウンロード
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = selectedFile.name.replace(/\.pdf$/i, '') + '_offset' + offset + 'mm.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showStatus('変換完了！ ダウンロードが開始されました。', 'success');
+  } catch (err) {
+    console.error(err);
+    showStatus('エラー: ' + err.message, 'error');
+  } finally {
+    convertBtn.disabled = false;
+  }
+});
+</script>
+
+</body>
+</html>
