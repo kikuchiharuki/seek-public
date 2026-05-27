@@ -39,13 +39,30 @@
   .output-header h2 { font-size: 14px; font-weight: bold; }
   .print-note { font-size: 11px; color: #888; margin-bottom: 8px; }
 
+  /* 工場メモHTML版 */
   .factory-memo { background: #fff; border: 2px solid #333; padding: 16px; margin-bottom: 16px; }
-  .factory-memo-content { font-family: 'Meiryo', monospace; font-size: 13px; line-height: 1.8; white-space: pre-wrap; outline: none; min-height: 100px; }
+  .memo-header { text-align: center; font-weight: bold; font-size: 15px; padding-bottom: 8px; border-bottom: 2px solid #333; margin-bottom: 4px; }
+  .memo-subheader { font-size: 12px; color: #666; margin-bottom: 12px; }
+  .slip-block { border: 2px solid #333; border-radius: 4px; margin-bottom: 10px; overflow: hidden; page-break-inside: avoid; }
+  .slip-title-pallet { background: #333; color: #fff; padding: 4px 12px; font-weight: bold; font-size: 13px; }
+  .slip-title-box { background: #eee; color: #333; padding: 4px 12px; font-weight: bold; font-size: 13px; border-bottom: 2px solid #333; }
+  .slip-body { padding: 6px 12px; font-size: 13px; line-height: 1.6; }
+  .slip-body [contenteditable] { outline: none; }
+  .slip-body [contenteditable]:focus { background: #ffffdd; }
+  .slip-addr { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .slip-dates { margin-bottom: 4px; }
+  .slip-items { border-top: 1px solid #ddd; padding-top: 4px; margin-bottom: 4px; }
+  .slip-item-name { }
+  .slip-item-lot { color: #888; padding-left: 2em; }
+  .slip-footer { border-top: 1px solid #ddd; padding-top: 4px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; }
+  .slip-footer span { white-space: nowrap; }
+  .slip-insurance { font-weight: bold; }
+  .slip-warning { margin-top: 4px; padding: 3px 8px; background: #fff3cd; color: #856404; font-size: 12px; border-radius: 3px; }
+  .memo-legend { font-size: 11px; color: #999; text-align: center; margin-top: 6px; }
 
   .email-output { background: #fff; border: 1px solid #ccc; padding: 16px; margin-bottom: 16px; border-radius: 4px; }
   .email-output pre { background: #f4f4f4; border: 1px solid #ddd; padding: 12px; font-family: 'Meiryo', monospace; font-size: 13px; white-space: pre-wrap; line-height: 1.7; }
 
-  /* 修正指示エリア */
   .edit-section { background: #fff; border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; border-radius: 4px; }
   .edit-section h2 { font-size: 14px; font-weight: bold; margin-bottom: 8px; }
   .edit-section textarea { width: 100%; font-family: 'Meiryo', sans-serif; font-size: 13px; padding: 8px; border: 1px solid #aaa; border-radius: 3px; resize: vertical; min-height: 50px; max-height: 120px; }
@@ -56,6 +73,11 @@
   .edit-btn:hover { background: #555; }
   .edit-btn:disabled { background: #aaa; cursor: default; }
   .edit-examples { font-size: 11px; color: #999; margin-top: 4px; }
+  .edit-status { margin-top: 8px; padding: 8px 12px; border-radius: 4px; font-size: 13px; text-align: center; }
+  .edit-status.loading { background: #e8f0fe; color: #1a73e8; }
+  .edit-status.success { background: #d4edda; color: #155724; }
+  .edit-status.fail { background: #fdecea; color: #721c24; }
+  .edit-status .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #a0c4ff; border-top-color: #1a73e8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px; vertical-align: middle; }
 
   button { font-size: 13px; padding: 5px 14px; border: 1px solid #666; border-radius: 3px; cursor: pointer; background: #fff; }
   button:hover { background: #eee; }
@@ -65,10 +87,11 @@
   button.copy-btn:hover { background: #1557b0; }
 
   @media print {
-    body { background: #fff; }
+    body { background: #fff; font-size: 12px; }
     .no-print { display: none !important; }
     .factory-memo { border: 1px solid #000; }
-    .factory-memo-content { font-size: 12px; }
+    .slip-block { border: 1.5px solid #000; }
+    .slip-body [contenteditable]:focus { background: transparent; }
     .container { max-width: 100%; padding: 8px; }
   }
 </style>
@@ -97,9 +120,6 @@
   <div class="loading no-print" id="loading" style="display:none;">
     <span class="spinner"></span>PDFを解析中...
   </div>
-  <div class="loading no-print" id="editLoading" style="display:none;">
-    <span class="spinner"></span>修正中...
-  </div>
 
   <div class="error no-print" id="errorArea" style="display:none;"></div>
   <div class="info-msg no-print" id="infoArea" style="display:none;"></div>
@@ -109,10 +129,8 @@
       <h2>📋 工場用メモ（この枠内が印刷されます）</h2>
       <button class="primary" onclick="window.print()">印刷</button>
     </div>
-    <div class="print-note no-print">※ 内容を直接編集できます。編集後に印刷してください。</div>
-    <div class="factory-memo">
-      <div class="factory-memo-content" id="factoryMemo" contenteditable="true"></div>
-    </div>
+    <div class="print-note no-print">※ 各フィールドをクリックして直接編集できます。編集後に印刷してください。</div>
+    <div class="factory-memo" id="factoryMemo"></div>
 
     <div class="no-print">
       <div class="output-header">
@@ -124,7 +142,6 @@
       </div>
     </div>
 
-    <!-- 修正指示 -->
     <div class="edit-section no-print" id="editSection">
       <h2>🔧 修正指示</h2>
       <textarea id="editInput" placeholder="例：詰替用24㌜を14㌜と10㌜に分納して" maxlength="200" oninput="updateCharCount()"></textarea>
@@ -134,6 +151,7 @@
         <span class="edit-count" id="editCount">修正回数：0/5</span>
         <button class="edit-btn" id="editBtn" onclick="submitEdit()">修正実行</button>
       </div>
+      <div class="edit-status" id="editStatus" style="display:none;"></div>
     </div>
   </div>
 </div>
@@ -142,6 +160,7 @@
 let pendingPdfBase64 = null;
 let editCounter = 0;
 const MAX_EDITS = 5;
+let currentData = null; // JSONデータ保持
 
 // ─── APIキー ───
 function loadApiKey() {
@@ -207,7 +226,7 @@ async function run() {
   if (!pendingPdfBase64) { showError('PDFを先に選択してください。'); return; }
   const apiKey = getApiKey();
   if (!apiKey) { showError('APIキーを設定してください。'); return; }
-  showLoading('loading', true);
+  showLoading(true);
   hideError(); hideInfo();
   document.getElementById('outputArea').style.display = 'none';
   document.getElementById('runBtn').disabled = true;
@@ -215,11 +234,12 @@ async function run() {
   updateEditCount();
   try {
     const result = await callClaudeAPI(apiKey, pendingPdfBase64);
+    currentData = result;
     renderOutput(result);
   } catch (err) {
     showError('エラー：' + err.message);
   } finally {
-    showLoading('loading', false);
+    showLoading(false);
     document.getElementById('runBtn').disabled = false;
   }
 }
@@ -305,6 +325,7 @@ async function callClaudeAPI(apiKey, pdfBase64) {
       "contact": "担当者（あれば）",
       "shipping_type": "pallet" or "box",
       "estimated_weight_kg": 概算総重量(小数1桁。計算できない場合はnull),
+      "needs_split_review": true/false,
       "items": [
         {
           "name": "品名",
@@ -364,39 +385,34 @@ async function callEditAPI(apiKey, factoryText, emailText, instruction) {
 
 ## 対応する修正の例
 - 分納指示（「○㌜を△㌜と□㌜に分ける」）
-- 数量変更（「○○を800個に変更」）
+- 数量変更
 - 出荷日・到着日の変更
-- ロットの記入
-- 送り状番号の記入
-- 納品先の追加・削除
+- ロット・送り状番号の記入
+- パレット分割
 - その他、出荷メモに関する修正
 
 ## 対応しないもの
 出荷メモと無関係な質問・雑談・調べもの → 即座に "REJECT" とだけ返してください。
 
 ## 保険入力の計算ルール（必ず守ること）
-保険金額は送り状単位で計算する。
 1. その送り状に含まれる全商品の（税抜単価 × 数量）を合計
-2. 合計 × 1.1 で税込にする
-3. 万円単位に切り上げ（1万円未満の端数は切り上げ）
-4. 最低5（5万円）
-5. 表記は [数字] のみ。金額詳細は書かない。
+2. 合計 × 1.1 で税込
+3. 万円単位に切り上げ
+4. 最低5
+5. 表記は [数字] のみ
 
 ## 出荷日ルール
 - 出荷日 = 納品日（到着日）の前日
-- 月曜納品 → 金曜出荷（土日を避ける）
+- 月曜納品 → 金曜出荷
 
 ## 概算重量ルール
 - 1個あたり概算 = 容量(ml) × 1.1(比重) + 容器20g（10ml以下は最低50g）
 - 1㌜あたり概算 = 1個あたり × ケース入数 + 段ボール500g
 - パレット分割基準：240kg超 または 32㌜超
-- 分割時は品目単位で分ける（1品目を途中で割らない）
-- 分割した場合「パレット①」「パレット②」等を名称に付ける
-- 概算重量は「重量：＿＿＿＿ kg（概算 ○○kg）」の形で記載
+- 概算重量は「おおよそ○○kgくらい」（整数、切り上げ）
 
 ## 出力形式
-修正後の工場用メモとメール用テキストを以下の形式で返してください。
-前置き不要。
+修正後の工場用メモとメール用テキストを以下の形式で返してください。前置き不要。
 
 ===FACTORY===
 （工場用メモのテキスト全文）
@@ -435,50 +451,100 @@ async function callEditAPI(apiKey, factoryText, emailText, instruction) {
 
 // ─── 修正実行 ───
 async function submitEdit() {
-  const input = document.getElementById('editInput').value.trim();
-  if (!input) { showError('修正内容を入力してください。'); return; }
-  if (input.length > 200) { showError('200文字以内で入力してください。'); return; }
-  if (editCounter >= MAX_EDITS) { showError('修正回数の上限（' + MAX_EDITS + '回）に達しました。再度PDFから生成してください。'); return; }
+  const inputEl = document.getElementById('editInput');
+  const input = inputEl.value.trim();
+  if (!input) { showEditStatus('修正内容を入力してください。', 'fail'); return; }
+  if (input.length > 200) { showEditStatus('200文字以内で入力してください。', 'fail'); return; }
+  if (editCounter >= MAX_EDITS) { showEditStatus('修正回数の上限（' + MAX_EDITS + '回）に達しました。再度PDFから生成してください。', 'fail'); return; }
 
   const apiKey = getApiKey();
-  if (!apiKey) { showError('APIキーを設定してください。'); return; }
+  if (!apiKey) { showEditStatus('APIキーを設定してください。', 'fail'); return; }
 
-  const factoryText = document.getElementById('factoryMemo').innerText;
+  // 工場メモからテキストを抽出
+  const factoryText = getFactoryMemoText();
   const emailText = document.getElementById('emailText').textContent;
 
   hideError(); hideInfo();
-  showLoading('editLoading', true);
   document.getElementById('editBtn').disabled = true;
+  inputEl.disabled = true;
+  inputEl.style.opacity = '0.5';
+  showEditStatus('<span class="spinner"></span>修正中...', 'loading');
 
   try {
     const result = await callEditAPI(apiKey, factoryText, emailText, input);
 
     if (result.trim() === 'REJECT') {
-      showInfo('出荷メモと関係のない入力のため、処理しませんでした。');
+      showEditStatus('出荷メモと関係のない入力のため、処理しませんでした。', 'fail');
       return;
     }
 
-    // ===FACTORY=== と ===EMAIL=== で分割
     const factoryMatch = result.match(/===FACTORY===([\s\S]*?)===EMAIL===/);
     const emailMatch = result.match(/===EMAIL===([\s\S]*?)$/);
 
     if (factoryMatch && emailMatch) {
-      document.getElementById('factoryMemo').innerText = factoryMatch[1].trim();
+      // テキスト→HTMLに再変換
+      renderFactoryMemoFromText(factoryMatch[1].trim());
       document.getElementById('emailText').textContent = emailMatch[1].trim();
       editCounter++;
       updateEditCount();
-      document.getElementById('editInput').value = '';
+      inputEl.value = '';
       updateCharCount();
-      showInfo('修正を反映しました。');
+      showEditStatus('✔ 修正を反映しました。', 'success');
     } else {
-      showError('修正結果の解析に失敗しました。手動で編集してください。');
+      showEditStatus('修正結果の解析に失敗しました。手動で編集してください。', 'fail');
     }
   } catch (err) {
-    showError('修正エラー：' + err.message);
+    showEditStatus('修正エラー：' + err.message, 'fail');
   } finally {
-    showLoading('editLoading', false);
     document.getElementById('editBtn').disabled = false;
+    inputEl.disabled = false;
+    inputEl.style.opacity = '1';
   }
+}
+
+// ─── 工場メモテキスト抽出（HTML→テキスト） ───
+function getFactoryMemoText() {
+  const memo = document.getElementById('factoryMemo');
+  let text = '';
+  const header = memo.querySelector('.memo-header');
+  const sub = memo.querySelector('.memo-subheader');
+  if (header) text += header.innerText + '\n';
+  if (sub) text += sub.innerText + '\n\n';
+
+  memo.querySelectorAll('.slip-block').forEach(block => {
+    const title = block.querySelector('.slip-title-pallet, .slip-title-box');
+    if (title) text += title.innerText + '\n';
+    const body = block.querySelector('.slip-body');
+    if (body) {
+      const addr = body.querySelector('.slip-addr');
+      if (addr) text += addr.innerText + '\n';
+      const dates = body.querySelector('.slip-dates');
+      if (dates) text += dates.innerText + '\n';
+      body.querySelectorAll('.slip-item-name').forEach(item => {
+        text += item.innerText + '\n';
+      });
+      body.querySelectorAll('.slip-item-lot').forEach(lot => {
+        text += '  ' + lot.innerText + '\n';
+      });
+      const footer = body.querySelector('.slip-footer');
+      if (footer) {
+        footer.querySelectorAll('span').forEach(s => { text += s.innerText + '　'; });
+        text += '\n';
+      }
+      const warn = body.querySelector('.slip-warning');
+      if (warn) text += warn.innerText + '\n';
+    }
+    text += '\n';
+  });
+  return text.trim();
+}
+
+// ─── 修正後テキスト→HTML再構築（簡易パーサー） ───
+function renderFactoryMemoFromText(text) {
+  const container = document.getElementById('factoryMemo');
+  // テキストをそのままcontenteditable divに入れるフォールバック
+  // 完全なHTML再構築は複雑なので、プレーンテキスト表示にする
+  container.innerHTML = '<div contenteditable="true" style="font-family: Meiryo, monospace; font-size: 13px; line-height: 1.8; white-space: pre-wrap; outline: none; min-height: 100px;">' + escapeHtml(text) + '</div>';
 }
 
 // ─── 保険金額計算 ───
@@ -507,18 +573,14 @@ function calcShipDate(delivDateStr) {
   return (shipDt.getMonth() + 1) + '月' + shipDt.getDate() + '日';
 }
 
-// ─── 出力生成 ───
+// ─── HTML出力生成 ───
 function renderOutput(data) {
   const delivDate = data.delivery_date || '＿月＿日';
   const shipDateStr = calcShipDate(delivDate);
 
-  // ── 工場用メモ ──
-  let f = '';
-  f += '━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-  f += '出荷メモ　' + data.client + '\n';
-  f += '発注書No：' + data.po_number + '\n';
-  f += '納期：' + delivDate + '\n';
-  f += '━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  let html = '';
+  html += '<div class="memo-header" contenteditable="true">出荷メモ　' + esc(data.client) + '</div>';
+  html += '<div class="memo-subheader" contenteditable="true">発注書No：' + esc(data.po_number) + '　｜　納期：' + esc(delivDate) + '</div>';
 
   data.destinations.forEach(dest => {
     let destTaxExcl = 0;
@@ -530,57 +592,75 @@ function renderOutput(data) {
     const insurance = calcInsurance(destTaxExcl);
     const totalCs = dest.items.reduce((s, it) => s + (parseFloat(it.cs) || 0), 0);
     const totalCsCeil = Math.ceil(totalCs);
-    const shipType = dest.shipping_type === 'pallet' ? 'パレット' : 'バラ';
+    const isPallet = dest.shipping_type === 'pallet';
+    const typeIcon = isPallet ? '■' : '□';
+    const typeLabel = isPallet ? 'パレット' : 'バラ';
+    const titleClass = isPallet ? 'slip-title-pallet' : 'slip-title-box';
 
-    f += '\n──────────────────────────\n';
-    f += '【' + dest.name + '】（' + shipType + '）\n';
-    if (dest.address) f += dest.address + '\n';
-    if (dest.contact) f += dest.contact + '\n';
-    f += '──────────────────────────\n';
-    f += '出荷日：' + (shipDateStr || '＿＿月＿＿日') + '　→　到着日：' + delivDate + '\n\n';
+    // 概算重量（整数切り上げ）
+    const estWeight = dest.estimated_weight_kg ? Math.ceil(dest.estimated_weight_kg) : null;
 
+    html += '<div class="slip-block">';
+    html += '<div class="' + titleClass + '" contenteditable="true">' + typeIcon + ' ' + esc(dest.name) + '（' + typeLabel + '）</div>';
+    html += '<div class="slip-body">';
+
+    if (dest.address || dest.contact) {
+      html += '<div class="slip-addr" contenteditable="true">';
+      if (dest.address) html += esc(dest.address);
+      if (dest.contact) html += '　' + esc(dest.contact);
+      html += '</div>';
+    }
+
+    html += '<div class="slip-dates" contenteditable="true">出荷日：' + (shipDateStr || '＿＿月＿＿日') + '　→　到着日：' + esc(delivDate) + '</div>';
+
+    html += '<div class="slip-items">';
     dest.items.forEach(item => {
-      const formStr = item.form ? '（' + item.form + '）' : '';
+      const formStr = item.form ? '（' + esc(item.form) + '）' : '';
       let csDetail = '';
       if (item.case_count && item.cs) {
         csDetail = '（' + item.case_count + '入×' + item.cs + '㌜）';
       } else if (item.cs) {
         csDetail = '（' + item.cs + '㌜）';
       }
-      f += '　' + item.name + formStr + '　' + item.quantity + '個' + csDetail + '\n';
-      f += '　　lot：＿＿＿＿＿＿\n';
+      html += '<div class="slip-item-name" contenteditable="true">　' + esc(item.name) + formStr + '　' + item.quantity + '個' + csDetail + '</div>';
+      html += '<div class="slip-item-lot" contenteditable="true">lot：＿＿＿＿＿＿</div>';
     });
+    html += '</div>';
 
-    f += '\n';
-    if (dest.shipping_type === 'pallet') {
-      f += '個口：＿＿（' + totalCsCeil + '㌜）(' + shipType + ')\n';
+    html += '<div class="slip-footer">';
+    if (isPallet) {
+      html += '<span contenteditable="true">個口：＿＿（' + totalCsCeil + '㌜）</span>';
     } else {
-      f += '個口：' + totalCsCeil + 'ケース(' + shipType + ')\n';
+      html += '<span contenteditable="true">個口：' + totalCsCeil + 'ケース</span>';
     }
-    f += '重量：＿＿＿＿ kg';
-    if (dest.estimated_weight_kg) f += '（概算 ' + dest.estimated_weight_kg + 'kg）';
-    f += '\n';
-    f += '保険入力 [' + insurance + ']\n';
+    let weightStr = '重量：＿＿＿＿ kg';
+    if (estWeight) weightStr += '（おおよそ' + estWeight + 'kgくらい）';
+    html += '<span contenteditable="true">' + weightStr + '</span>';
+    html += '<span class="slip-insurance" contenteditable="true">保険入力 [' + insurance + ']</span>';
+    html += '</div>';
+
     if (dest.needs_split_review) {
-      f += '※ ㌜数・重量が多いためパレット分割の可能性あり\n';
+      html += '<div class="slip-warning">※ ㌜数・重量が多いためパレット分割の可能性あり</div>';
     }
+
+    html += '</div></div>';
   });
 
   if (data.notes) {
-    f += '\n──────────────────────────\n';
-    f += '備考：' + data.notes + '\n';
+    html += '<div style="font-size:12px; color:#666; margin-top:8px; padding:6px;" contenteditable="true">備考：' + esc(data.notes) + '</div>';
   }
-  f += '──────────────────────────\n';
 
-  document.getElementById('factoryMemo').innerText = f;
+  html += '<div class="memo-legend">■ 黒帯 = パレット出荷　｜　□ 白帯 = バラ箱出荷</div>';
+
+  document.getElementById('factoryMemo').innerHTML = html;
 
   // ── メール用テキスト ──
   let e = '';
-  e += '出荷日：' + (shipDateStr || '＿＿月＿＿日') + '　→　納品日：' + delivDate + '\n\n';
+  e += '出荷日：' + (shipDateStr || '＿＿月＿＿日') + '　→　納品日：' + esc(delivDate) + '\n\n';
 
   data.destinations.forEach(dest => {
-    const shipType = dest.shipping_type === 'pallet' ? 'パレット' : 'バラ';
-    e += '【' + dest.name + '宛】（' + shipType + '）\n';
+    const typeLabel = dest.shipping_type === 'pallet' ? 'パレット' : 'バラ';
+    e += '【' + dest.name + '宛】（' + typeLabel + '）\n';
     dest.items.forEach(item => {
       const formStr = item.form ? '（' + item.form + '）' : '';
       let csDetail = '';
@@ -601,6 +681,8 @@ function renderOutput(data) {
 }
 
 // ─── ユーティリティ ───
+function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeHtml(str) { return esc(str); }
 function copyEmail() {
   const text = document.getElementById('emailText').textContent;
   navigator.clipboard.writeText(text).then(() => {
@@ -616,11 +698,17 @@ function updateCharCount() {
 function updateEditCount() {
   document.getElementById('editCount').textContent = '修正回数：' + editCounter + '/' + MAX_EDITS;
 }
-function showLoading(id, show) { document.getElementById(id).style.display = show ? 'block' : 'none'; }
+function showLoading(show) { document.getElementById('loading').style.display = show ? 'block' : 'none'; }
 function showError(msg) { const el = document.getElementById('errorArea'); el.textContent = msg; el.style.display = 'block'; }
 function hideError() { document.getElementById('errorArea').style.display = 'none'; }
 function showInfo(msg) { const el = document.getElementById('infoArea'); el.textContent = msg; el.style.display = 'block'; }
 function hideInfo() { document.getElementById('infoArea').style.display = 'none'; }
+function showEditStatus(html, type) {
+  const el = document.getElementById('editStatus');
+  el.innerHTML = html;
+  el.className = 'edit-status ' + type;
+  el.style.display = 'block';
+}
 
 window.addEventListener('DOMContentLoaded', () => { loadApiKey(); });
 </script>
