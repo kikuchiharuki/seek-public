@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カートン小札用ラベル用紙</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  background: #f0ede8;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px;
+  gap: 16px;
+}
+
+h1 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #888;
+}
+
+.print-btn {
+  padding: 10px 32px;
+  background: #2a6b3a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+}
+.print-btn:hover { background: #225530; }
+.print-btn:active { transform: scale(0.98); }
+
+.hint {
+  font-size: 11px;
+  color: #aaa;
+  text-align: center;
+  line-height: 1.8;
+}
+
+.sheet-outer {
+  width: 620px;
+  height: 876px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.13);
+}
+
+.sheet {
+  width: 210mm;
+  height: 297mm;
+  background: #e8e8e8;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(5, 1fr);
+  gap: 0.3mm;
+  transform-origin: top left;
+  transform: scale(0.781);
+}
+
+textarea {
+  background: #fff;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: 14pt;
+  color: #111;
+  line-height: 1.4;
+  padding: 6mm;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+textarea:focus { background: rgba(44,95,138,0.04); }
+
+/* ============ PRINT ============ */
+@media print {
+  @page {
+    size: 210mm 297mm portrait;
+    margin: 0;
+  }
+
+  body { background: white; padding: 0; display: block; }
+  h1, .print-btn, .hint { display: none; }
+
+  .sheet-outer {
+    width: 210mm;
+    height: 297mm;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .sheet {
+    transform: none;
+    background: white;
+    gap: 0;
+  }
+
+  textarea {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    overflow: hidden;
+  }
+}
+</style>
+</head>
+<body>
+
+<h1>【カートン小札用】ラベル用紙 10面 A4</h1>
+
+<button class="print-btn" onclick="window.print()">印刷 / PDF保存</button>
+
+<div class="sheet-outer">
+  <div class="sheet">
+    <textarea></textarea>
+    <textarea></textarea>
+    <textarea></textarea>
+    <textarea></textarea>
+    <textarea></textarea>
+    <textarea></textarea>
+    <textarea></textarea>
+    <textarea></textarea>
+    <textarea></textarea>
+    <textarea></textarea>
+  </div>
+</div>
+
+<p class="hint">各セルに直接入力（7行まで） → 印刷ボタンでPDF保存または印刷</p>
+
+<script>
+const MAX_LINES = 7;
+document.querySelectorAll('textarea').forEach(ta => {
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (ta.value.split('\n').length >= MAX_LINES) e.preventDefault();
+    }
+  });
+  ta.addEventListener('input', () => {
+    const lines = ta.value.split('\n');
+    if (lines.length > MAX_LINES) {
+      ta.value = lines.slice(0, MAX_LINES).join('\n');
+    }
+  });
+});
+</script>
+
+</body>
+</html>
