@@ -122,23 +122,45 @@
     </div>
   </div>
 
-  <div class="diagram">
-    <svg viewBox="0 0 460 160" xmlns="http://www.w3.org/2000/svg">
-      <text x="105" y="14" text-anchor="middle" font-size="11" fill="#666">元のPDF</text>
-      <rect x="5" y="20" width="200" height="130" rx="3" fill="#fff" stroke="#ccc" stroke-width="1"/>
-      <rect x="12" y="28" width="80" height="114" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
-      <text x="52" y="88" text-anchor="middle" font-size="11" fill="#3b82f6">伝票</text>
-      <line x1="105" y1="28" x2="105" y2="142" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
-      <text x="230" y="80" text-anchor="middle" font-size="20" fill="#4a6cf7">→</text>
-      <text x="230" y="98" text-anchor="middle" font-size="10" fill="#4a6cf7" id="arrowLabel">110mm</text>
-      <text x="355" y="14" text-anchor="middle" font-size="11" fill="#666">変換後</text>
-      <rect x="255" y="20" width="200" height="130" rx="3" fill="#fff" stroke="#ccc" stroke-width="1"/>
-      <line x1="355" y1="28" x2="355" y2="142" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
-      <rect x="362" y="28" width="80" height="114" rx="2" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
-      <text x="402" y="88" text-anchor="middle" font-size="11" fill="#16a34a">伝票</text>
-      <text x="310" y="88" text-anchor="middle" font-size="10" fill="#aaa">剥がし済み</text>
+  <!-- 図はA4横(297mm)に対する伝票幅110mmの実寸比（scale 0.5: 1mm=0.5px） -->
+  <div class="diagram" id="diagramSplit">
+    <svg viewBox="0 0 530 150" xmlns="http://www.w3.org/2000/svg">
+      <text x="79" y="14" text-anchor="middle" font-size="11" fill="#666">元のPDF（伝票2面）</text>
+      <rect x="5" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
+      <rect x="7" y="23" width="51" height="99" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+      <text x="32.5" y="77" text-anchor="middle" font-size="10" fill="#3b82f6">伝票A</text>
+      <rect x="62" y="23" width="51" height="99" rx="2" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
+      <text x="87.5" y="77" text-anchor="middle" font-size="10" fill="#b45309">伝票B</text>
+      <text x="178" y="70" text-anchor="middle" font-size="18" fill="#4a6cf7">→</text>
+      <text x="178" y="88" text-anchor="middle" font-size="9" fill="#4a6cf7">分割</text>
+      <text x="279" y="14" text-anchor="middle" font-size="11" fill="#666">1ページ目</text>
+      <rect x="205" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
+      <text x="233" y="77" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
+      <rect x="262" y="23" width="51" height="99" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+      <text x="287.5" y="77" text-anchor="middle" font-size="10" fill="#3b82f6">伝票A</text>
+      <text x="444" y="14" text-anchor="middle" font-size="11" fill="#666">2ページ目</text>
+      <rect x="370" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
+      <text x="398" y="77" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
+      <rect x="427" y="23" width="51" height="99" rx="2" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
+      <text x="452.5" y="77" text-anchor="middle" font-size="10" fill="#b45309">伝票B</text>
     </svg>
-    <div class="diagram-caption" id="diagramCaption">左側を剥がした用紙の右側に印刷できるようにずらします</div>
+    <div class="diagram-caption">分割して右寄せ: 2面入りページを1面ずつに分割し、すべて右側ラベルの位置に配置します</div>
+  </div>
+  <div class="diagram" id="diagramOffset" style="margin-top:-8px">
+    <svg viewBox="0 0 530 150" xmlns="http://www.w3.org/2000/svg">
+      <text x="156" y="14" text-anchor="middle" font-size="11" fill="#666">元のPDF（伝票1面）</text>
+      <rect x="82" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
+      <rect x="84" y="23" width="51" height="99" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+      <text x="109.5" y="77" text-anchor="middle" font-size="10" fill="#3b82f6">伝票</text>
+      <text x="255" y="70" text-anchor="middle" font-size="18" fill="#4a6cf7">→</text>
+      <text x="255" y="88" text-anchor="middle" font-size="9" fill="#4a6cf7" id="arrowLabel">110mm</text>
+      <text x="356" y="14" text-anchor="middle" font-size="11" fill="#666">変換後</text>
+      <rect x="282" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
+      <text x="310" y="77" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
+      <rect x="339" y="23" width="51" height="99" rx="2" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
+      <text x="364.5" y="77" text-anchor="middle" font-size="10" fill="#16a34a">伝票</text>
+    </svg>
+    <div class="diagram-caption">ずらしのみ: 左詰めの伝票を右に110mm移動します</div>
   </div>
 
   <button class="btn btn-primary" id="convertBtn" disabled>変換してダウンロード</button>
@@ -161,15 +183,12 @@ const debugEl = document.getElementById('debugInfo');
 const arrowLabel = document.getElementById('arrowLabel');
 const modeSelect = document.getElementById('modeSelect');
 const pageTargetEl = document.getElementById('pageTarget');
-const diagramCaption = document.getElementById('diagramCaption');
+const diagramSplit = document.getElementById('diagramSplit');
+const diagramOffset = document.getElementById('diagramOffset');
 const noteText = document.getElementById('noteText');
 
 let selectedFile = null;
 
-const CAPTIONS = {
-  split: '2面入りの各ページを左スリップ・右スリップに分割し、それぞれ右寄せで出力します',
-  offset: '左側を剥がした用紙の右側に印刷できるようにずらします',
-};
 const NOTES = {
   split: '<strong>使い方（分割モード）:</strong> 1ページに伝票2面が入ったPDFを選択 → オフセット量を確認（既定110mm）→ 変換ボタンで分割PDFをダウンロード。各ページが右側のラベルに印刷されます。',
   offset: '<strong>使い方（ずらしのみ）:</strong> 1件分の伝票が左詰めで入ったPDFを選択 → オフセット量を確認（既定110mm）→ 変換ボタンで右にずらしたPDFをダウンロード。そのまま印刷すれば右側のラベルに印刷されます。',
@@ -177,9 +196,11 @@ const NOTES = {
 
 function updateModeUI() {
   const mode = modeSelect.value;
-  diagramCaption.textContent = CAPTIONS[mode];
   noteText.innerHTML = NOTES[mode];
   pageTargetEl.disabled = (mode === 'split');
+  // 選択中モードの図を強調、もう一方は薄く表示
+  diagramSplit.style.opacity = (mode === 'split') ? '1' : '0.35';
+  diagramOffset.style.opacity = (mode === 'offset') ? '1' : '0.35';
 }
 
 modeSelect.addEventListener('change', updateModeUI);
