@@ -54,6 +54,18 @@
     border-radius: 6px; font-size: 14px; outline: none; transition: border-color .2s;
   }
   .field input:focus, .field select:focus { border-color: #4a6cf7; }
+
+  .mode-buttons { display: flex; gap: 10px; }
+  .mode-btn {
+    flex: 1; padding: 14px 12px; border: 2px solid #d0d5dd; border-radius: 8px;
+    background: #fff; font-size: 16px; font-weight: 700; color: #555;
+    cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+    font-family: inherit; text-align: center;
+  }
+  .mode-btn span { display: block; font-size: 11px; font-weight: 400; color: #888; margin-top: 4px; }
+  .mode-btn:hover { border-color: #a5b4fc; }
+  .mode-btn.active { border-color: #4a6cf7; background: #f5f7ff; color: #4a6cf7; }
+  .mode-btn.active span { color: #6b83f8; }
   .unit { font-size: 12px; color: #888; margin-top: 2px; }
 
   .diagram {
@@ -103,10 +115,10 @@
   <div class="settings">
     <div class="field" style="flex-basis:100%">
       <label>モード</label>
-      <select id="modeSelect">
-        <option value="split">分割して右寄せ（2面→2ページ）</option>
-        <option value="offset">ずらしのみ（既存動作）</option>
-      </select>
+      <div class="mode-buttons">
+        <button type="button" class="mode-btn active" data-mode="split">分割して右寄せ<span>2面入りPDFを1面ずつ右寄せに（推奨）</span></button>
+        <button type="button" class="mode-btn" data-mode="offset">ずらしのみ<span>全体を右に移動するだけ（従来動作）</span></button>
+      </div>
     </div>
     <div class="field">
       <label>オフセット量</label>
@@ -181,7 +193,7 @@ const convertBtn = document.getElementById('convertBtn');
 const statusEl = document.getElementById('status');
 const debugEl = document.getElementById('debugInfo');
 const arrowLabel = document.getElementById('arrowLabel');
-const modeSelect = document.getElementById('modeSelect');
+const modeBtns = document.querySelectorAll('.mode-btn');
 const pageTargetEl = document.getElementById('pageTarget');
 const diagramSplit = document.getElementById('diagramSplit');
 const diagramOffset = document.getElementById('diagramOffset');
@@ -194,16 +206,18 @@ const NOTES = {
   offset: '<strong>使い方（ずらしのみ）:</strong> 1件分の伝票が左詰めで入ったPDFを選択 → オフセット量を確認（既定110mm）→ 変換ボタンで右にずらしたPDFをダウンロード。そのまま印刷すれば右側のラベルに印刷されます。',
 };
 
+let currentMode = 'split';
+
 function updateModeUI() {
-  const mode = modeSelect.value;
-  noteText.innerHTML = NOTES[mode];
-  pageTargetEl.disabled = (mode === 'split');
-  // 選択中モードの図を強調、もう一方は薄く表示
-  diagramSplit.style.opacity = (mode === 'split') ? '1' : '0.35';
-  diagramOffset.style.opacity = (mode === 'offset') ? '1' : '0.35';
+  noteText.innerHTML = NOTES[currentMode];
+  pageTargetEl.disabled = (currentMode === 'split');
+  modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === currentMode));
+  // 選択中モードの見本だけを表示
+  diagramSplit.style.display = (currentMode === 'split') ? '' : 'none';
+  diagramOffset.style.display = (currentMode === 'offset') ? '' : 'none';
 }
 
-modeSelect.addEventListener('change', updateModeUI);
+modeBtns.forEach(b => b.addEventListener('click', () => { currentMode = b.dataset.mode; updateModeUI(); }));
 updateModeUI();
 
 offsetMm.addEventListener('input', () => { arrowLabel.textContent = offsetMm.value + 'mm'; });
@@ -266,7 +280,7 @@ convertBtn.addEventListener('click', async () => {
 
     const offset = parseFloat(offsetMm.value);
     const offsetPt = offset * (72 / 25.4);
-    const mode = modeSelect.value;
+    const mode = currentMode;
     const pageTarget = pageTargetEl.value;
 
     const srcPageIndices = srcDoc.getPageIndices();
