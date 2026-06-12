@@ -137,24 +137,29 @@
   <!-- 図はA4横(297mm)に対する伝票幅110mmの実寸比（scale 0.5: 1mm=0.5px） -->
   <div class="diagram" id="diagramSplit">
     <svg viewBox="0 0 530 150" xmlns="http://www.w3.org/2000/svg">
+      <!-- 伝票: 高さは用紙の75%で上寄せ、幅は実寸比+6%、実物（福山通運is-x）に合わせたオレンジ配色 -->
       <text x="79" y="14" text-anchor="middle" font-size="11" fill="#666">元のPDF（伝票2面）</text>
       <rect x="5" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
-      <rect x="7" y="23" width="51" height="99" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
-      <text x="32.5" y="77" text-anchor="middle" font-size="10" fill="#3b82f6">伝票A</text>
-      <rect x="62" y="23" width="51" height="99" rx="2" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
-      <text x="87.5" y="77" text-anchor="middle" font-size="10" fill="#b45309">伝票B</text>
+      <rect x="7" y="23" width="54" height="77" rx="2" fill="#fff7ed" stroke="#f97316" stroke-width="1.2"/>
+      <rect x="8" y="24" width="52" height="7" fill="#fb923c"/>
+      <text x="34" y="68" text-anchor="middle" font-size="10" fill="#c2410c">伝票A</text>
+      <rect x="65" y="23" width="54" height="77" rx="2" fill="#fff7ed" stroke="#f97316" stroke-width="1.2"/>
+      <rect x="66" y="24" width="52" height="7" fill="#fb923c"/>
+      <text x="92" y="68" text-anchor="middle" font-size="10" fill="#c2410c">伝票B</text>
       <text x="178" y="70" text-anchor="middle" font-size="18" fill="#4a6cf7">→</text>
       <text x="178" y="88" text-anchor="middle" font-size="9" fill="#4a6cf7">分割</text>
       <text x="279" y="14" text-anchor="middle" font-size="11" fill="#666">1ページ目</text>
       <rect x="205" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
-      <text x="233" y="77" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
-      <rect x="262" y="23" width="51" height="99" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
-      <text x="287.5" y="77" text-anchor="middle" font-size="10" fill="#3b82f6">伝票A</text>
+      <text x="233" y="68" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
+      <rect x="262" y="23" width="54" height="77" rx="2" fill="#fff7ed" stroke="#f97316" stroke-width="1.2"/>
+      <rect x="263" y="24" width="52" height="7" fill="#fb923c"/>
+      <text x="289" y="68" text-anchor="middle" font-size="10" fill="#c2410c">伝票A</text>
       <text x="444" y="14" text-anchor="middle" font-size="11" fill="#666">2ページ目</text>
       <rect x="370" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
-      <text x="398" y="77" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
-      <rect x="427" y="23" width="51" height="99" rx="2" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
-      <text x="452.5" y="77" text-anchor="middle" font-size="10" fill="#b45309">伝票B</text>
+      <text x="398" y="68" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
+      <rect x="427" y="23" width="54" height="77" rx="2" fill="#fff7ed" stroke="#f97316" stroke-width="1.2"/>
+      <rect x="428" y="24" width="52" height="7" fill="#fb923c"/>
+      <text x="454" y="68" text-anchor="middle" font-size="10" fill="#c2410c">伝票B</text>
     </svg>
     <div class="diagram-caption">分割して右寄せ: 2面入りページを1面ずつに分割し、すべて右側ラベルの位置に配置します</div>
   </div>
@@ -162,15 +167,17 @@
     <svg viewBox="0 0 530 150" xmlns="http://www.w3.org/2000/svg">
       <text x="156" y="14" text-anchor="middle" font-size="11" fill="#666">元のPDF（伝票1面）</text>
       <rect x="82" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
-      <rect x="84" y="23" width="51" height="99" rx="2" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
-      <text x="109.5" y="77" text-anchor="middle" font-size="10" fill="#3b82f6">伝票</text>
+      <rect x="84" y="23" width="54" height="77" rx="2" fill="#fff7ed" stroke="#f97316" stroke-width="1.2"/>
+      <rect x="85" y="24" width="52" height="7" fill="#fb923c"/>
+      <text x="111" y="68" text-anchor="middle" font-size="10" fill="#c2410c">伝票</text>
       <text x="255" y="70" text-anchor="middle" font-size="18" fill="#4a6cf7">→</text>
       <text x="255" y="88" text-anchor="middle" font-size="9" fill="#4a6cf7" id="arrowLabel">110mm</text>
       <text x="356" y="14" text-anchor="middle" font-size="11" fill="#666">変換後</text>
       <rect x="282" y="20" width="148.5" height="105" rx="2" fill="#fff" stroke="#ccc" stroke-width="1"/>
-      <text x="310" y="77" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
-      <rect x="339" y="23" width="51" height="99" rx="2" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
-      <text x="364.5" y="77" text-anchor="middle" font-size="10" fill="#16a34a">伝票</text>
+      <text x="310" y="68" text-anchor="middle" font-size="9" fill="#aaa">剥がし済み</text>
+      <rect x="339" y="23" width="54" height="77" rx="2" fill="#fff7ed" stroke="#f97316" stroke-width="1.2"/>
+      <rect x="340" y="24" width="52" height="7" fill="#fb923c"/>
+      <text x="366" y="68" text-anchor="middle" font-size="10" fill="#c2410c">伝票</text>
     </svg>
     <div class="diagram-caption">ずらしのみ: 左詰めの伝票を右に110mm移動します</div>
   </div>
