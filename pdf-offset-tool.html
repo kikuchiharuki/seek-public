@@ -132,6 +132,12 @@
         <option value="first">1ページ目のみ</option>
       </select>
     </div>
+    <div class="field" id="oddField" style="flex-basis:100%">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="oddCount" style="width:18px;height:18px;cursor:pointer">
+        奇数件 — 最後の白紙ページを除く
+      </label>
+    </div>
   </div>
 
   <!-- 図はA4横(297mm)に対する伝票幅110mmの実寸比（scale 0.5: 1mm=0.5px） -->
@@ -205,6 +211,8 @@ const pageTargetEl = document.getElementById('pageTarget');
 const diagramSplit = document.getElementById('diagramSplit');
 const diagramOffset = document.getElementById('diagramOffset');
 const noteText = document.getElementById('noteText');
+const oddCountEl = document.getElementById('oddCount');
+const oddField = document.getElementById('oddField');
 
 let selectedFile = null;
 
@@ -220,6 +228,7 @@ function updateModeUI() {
   pageTargetEl.disabled = (currentMode === 'split');
   modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === currentMode));
   // 選択中モードの見本だけを表示
+  oddField.style.display = (currentMode === 'split') ? '' : 'none';
   diagramSplit.style.display = (currentMode === 'split') ? '' : 'none';
   diagramOffset.style.display = (currentMode === 'offset') ? '' : 'none';
 }
@@ -302,12 +311,16 @@ convertBtn.addEventListener('click', async () => {
 
       const ctx = newDoc.context;
 
-      for (let ci = 0; ci < copiedPages.length; ci++) {
-        const page = copiedPages[ci];
-        newDoc.addPage(page);
+      const skipLastRight = oddCountEl.checked;
 
+      for (let ci = 0; ci < copiedPages.length; ci++) {
         const srcIdx = Math.floor(ci / 2);
         const isLeft = (ci % 2 === 0);
+
+        if (skipLastRight && !isLeft && srcIdx === srcPageIndices.length - 1) continue;
+
+        const page = copiedPages[ci];
+        newDoc.addPage(page);
 
         const rotateObj = page.node.get(PDFName.of('Rotate'));
         const rotation = rotateObj ? (typeof rotateObj.asNumber === 'function' ? rotateObj.asNumber() : Number(rotateObj)) : 0;
