@@ -112,6 +112,10 @@
     <div class="filename" id="fileName"></div>
   </div>
 
+  <div class="note" id="noteText">
+    <strong>使い方:</strong> 1件分の伝票が左詰めで入ったPDFを選択 → オフセット量を確認（既定110mm）→ 変換ボタンで右にずらしたPDFをダウンロード。そのまま印刷すれば右側のラベルに印刷されます。
+  </div>
+
   <div class="settings">
     <div class="field" style="flex-basis:100%">
       <label>モード</label>
@@ -119,6 +123,12 @@
         <button type="button" class="mode-btn active" data-mode="split">複数件<span>2面入りPDFを1面ずつ右寄せに</span></button>
         <button type="button" class="mode-btn" data-mode="offset">1件のみ<span>1件だけの伝票を右寄せに</span></button>
       </div>
+    </div>
+    <div class="field" id="oddField" style="flex-basis:100%">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="oddCount" style="width:18px;height:18px;cursor:pointer">
+        奇数件 — 最後が白紙ページになるのを防ぐ
+      </label>
     </div>
     <div class="field">
       <label>オフセット量</label>
@@ -131,12 +141,6 @@
         <option value="all">全ページ</option>
         <option value="first">1ページ目のみ</option>
       </select>
-    </div>
-    <div class="field" id="oddField" style="flex-basis:100%">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0">
-        <input type="checkbox" id="oddCount" style="width:18px;height:18px;cursor:pointer">
-        奇数件 — 最後の白紙ページを除く
-      </label>
     </div>
   </div>
 
@@ -191,10 +195,6 @@
   <button class="btn btn-primary" id="convertBtn" disabled>変換してダウンロード</button>
   <div class="status" id="status"></div>
   <div class="debug-info" id="debugInfo"></div>
-
-  <div class="note" id="noteText">
-    <strong>使い方:</strong> 1件分の伝票が左詰めで入ったPDFを選択 → オフセット量を確認（既定110mm）→ 変換ボタンで右にずらしたPDFをダウンロード。そのまま印刷すれば右側のラベルに印刷されます。
-  </div>
 </div>
 
 <script>
