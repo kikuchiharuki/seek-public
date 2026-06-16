@@ -1,0 +1,2736 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSV整形ツール</title>
+<!-- xlsx-js-style: SheetJS 0.18.5互換 + セル背景色/フォント/罫線などのスタイル出力対応 -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.2.0/encoding.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; background: #f5f7fa; color: #333; }
+
+.app-header {
+  background: #2c3e50; color: #fff; padding: 12px 24px;
+  display: flex; align-items: center; gap: 16px;
+}
+.app-header h1 { font-size: 18px; font-weight: 600; }
+.app-header .step-indicator {
+  display: flex; gap: 4px; margin-left: auto; font-size: 13px;
+}
+.app-header .step {
+  padding: 4px 12px; border-radius: 12px; background: rgba(255,255,255,0.15);
+}
+.app-header .step.active { background: #3498db; font-weight: 600; }
+.app-header .step.done { background: #27ae60; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+/* Drop zone */
+.drop-zone {
+  border: 3px dashed #bdc3c7; border-radius: 12px; padding: 60px 20px;
+  text-align: center; background: #fff; cursor: pointer;
+  transition: all 0.2s;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: #3498db; background: #ebf5fb;
+}
+.drop-zone-icon { font-size: 48px; margin-bottom: 12px; }
+.drop-zone-text { font-size: 16px; color: #666; }
+.drop-zone-text strong { color: #3498db; }
+.drop-zone-sub { font-size: 13px; color: #999; margin-top: 8px; }
+.drop-zone input[type="file"] { display: none; }
+
+/* ファイルを変更ボタン（元データ欄の右端） */
+.btn-reset {
+  background: none; border: 1px solid #e74c3c; color: #e74c3c;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  white-space: nowrap;
+}
+.btn-reset:hover { background: #e74c3c; color: #fff; }
+
+/* 元データセクション */
+.raw-section {
+  display: none; background: #fff; border-radius: 8px; padding: 20px;
+  margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.raw-section.visible { display: block; }
+/* 変換後は1行に折りたたむ（ヘッダー行だけ残す・コンパクト表示） */
+.raw-section.collapsed { padding: 4px 20px; }
+.raw-section.collapsed .table-wrapper,
+.raw-section.collapsed .mapping-section,
+.raw-section.collapsed .mapping-badge,
+.raw-section.collapsed #btnToggleMapping { display: none; }
+.raw-section.collapsed .raw-header { margin-bottom: 0; }
+.raw-section.collapsed .raw-header h2 { font-size: 14px; }
+.raw-section.collapsed .btn-convert {
+  padding: 5px 16px; font-size: 13px; box-shadow: none;
+}
+.raw-section.collapsed .btn-reset { padding: 4px 12px; font-size: 12px; }
+.raw-header {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.raw-header h2 { font-size: 16px; cursor: pointer; user-select: none; }
+.raw-header h2:hover { color: #3498db; }
+.count-badge { font-size: 13px; color: #666; font-weight: normal; }
+.raw-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.mapping-badge { font-size: 12px; }
+.mapping-badge.ok { color: #27ae60; }
+.mapping-badge.warn { color: #e67e22; font-weight: 600; }
+.btn-link {
+  background: none; border: none; color: #3498db; cursor: pointer;
+  font-size: 13px; text-decoration: underline; padding: 4px;
+}
+.btn-link:hover { color: #2980b9; }
+.btn-convert {
+  background: #27ae60; color: #fff; border: none; padding: 12px 36px;
+  border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(39,174,96,0.4);
+}
+.btn-convert:hover { background: #229954; }
+.btn-convert:disabled { background: #bdc3c7; box-shadow: none; cursor: not-allowed; }
+.ship-date-label {
+  font-size: 13px; color: #444; display: flex; align-items: center; gap: 6px;
+  font-weight: 600;
+}
+/* 出荷日の日付ボックス: 隣の「出荷日を設定」ボタンと同じ青背景・同じ高さ(41px)に揃える */
+.ship-date-label input {
+  height: 41px; box-sizing: border-box;
+  padding: 0 10px; border: none; border-radius: 6px; font-size: 14px;
+  font-family: inherit; font-weight: 600;
+  background: #3498db; color: #fff; cursor: pointer;
+  color-scheme: dark;  /* カレンダーアイコンも白系にする */
+  min-width: 140px;    /* テキスト部分も十分クリックできる幅を確保 */
+}
+
+/* 複数ファイル時の元データ見出し */
+.raw-file-title {
+  font-size: 14px; font-weight: 600; margin: 16px 0 6px; color: #444;
+}
+.raw-file-title:first-child { margin-top: 0; }
+
+/* Column mapping（raw-section内の折りたたみ） */
+.mapping-section {
+  display: none; border: 1px solid #e0e0e0; border-radius: 8px;
+  padding: 16px; margin-bottom: 12px; background: #fcfcfc;
+}
+.mapping-section.visible { display: block; }
+.mapping-section .mapping-desc { font-size: 13px; color: #666; margin-bottom: 16px; }
+
+/* マッピングのファイル切り替えタブ（複数ファイル時のみ表示） */
+.file-tabs { display: none; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.file-tabs.visible { display: flex; }
+.file-tab {
+  padding: 6px 14px; border: 1px solid #ddd; border-radius: 6px;
+  background: #f0f0f0; cursor: pointer; font-size: 13px;
+}
+.file-tab.active { background: #3498db; color: #fff; border-color: #3498db; font-weight: 600; }
+.file-tab.warn { border-color: #e67e22; color: #e67e22; }
+.file-tab.active.warn { background: #e67e22; color: #fff; }
+
+.mapping-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.mapping-item {
+  border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px;
+  background: #fafafa;
+}
+.mapping-item.mapped { border-color: #27ae60; background: #f0faf0; }
+.mapping-item.unmapped { border-color: #e67e22; background: #fef9f0; }
+.mapping-item.auto-mapped { border-color: #3498db; background: #f0f7fe; }
+.mapping-item label {
+  display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;
+}
+.mapping-item .required-badge {
+  font-size: 11px; color: #e74c3c; font-weight: normal; margin-left: 4px;
+}
+.mapping-item .optional-badge {
+  font-size: 11px; color: #999; font-weight: normal; margin-left: 4px;
+}
+.mapping-item select {
+  width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;
+  font-size: 13px; background: #fff;
+}
+.mapping-item .sample-data {
+  font-size: 11px; color: #888; margin-top: 4px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+.mapping-actions {
+  margin-top: 16px; display: flex; gap: 12px; align-items: center;
+}
+.btn-primary {
+  background: #3498db; color: #fff; border: none; padding: 10px 28px;
+  border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.btn-primary:hover { background: #2980b9; }
+.btn-primary:disabled { background: #bdc3c7; cursor: not-allowed; }
+.btn-secondary {
+  background: #fff; color: #333; border: 1px solid #ddd; padding: 10px 28px;
+  border-radius: 6px; font-size: 14px; cursor: pointer;
+}
+.btn-secondary:hover { background: #f5f5f5; }
+
+.mapping-status { font-size: 13px; color: #666; margin-left: auto; }
+
+/* 変換結果のヘッダーは少し小さめ */
+.preview-section .data-table th { font-size: 12px; }
+
+/* 変換結果ヘッダー（タイトル + 出荷日/印刷ボタン） */
+.preview-header {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.preview-header h2 { margin-bottom: 0; }
+.edit-hint { font-size: 11px; color: #999; font-weight: normal; margin-left: 8px; }
+.preview-actions {
+  margin-left: auto; display: flex; align-items: center; gap: 10px;
+}
+
+/* 編集可能セル */
+.data-table td[contenteditable]:hover { box-shadow: inset 0 0 0 1px #3498db55; cursor: text; }
+.data-table td[contenteditable]:focus {
+  outline: 2px solid #3498db; outline-offset: -2px; background: #fffdf0 !important;
+}
+
+/* 印刷専用ヘッダー（画面では非表示） */
+.print-only { display: none; }
+
+/* ───────── 印刷レイアウト（A4横） ───────── */
+@media print {
+  @page { size: A4 landscape; margin: 5mm; }
+  *:not(html):not(body) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { -webkit-print-color-adjust: economy !important; print-color-adjust: economy !important;
+    background: #fff !important; background-color: #fff !important; }
+  .app-header, .drop-zone, .file-info, .raw-section,
+  .preview-header, .toast, #invoiceSection, .del-col, .mail-overlay { display: none !important; }
+  .container { max-width: none; padding: 0 !important; margin: 0 !important; }
+  .preview-section { box-shadow: none !important; border: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; background: none !important; }
+  .print-only { display: block !important; margin: 0 !important; padding: 0 !important; }
+  /* 1行目: 出荷日見出し */
+  #printHeader {
+    font-size: 33px; font-weight: 700; color: rgb(10, 150, 255);
+    text-align: center; margin: 0 0 4px 0 !important; padding: 0 !important;
+  }
+  /* 2行目: 商品別の個数 */
+  #printSummary {
+    font-size: 27px; font-weight: 700; color: #ff0000;
+    text-align: right; margin: 0 0 6px 0 !important; padding: 0 !important;
+  }
+  /* 画面用の青い集計バーは印刷しない（印刷は上のprintSummaryを使う） */
+  #summaryBar { display: none !important; }
+  .summary-notes { display: none !important; }
+  .table-wrapper { overflow: visible; max-height: none; }
+  /* テーブルは画面と同じレイアウトのまま、印刷時にzoomで全列を1ページ幅に縮小する
+     （Excelの「すべての列を1ページに印刷」と同じ。倍率はbeforeprintでJSが計算） */
+  /* 枠線: 全セル統一の細い黒線（0.5pxでExcel印刷に近い太さ） */
+  .data-table th, .data-table td { border: 0.5px solid #000 !important; }
+  /* 列名: 背景なし・黒文字・太字解除 */
+  .data-table th { position: static; background: none !important; color: #000 !important; font-weight: normal !important; }
+  /* 全体: フォント縮小・行高さ90% */
+  .data-table { font-size: 11px; }
+  .data-table td { line-height: 14px; height: 29px; box-sizing: border-box; }
+  .data-table th { line-height: 14px; height: 29px; }
+  .data-table td, .data-table th { padding-left: 4px; padding-right: 4px; }
+  .data-table tr { break-inside: avoid; }
+  /* #・数量・日付・都道府県列: 文字80%に縮小 */
+  .data-table th.row-num, .data-table td.row-num,
+  .data-table th[data-k="quantity"], .data-table td[data-k="quantity"],
+  .data-table th[data-k="requestDate"], .data-table td[data-k="requestDate"],
+  .data-table th[data-k="deliveryDate"], .data-table td[data-k="deliveryDate"],
+  .data-table th[data-k="shipDate"], .data-table td[data-k="shipDate"],
+  .data-table th[data-k="prefecture"], .data-table td[data-k="prefecture"] {
+    font-size: 80%;
+  }
+}
+
+/* Preview table */
+.preview-section {
+  display: none; background: #fff; border-radius: 8px; padding: 20px;
+  margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.preview-section.visible { display: block; }
+.preview-section h2 { font-size: 16px; margin-bottom: 12px; }
+
+.table-wrapper { overflow-x: auto; max-height: 500px; overflow-y: auto; }
+.preview-section .table-wrapper { max-height: none; }
+.data-table {
+  width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap;
+}
+.data-table th {
+  background: #34495e; color: #fff; padding: 8px 6px; text-align: left;
+  position: sticky; top: 0; z-index: 1; vertical-align: bottom;
+}
+/* 縦線あり（Excelの枠線と同じくらいの色） */
+.data-table td { padding: 6px 6px; border: 1px solid #d4d4d4; }
+.data-table th { border: 1px solid #4a5d70; }
+.data-table tr:hover td { background: #f5f8ff; }
+.data-table .row-num { color: #999; text-align: center; width: 40px; }
+
+/* 複数ファイル時のファイル区切り行（VBA版のファイル名行を再現） */
+.data-table tr.file-sep-row td {
+  background: #eef2f7; font-weight: 700; font-size: 14px;
+  padding: 10px 12px; border-top: 2px solid #cbd5e0; color: #2c3e50;
+}
+.data-table tr.file-sep-row:hover td { background: #eef2f7; }
+/* 複数ファイル時にtbody内へ繰り返し出す列名行（stickyにしない） */
+.data-table tr.col-head-row th { position: static; }
+/* 行削除ボタン列（枠線・背景なし。印刷には出さない） */
+.data-table .del-col {
+  border: none !important; background: none !important; padding: 0 2px; width: 26px;
+}
+.row-del {
+  border: none; background: none; cursor: pointer; font-size: 13px;
+  opacity: 0.4; padding: 2px;
+}
+.row-del:hover { opacity: 1; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; background: #333; color: #fff;
+  padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 1000;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; pointer-events: auto; cursor: pointer; }
+.toast.error { background: #e74c3c; }
+.toast.success { background: #27ae60; }
+
+/* ── 設定ビューア モーダル ── */
+.cfg-btn {
+  background: none; border: 1px solid rgba(255,255,255,0.3); color: #ccc;
+  padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+.cfg-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.cfg-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 2000; justify-content: center; align-items: start; padding: 30px;
+  overflow-y: auto;
+}
+.cfg-overlay.open { display: flex; }
+.cfg-modal {
+  background: #fff; border-radius: 10px; width: 100%; max-width: 1100px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25); overflow: hidden;
+}
+.cfg-modal-header {
+  display: flex; align-items: center; padding: 16px 24px;
+  background: #2c3e50; color: #fff;
+}
+.cfg-modal-header h2 { font-size: 17px; margin: 0; }
+.cfg-close {
+  margin-left: auto; background: none; border: none; color: #fff;
+  font-size: 22px; cursor: pointer; padding: 4px 8px; opacity: 0.7;
+}
+.cfg-close:hover { opacity: 1; }
+.cfg-tabs {
+  display: flex; gap: 0; border-bottom: 2px solid #e0e0e0; background: #f8f8f8;
+}
+.cfg-tab {
+  padding: 10px 22px; cursor: pointer; font-size: 13px; font-weight: 600;
+  border-bottom: 2px solid transparent; margin-bottom: -2px; color: #666;
+}
+.cfg-tab:hover { color: #333; }
+.cfg-tab.active { color: #3498db; border-bottom-color: #3498db; }
+.cfg-panel { display: none; padding: 20px 24px; }
+.cfg-panel.active { display: block; }
+.cfg-panel h3 {
+  font-size: 14px; color: #2c3e50; margin: 20px 0 8px; padding-bottom: 4px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.cfg-panel h3:first-child { margin-top: 0; }
+.cfg-table {
+  width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px;
+}
+.cfg-table th {
+  background: #f0f3f6; padding: 7px 10px; text-align: left; font-weight: 600;
+  border: 1px solid #d4d4d4; white-space: nowrap; color: #2c3e50;
+}
+.cfg-table td {
+  padding: 7px 10px; border: 1px solid #d4d4d4; vertical-align: top;
+}
+.cfg-table tr:hover td { background: #f9fbff; }
+.cfg-tag {
+  display: inline-block; background: #eaf2fb; color: #2c7be5; padding: 2px 8px;
+  border-radius: 4px; font-size: 12px; margin: 1px 2px;
+}
+.cfg-tag.green { background: #e6f9ed; color: #1a7f37; }
+.cfg-tag.orange { background: #fff3e0; color: #e65100; }
+.cfg-tag.red { background: #ffeaea; color: #d32f2f; }
+.cfg-note { font-size: 12px; color: #888; margin-top: -10px; margin-bottom: 14px; }
+
+/* ── メール文モーダル ── */
+.mail-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 2000; justify-content: center; align-items: center;
+}
+.mail-overlay.open { display: flex; }
+.mail-modal {
+  background: #fff; border-radius: 10px; width: 540px; max-width: calc(100vw - 40px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3); overflow: hidden;
+}
+.mail-modal-header {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  background: #2c3e50; color: #fff;
+}
+.mail-close {
+  background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;
+  padding: 2px 6px; opacity: 0.75; flex-shrink: 0; line-height: 1;
+}
+.mail-close:hover { opacity: 1; }
+.mail-modal-header h3 { font-size: 15px; margin: 0; flex: 1; }
+.btn-copy {
+  background: #3498db; color: #fff; border: 1px solid #2980b9;
+  padding: 5px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600;
+  flex-shrink: 0; transition: background 0.15s;
+}
+.btn-copy:hover { background: #2980b9; }
+.btn-copy.copied { background: #27ae60; border-color: #219a52; }
+.mail-body { padding: 16px 20px 20px; }
+.mail-preview {
+  font-family: 'Meiryo', 'Hiragino Sans', sans-serif; font-size: 14px; line-height: 1.75;
+  border: 1px solid #d8d8d8; border-radius: 6px; padding: 14px 18px;
+  background: #fafafa; color: #222; min-height: 160px; max-height: 420px; overflow-y: auto;
+}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1>CSV整形ツール</h1>
+  <div class="step-indicator">
+    <span class="step active" id="step1">1. 読み込み</span>
+    <span class="step" id="step2">2. 元データ確認</span>
+    <span class="step" id="step3">3. 変換結果</span>
+  </div>
+  <button class="cfg-btn" id="btnOpenConfig">⚙ 設定一覧</button>
+</div>
+
+<div class="container">
+  <!-- File drop zone -->
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-zone-icon">📁</div>
+    <div class="drop-zone-text">
+      ファイルをドラッグ&ドロップ、または<strong>クリックして選択</strong>
+    </div>
+    <div class="drop-zone-sub">CSV (.csv) / Excel (.xlsx, .xls) に対応 ｜ 複数ファイル同時OK（最大5ファイル）</div>
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple>
+  </div>
+
+  <!-- 元データ + 変換ボタン -->
+  <div class="raw-section" id="rawSection">
+    <div class="raw-header">
+      <h2 id="rawTitle" title="クリックで開閉"><span id="rawToggleIcon">▾</span> 元データ <span id="rawCount" class="count-badge"></span></h2>
+      <div class="raw-actions">
+        <span class="mapping-badge" id="mappingBadge"></span>
+        <button class="btn-link" id="btnToggleMapping">列マッピングを確認・編集 ▸</button>
+        <button class="btn-convert" id="btnApplyMapping">⚡ 変換する</button>
+        <button class="btn-reset" id="btnReset">ファイルを変更</button>
+      </div>
+    </div>
+    <!-- 列マッピング（普段は非表示。自動認識できない列があるときだけ自動で開く） -->
+    <div class="mapping-section" id="mappingSection">
+      <div class="mapping-desc">
+        出力に必要な列と、読み込んだファイルの列の対応付けです。
+        自動認識された列は青枠で表示されます。認識できなかった列は手動で選択してください。
+      </div>
+      <div class="file-tabs" id="mappingTabs"></div>
+      <div class="mapping-grid" id="mappingGrid"></div>
+      <div class="mapping-actions">
+        <button class="btn-secondary" id="btnAutoMap">自動認識やり直し</button>
+        <div class="mapping-status" id="mappingStatus"></div>
+      </div>
+    </div>
+    <div class="table-wrapper" id="rawTableWrapper"></div>
+  </div>
+
+  <!-- 変換結果 -->
+  <div class="preview-section" id="previewSection">
+    <div class="preview-header">
+      <h2>変換結果 <span id="previewCount" style="font-size:13px;color:#666;font-weight:normal;"></span>
+        <span class="edit-hint">※ セルはクリックして直接修正できます</span>
+      </h2>
+      <div class="preview-actions">
+        <label class="ship-date-label">出荷日
+          <input type="date" id="shipDate">
+        </label>
+        <button class="btn-primary" id="btnApplyShipDate">📅 出荷日を設定</button>
+        <button class="btn-secondary" id="btnExcel">📥 Excel保存</button>
+        <button class="btn-secondary" id="btnMailText">✉ メール文</button>
+        <button class="btn-secondary" id="btnInvoiceCsv">🚚 送り状CSV</button>
+        <button class="btn-secondary" id="btnPrint">🖨 印刷</button>
+      </div>
+    </div>
+    <div class="print-only" id="printHeader"></div>
+    <div class="print-only" id="printSummary"></div>
+    <div class="table-wrapper" id="tableWrapper"></div>
+  </div>
+
+  <!-- 送り状CSVプレビュー（編集してからダウンロードする） -->
+  <div class="preview-section" id="invoiceSection">
+    <div class="preview-header">
+      <h2>🚚 福山通運用 送り状CSVプレビュー <span id="invoiceCount" style="font-size:13px;color:#666;font-weight:normal;"></span>
+        <span class="edit-hint">※ セルはクリックして直接修正できます。修正してから下のボタンで保存</span>
+      </h2>
+      <div class="preview-actions">
+        <button class="btn-primary" id="btnInvoiceDownload">📥 CSVをダウンロード</button>
+        <button class="btn-secondary" id="btnInvoiceClose">✖ 閉じる</button>
+      </div>
+    </div>
+    <div id="invoiceNotes" style="font-size:13px;color:#666;margin-bottom:4px;"></div>
+    <div id="invoiceHint" style="font-size:13px;color:#666;margin-bottom:8px;">
+      ※ 時間指定をする場合のみ: 輸送商品１に「100」、輸送商品２に時間帯コード
+      （110=10時～12時 / 112=12時～14時 / 114=14時～16時 / 116=16時～18時 / 118=18時～20時）を入力。
+      通常は両方とも空欄のまま
+    </div>
+    <div class="table-wrapper" id="invoiceTableWrapper"></div>
+  </div>
+</div>
+
+<!-- メール文モーダル -->
+<div class="mail-overlay" id="mailOverlay">
+  <div class="mail-modal">
+    <div class="mail-modal-header">
+      <button class="mail-close" id="mailClose">&times;</button>
+      <h3>✉ メール文</h3>
+      <button class="btn-copy" id="btnCopyMail">コピー</button>
+    </div>
+    <div class="mail-body">
+      <div class="mail-preview" id="mailPreview"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 設定ビューア モーダル -->
+<div class="cfg-overlay" id="cfgOverlay">
+  <div class="cfg-modal">
+    <div class="cfg-modal-header">
+      <h2>⚙ 設定一覧（CONFIG）</h2>
+      <button class="cfg-close" id="cfgClose">&times;</button>
+    </div>
+    <div class="cfg-tabs" id="cfgTabs">
+      <div class="cfg-tab active" data-tab="cfgProduct">製品マスタ</div>
+      <div class="cfg-tab" data-tab="cfgRules">変換ルール</div>
+      <div class="cfg-tab" data-tab="cfgInvoice">送り状CSV設定</div>
+    </div>
+    <div class="cfg-panel active" id="cfgProduct"></div>
+    <div class="cfg-panel" id="cfgRules"></div>
+    <div class="cfg-panel" id="cfgInvoice"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// ★★★ 設定データベース ★★★
+// 新しいCSVフォーマット・製品・ルールが増えたら、原則ここだけ編集する。
+// 各セクションの説明は csv-formatter/README.md にも記載。
+// ════════════════════════════════════════════════════════════
+const CONFIG = {
+
+  // ──────────────────────────────────────────────
+  // ⓪ 一度に読み込めるファイル数の上限
+  // ──────────────────────────────────────────────
+  maxFiles: 5,
+
+  // ──────────────────────────────────────────────
+  // ① 出力列の定義（この順番で出力される / 最終形）
+  //    required: true  = マッピング必須の列
+  //    computed: true  = 処理中に自動生成される列（マッピング不要）
+  // ──────────────────────────────────────────────
+  outputColumns: [
+    { key: 'product',      label: '商品',               required: true  },
+    { key: 'quantity',     label: '数量',               required: true  },
+    { key: 'requestDate',  label: '配送依頼日',         required: true  },
+    { key: 'deliveryDate', label: '指定納期',           required: true  },
+    { key: 'shipDate',     label: '出荷日',             computed: true  },
+    { key: 'companyName',  label: '販売先会社名',       required: true  },
+    { key: 'phone1',       label: '電話番号1',          required: true  },
+    { key: 'postalCode',   label: '郵便番号',           required: true  },
+    { key: 'prefecture',   label: '都道府県',           required: false },
+    { key: 'address',      label: '市区町村郡町名番地', required: true  },
+    { key: 'building',     label: '建物名など',         required: false },
+    { key: 'carrier',      label: '運送会社',           computed: true  },
+    { key: 'duplicate',    label: '重複',               computed: true  },
+  ],
+
+  // ──────────────────────────────────────────────
+  // ② 列名エイリアス（入力ファイルの列名 → 内部キー）
+  //    新フォーマットで列名が違う場合はここに追加する。
+  //    現在対応: ジェット形式 / ruum形式
+  // ──────────────────────────────────────────────
+  columnAliases: {
+    product:      ['商品', '商品名'],
+    quantity:     ['数量'],
+    requestDate:  ['配送依頼日', '建物管理配送依頼日'],
+    deliveryDate: ['指定納期'],
+    companyName:  ['販売先会社名', '業者名'],
+    phone1:       ['電話番号1'],
+    phone2:       ['電話番号2'],
+    contactPhone: ['担当者連絡先番号', '担当者連絡先'],
+    inquiryPhone: ['問合せ電話番号'],
+    postalCode:   ['郵便番号'],
+    prefecture:   ['都道府県'],
+    city:         ['市区町村郡'],
+    town:         ['町名'],
+    block:        ['番地'],
+    building:     ['建物名など'],
+    address:      ['住所', '市区町村郡町名番地'],
+  },
+
+  // ──────────────────────────────────────────────
+  // ③ 電話番号の優先順位（上から順にデータが入っている最初のものを採用）
+  //    ※ 問合せ電話番号は空白のことが多いため最低優先
+  // ──────────────────────────────────────────────
+  phonePriority: ['phone1', 'contactPhone', 'phone2', 'inquiryPhone'],
+  invalidPhoneValues: ['', '-', '--', '---', 'なし', '無', '不明'],
+
+  // ──────────────────────────────────────────────
+  // ④ 製品ルール（商品名に応じた特殊処理）
+  //    新製品の特殊ルールはここに追加する
+  // ──────────────────────────────────────────────
+  productRules: [
+    {
+      // 対象の商品名（複数指定可。完全一致で判定）
+      productNames: ['ジェット＆ビーズ', 'ジェット＆ディフューザー'],
+      description: '会社名の先頭に「大東建託リーシング株式会社」+改行、末尾に「店」を追加',
+      companyPrefix: '大東建託リーシング株式会社\n',
+      companySuffix: '店',
+      skipIfCompanyIncludes: '大東建託リーシング株式会社',  // 重複実行対策
+    },
+  ],
+
+  // ──────────────────────────────────────────────
+  // ⑤ ファイルソース自動判定ルール（送り状CSV出力時に荷送人コード等を上書き）
+  //    filenameKeywords: ファイル名にこのいずれかが含まれる
+  //    signatureColumns: ファイルのヘッダー列にこのいずれかが存在する
+  //    → どちらか一方に該当したらそのソースと判定し invoiceOverrides を適用する
+  // ──────────────────────────────────────────────
+  fileSourceRules: [
+    {
+      source: 'DKPORTAL',
+      description: 'ＤＫ　ＰＯＲＴＡＬファイル判定（荷送人コードを580Cに上書き）',
+      filenameKeywords: ['DKPORTAL'],
+      signatureColumns: ['受注確認№', '受注明細№', 'ベンダーＣＤ', '建物管理配送依頼日', '配送伝票番号', '問合せ電話番号'],
+      invoiceOverrides: { 荷送人コード: '08002001580C' },
+    },
+  ],
+
+  // ──────────────────────────────────────────────
+  // ⑥ 運送会社の自動判定ルール
+  //    checkFields のいずれかに keywords のいずれかが含まれたら carrier を設定
+  // ──────────────────────────────────────────────
+  carrierRules: [
+    {
+      carrier: 'ゆうパック',
+      description: '沖縄・那覇向けはゆうパック',
+      keywords: ['沖縄', '那覇'],
+      checkFields: ['prefecture', 'address'],
+    },
+  ],
+
+  // ──────────────────────────────────────────────
+  // ⑥ 重複注文の統合キー
+  //    これが全て一致した行は数量を合算して1行にまとめる（重複列に「数量合算」）
+  //    ※ 統合はファイル単位で行う（ファイルをまたいで統合しない）
+  // ──────────────────────────────────────────────
+  duplicateMergeKeys: ['product', 'deliveryDate', 'companyName', 'address'],
+
+  // ──────────────────────────────────────────────
+  // ⑦ 会社名の改行ルール（このいずれかの後で改行を入れる）
+  //    ㈱+半角スペース / ㈱+全角スペース（例: 大東建託パートナーズ㈱　熊本営業所）
+  // ──────────────────────────────────────────────
+  companyLineBreakMarkers: ['㈱ ', '㈱　', '大東建託パートナーズ ', '大東建託パートナーズ　'],
+
+  // ──────────────────────────────────────────────
+  // ⑧ 条件付き書式（色ルール）
+  // ──────────────────────────────────────────────
+  colors: {
+    emptyCell:       '#ff5d5d',   // 必須セルが空白 → 赤
+    quantityHigh:    '#99ff66',   // 数量2以上 → 緑（太字）
+    yupackRow:       '#ffccff',   // ゆうパック行 → ピンク
+    yupackText:      '#ff0000',   // ゆうパックの文字 → 赤太字
+    deliveryChanged: '#ffff00',   // リードタイム的に間に合わず指定納期を変更したセル → 黄色
+    overLength:      '#ffd591',   // 送り状ソフトの文字数上限超過セル → 橙（警告・保存はできる）
+  },
+
+  // 空白チェック対象列（空白だと赤色表示になる列）
+  // 郵便番号: API取得でも埋まらなかった行に気付けるように / 市区町村郡町名番地も必須
+  emptyCheckColumns: ['product', 'requestDate', 'deliveryDate', 'companyName', 'phone1', 'prefecture', 'postalCode', 'address'],
+
+  // ──────────────────────────────────────────────
+  // ⑨ リードタイム・出荷日・納期チェック（福山通運 焼津支店発）
+  //    指定納期に間に合わない行は納期を最短着日に変更し黄色表示する
+  //    リードタイムデータ本体は下の LEADTIME 定数（lead-time.html 由来）
+  // ──────────────────────────────────────────────
+  leadTime: {
+    enabled: true,
+    holidayApiUrl: 'https://holidays-jp.github.io/api/v1/date.json',
+    skipIfCarrierSet: true,   // ゆうパック等、運送会社が確定した行は福通LTチェック対象外
+  },
+
+  // ──────────────────────────────────────────────
+  // ⑩ 郵便番号の自動取得（郵便番号が空白の行のみ）
+  //    HeartRails Geo API（無料・ブラウザから直接呼べる）
+  // ──────────────────────────────────────────────
+  zipcode: {
+    enabled: true,
+    apiUrl: 'https://geoapi.heartrails.com/api/json?method=suggest&matching=like&keyword=',
+    requestIntervalMs: 150,   // API負荷軽減の待ち時間
+  },
+
+  // ──────────────────────────────────────────────
+  // ⑩-2 住所分割（ExcelAPI / Cloudflare Workers プロキシ経由）
+  //    送り状CSV生成時に住所を分割して 住所1/2/3 にバランス良く配置する
+  //    proxyUrl を設定すると有効、空文字なら従来通り（住所1=都道府県, 住所2=合算住所）
+  //    Worker コード: csv-formatter/cloudflare-worker/lookup.js
+  //    デプロイ手順: csv-formatter/docs/Cloudflare-Worker-デプロイ手順.md
+  // ──────────────────────────────────────────────
+  addressLookup: {
+    enabled: true,
+    proxyUrl: 'https://excelapi-proxy.bhk565haru.workers.dev/lookup',
+    requestIntervalMs: 200,   // ExcelAPI負荷軽減（元Excel版と同じ間隔）
+    maxRetries: 3,            // 取得失敗時のリトライ回数（元Excel版と同じ）
+    retryWaitMs: 500,         // リトライ間の待機
+  },
+
+  // ──────────────────────────────────────────────
+  // ⑪ 送り状CSV出力（福山通運 送り状発行ソフト エントリーデータ）
+  //    「🚚 送り状CSV」ボタンで変換結果から生成する。
+  //    マスタ（荷送人・品名記事・固定値）はここで管理する。
+  //    旧Excel運用のマスタCSV（製品と荷送人マスタ.csv 等）に相当。
+  // ──────────────────────────────────────────────
+  invoiceCsv: {
+    // 出力ファイル名（{M}=月, {D}=日。日付は出荷日）
+    filenamePattern: '{M}月{D}日出荷日分CSVエントリーデータ.csv',
+    includeHeader: true,        // 1行目に列名行を出すか（ソフト側の取込設定に合わせる）
+    encoding: 'SJIS',           // 送り状ソフトはWindows用のためShift-JIS（UTF8も指定可）
+    dateFormat: 'yyyymmdd',     // 配達指定日・出荷日付・登録日付は8桁数字（iS-2でyyyy/mm/ddはエラーになる）
+    excludeCarriers: ['ゆうパック'],  // 福山通運以外で送る行は出力しない
+
+    // 出力列（この順番・この名称で出力される。送り状ソフトの取込仕様）
+    columns: [
+      '荷受人コード', '電話番号', '住所', '住所2', '住所3', '名前', '名前2',
+      '郵便番号', '特殊計', '着店コード', '荷送人コード', '個数', '才数', '重量',
+      '輸送商品１', '輸送商品２', '品名記事1', '品名記事2', '品名記事3',
+      '配達指定日', 'お客様管理番号', '予備', '元払区分', '保険金額',
+      '出荷日付', '登録日付',
+    ],
+
+    // ── 必須項目（空白だとプレビューで赤表示になり、CSVダウンロードできない）──
+    requiredColumns: [
+      '電話番号', '住所', '住所2', '名前', '郵便番号', '荷送人コード',
+      '個数', '配達指定日', '出荷日付', '元払区分', '品名記事1',
+    ],
+
+    // ── 文字数制限（全角換算）。超過するとプレビューで橙表示（保存はできる）──
+    //    現在の対象ソフト = 福山通運 **iS-2**（docs/送り状CSV仕様.md より）
+    //    ※ iS-X は品名記事が全角9と短い。将来両対応する場合は、ソフト切替時に
+    //      ここの '品名記事1/2/3' の値を 15→9 にする想定（productMaster側にも持たせる予定）
+    lengthLimits: {
+      '住所': 20, '住所2': 20, '住所3': 20,
+      '名前': 20, '名前2': 20,
+      '品名記事1': 15, '品名記事2': 15, '品名記事3': 15,  // iS-2: 全角15 / iS-X: 全角9
+    },
+
+    // ── 固定値マスタ（固定値マスタ.csv 相当。通常空白、元払区分のみ1=元払）──
+    fixedValues: {
+      '荷受人コード': '', '特殊計': '', '着店コード': '', '才数': '', '重量': '',
+      'お客様管理番号': '', '予備': '', '元払区分': '1', '保険金額': '',
+      '輸送商品１': '', '輸送商品２': '',
+    },
+
+    // ══ 製品マスタ（PLHD様/福山通運。2026-06-12受領の実データ）══
+    //    製品と荷送人マスタ + 製品と品名記事マスタを1つの表に統合。
+    //    【修正・追加はこの表を書き換えるだけ】1製品 = 1ブロック {...}。全製品が同じ項目。
+    //    ・製品名: 複数書ける（表記ゆれ対応。＆/& の全角半角は自動で同一視）
+    //    ・荷送人コード: 先頭0を保持するため必ず '引用符' で囲む
+    //    ・まとめ梱包: 1 = まとめない（1行=送り状1件、個数=数量のまま）
+    //                  2 = 2ケースずつ1梱包にまとめて送り状を分割
+    //                      （例: 数量5 →「2ケース1梱包」2件 + 1ケース1件 の計3件、各行の個数=1）
+    //                  3にすれば3ケースずつ。まとめた行の品名記事2は「まとめ梱包の品名記事2」になる
+    productMaster: [
+      {
+        製品名: ['ニオイしま栓！'],
+        荷送人名: '大東建託パートナーズ株式会社',
+        荷送人コード: '08002001580A',
+        品名記事1: 'ﾆｵｲしま栓！1L10本入',
+        品名記事2: '蒸発防止剤・航空機搭載可能',
+        品名記事3: '取扱注意',
+        まとめ梱包: 2,
+        まとめ梱包の品名記事2: '2ケース1梱包',
+        保険金額: '5',
+      },
+      {
+        製品名: ['ジェット＆ディフューザー'],
+        荷送人名: '大東建託リーシング株式会社',
+        荷送人コード: '08002001580B',
+        品名記事1: '抗菌ﾌﾚｸﾞﾗﾝｽｼﾞｪｯﾄ&ﾘｰﾄﾞﾃﾞｨﾌｭｰｻﾞｰ',
+        品名記事2: '【航空機搭載不可】各30入ｾｯﾄ',
+        品名記事3: '取扱注意',
+        まとめ梱包: 1,
+        まとめ梱包の品名記事2: '',
+        保険金額: '5',
+      },
+      {
+        // ※ジェット＆ビーズは受領した表に無かったため品名記事1を旧仕様例から、
+        //   荷送人コードはリーシングと同じBで仮置き。要確認
+        製品名: ['ジェット＆ビーズ'],
+        荷送人名: '大東建託リーシング株式会社',
+        荷送人コード: '08002001580B',
+        品名記事1: '抗菌ﾌﾚｸﾞﾗﾝｽｼﾞｪｯﾄ&ﾋﾞｰｽﾞ',
+        品名記事2: '【航空機搭載不可】各30入ｾｯﾄ',
+        品名記事3: '取扱注意',
+        まとめ梱包: 1,
+        まとめ梱包の品名記事2: '',
+        保険金額: '5',
+      },
+      {
+        製品名: ['ruum REED DIFFUSER GOLD LABEL'],
+        荷送人名: 'ＤＫ　ＰＯＲＴＡＬショップ',
+        荷送人コード: '08002001580C',
+        品名記事1: 'ruumﾘｰﾄﾞﾃﾞｨﾌｭｰｻﾞｰ',
+        品名記事2: '(本体100ml・ｽﾃｨｯｸ5本)×30個',
+        品名記事3: '取扱注意',
+        まとめ梱包: 1,
+        まとめ梱包の品名記事2: '',
+        保険金額: '5',
+      },
+    ],
+
+    // ── 輸送商品コード時間指定マスタ（輸送商品コード時間指定マスタ.csv 相当）──
+    //    現在の入力データに時間指定列が無いため未使用（輸送商品１/２は固定値の空白）。
+    //    時間指定を扱うようになったらここに追加する。
+    //    例: { timeSpec: '時間指定10時～12時', code: '○○', product1: '○○', product2: '○○' }
+    timeCodeMaster: [],
+  },
+
+  // ──────────────────────────────────────────────
+  // 都道府県リスト（結合住所からの都道府県分割に使用）
+  // ──────────────────────────────────────────────
+  prefectures: [
+    '北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県',
+    '茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県',
+    '新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県',
+    '静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県',
+    '奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県',
+    '徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県',
+    '熊本県','大分県','宮崎県','鹿児島県','沖縄県',
+  ],
+};
+
+// ════════════════════════════════════════════════════════════
+// 福山通運 焼津支店発 リードタイムデータ（seek-public/lead-time.html 由来）
+// p: 都道府県リスト（このデータ独自の並び順）
+// d: [都道府県index, 市区町村郡名, LTコード("1"/"2AM"等), 例外地区名, 備考]
+// ※ データ更新時は lead-time.html から再生成すること（手編集しない）
+// ════════════════════════════════════════════════════════════
+const LEADTIME={"p":["北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県","茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県","新潟県","富山県","石川県","福井県","山梨県","長野県","静岡県","愛知県","岐阜県","三重県","滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県","徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県"],"d":[[0,"三笠市","5"],[0,"上川郡","5"],[0,"上砂川町","5"],[0,"上磯郡","5"],[0,"中川郡","5"],[0,"久遠郡","5"],[0,"亀田郡","5"],[0,"二海郡","5"],[0,"伊達市","5"],[0,"余市郡","5"],[0,"共和町","4"],[0,"函館市","5"],[0,"利尻郡","5"],[0,"勇払郡","5"],[0,"北広島市","4"],[0,"北斗市","5"],[0,"北見市","5"],[0,"十勝郡浦幌町","5"],[0,"十勝郡厚内","5"],[0,"千歳市","5"],[0,"占冠村","5"],[0,"厚岸郡","5"],[0,"古宇郡","5"],[0,"古平郡","4"],[0,"名寄市","5"],[0,"喜茂別町","5"],[0,"増毛郡","5"],[0,"士別市","5"],[0,"夕張市","4"],[0,"夕張郡","5"],[0,"天塩郡","5"],[0,"奈井江町","5"],[0,"奥尻郡","5"],[0,"宗谷郡","5"],[0,"室蘭市","5"],[0,"富良野市","5"],[0,"寿都郡","5"],[0,"小樽市","4"],[0,"山越郡","5"],[0,"岩内町","5"],[0,"岩見沢市","5"],[0,"島牧郡","5"],[0,"川上郡","5"],[0,"帯広市","5"],[0,"常呂郡","5"],[0,"幌泉郡","4"],[0,"広尾郡","5"],[0,"恵庭市","5"],[0,"斜里郡","5"],[0,"新冠郡","5"],[0,"日高郡","5"],[0,"旭川市","5"],[0,"月形町","5"],[0,"有珠郡","5"],[0,"札幌市手稲区","5"],[0,"札幌市","4"],[0,"札幌市","4"],[0,"松前郡","5"],[0,"枝幸郡","5"],[0,"根室市","5"],[0,"様似郡","5"],[0,"標津郡","5"],[0,"樺戸郡","5"],[0,"檜山郡","4"],[0,"歌志内市","5"],[0,"江別市","4"],[0,"池田町","5"],[0,"沙流郡","5"],[0,"河東郡","5"],[0,"河西郡","5"],[0,"洞爺湖町","5"],[0,"浦河郡","5"],[0,"深川市","5"],[0,"滝川市","5"],[0,"瀬棚郡","5"],[0,"爾志郡","5"],[0,"留寿都村","5"],[0,"留萌市","5"],[0,"留萌郡","5"],[0,"登別市","5"],[0,"白糠郡","5"],[0,"白老郡","5"],[0,"目梨郡","5"],[0,"真狩村","5"],[0,"石狩市厚田区","5"],[0,"石狩市浜益区","5"],[0,"石狩市","5"],[0,"砂川市","5"],[0,"磯谷郡","4"],[0,"礼文郡","5"],[0,"稚内市","5"],[0,"積丹郡","5"],[0,"空知郡","5"],[0,"紋別市","5"],[0,"紋別郡","4"],[0,"網走市","5"],[0,"網走郡","5"],[0,"美唄市","5"],[0,"芦別市","5"],[0,"苫前郡","5"],[0,"苫小牧市","5"],[0,"茅部郡","5"],[0,"虻田郡","4"],[0,"豊浦町","5"],[0,"赤平市","5"],[0,"足寄郡","5"],[0,"野付郡","5"],[0,"釧路市","5"],[0,"釧路郡","5"],[0,"阿寒郡","5"],[0,"雨竜郡","5"],[1,"つがる市","3"],[1,"むつ市","3AM"],[1,"七戸町","3"],[1,"三戸郡","3"],[1,"三沢市","3AM"],[1,"上北郡","3AM"],[1,"下北郡","3"],[1,"中津軽郡","3"],[1,"五所川原市","3"],[1,"八戸市南郷区","3"],[1,"八戸市","3AM"],[1,"六ヶ所村","3AM"],[1,"北津軽郡","3"],[1,"十和田市","3"],[1,"南津軽郡","3"],[1,"平川市","3AM"],[1,"弘前市","3AM"],[1,"東北町","3"],[1,"東津軽郡","3"],[1,"板柳町","3AM"],[1,"横浜町","3AM"],[1,"西津軽郡","3"],[1,"野辺地町","2"],[1,"青森市","3AM"],[1,"黒石市","3AM"],[2,"一関市","3AM"],[2,"上閉伊郡","3AM"],[2,"下閉伊郡","2"],[2,"久慈市","3AM"],[2,"九戸村","3"],[2,"二戸市","3AM"],[2,"二戸郡","3"],[2,"八幡平市","3"],[2,"北上市","3AM"],[2,"和賀郡","3"],[2,"大船渡市","3"],[2,"奥州市江刺区","3AM"],[2,"奥州市","3AM"],[2,"宮古市","2"],[2,"山田町","3AM"],[2,"岩手郡","3"],[2,"気仙郡","3"],[2,"洋野町","3"],[2,"滝沢市","3AM"],[2,"盛岡市","3AM"],[2,"紫波郡","3AM"],[2,"胆沢郡","3AM"],[2,"花巻市","2"],[2,"西磐井郡","3AM"],[2,"軽米町","2"],[2,"遠野市","3"],[2,"野田村","3"],[2,"釜石市","3AM"],[2,"陸前高田","3"],[3,"七ヶ浜町","2AM"],[3,"亘理郡","2AM"],[3,"仙台市若林区","2AM"],[3,"仙台市泉区","2AM"],[3,"仙台市","2AM"],[3,"伊具郡","2AM"],[3,"刈田郡","2AM"],[3,"利府町","2AM"],[3,"加美郡","2"],[3,"名取市","2AM"],[3,"塩竃市","2AM"],[3,"多賀城市","2AM"],[3,"大崎市","2AM"],[3,"富谷市","2AM"],[3,"岩沼市","2AM"],[3,"本吉郡南三陸町","2"],[3,"東松島市","2AM"],[3,"松島町","2AM"],[3,"柴田郡","2AM"],[3,"栗原市","2AM"],[3,"気仙沼市","2AM"],[3,"牡鹿郡","2"],[3,"登米市","2AM"],[3,"白石市","2AM"],[3,"石巻市","2AM"],[3,"角田市","2AM"],[3,"遠田郡","2AM"],[3,"黒川郡","2"],[4,"にかほ市","3"],[4,"仙北市","3"],[4,"仙北郡","3"],[4,"北秋田市","3AM"],[4,"北秋田郡","3"],[4,"南秋田郡","3PM"],[4,"大仙市","3AM"],[4,"大館市","3AM"],[4,"山本郡","3"],[4,"横手市","3AM"],[4,"湯沢市","3AM"],[4,"潟上市","3PM"],[4,"由利本荘市","3AM"],[4,"男鹿市","3PM"],[4,"秋田市","3AM"],[4,"能代市","3"],[4,"雄勝郡","3"],[4,"鹿角市","3AM"],[4,"鹿角郡","3AM"],[5,"上山市","2AM"],[5,"北村山郡","2AM"],[5,"南陽市","2AM"],[5,"天童市","2AM"],[5,"寒河江市","2AM"],[5,"尾花沢市","2AM"],[5,"山形市","2AM"],[5,"新庄市","2AM"],[5,"最上郡","2AM"],[5,"朝日町","5"],[5,"村山市","2AM"],[5,"東村山郡","2AM"],[5,"東根市","2AM"],[5,"東田川郡","2AM"],[5,"東置賜郡","2AM"],[5,"米沢市","2AM"],[5,"西川町","5"],[5,"西村山郡","2AM"],[5,"西置賜郡","2"],[5,"酒田市","2AM"],[5,"長井市","2AM"],[5,"飽海郡","2AM"],[5,"鶴岡市","2AM"],[6,"いわき市","1"],[6,"二本松市","1AM"],[6,"伊達市","1AM"],[6,"伊達郡","1AM"],[6,"会津若松市","1PM"],[6,"南会津郡","1"],[6,"南相馬市","1"],[6,"双葉郡","7"],[6,"喜多方市","1"],[6,"大沼郡","1"],[6,"安達郡","1"],[6,"岩瀬郡","1AM"],[6,"平田村","1"],[6,"本宮市","1"],[6,"東白河郡","1"],[6,"河沼郡","1"],[6,"田村市","1"],[6,"田村郡","1"],[6,"白河市","1PM"],[6,"相馬市","1"],[6,"相馬郡","1"],[6,"石川郡","1"],[6,"福島市","1AM"],[6,"耶麻郡","1"],[6,"西白河郡","1AM"],[6,"郡山市","1"],[6,"郡山市","1AM"],[6,"鏡石町","1"],[6,"須賀川市","1"],[7,"かすみがうら市","1"],[7,"つくばみらい市","1"],[7,"つくば市","1AM"],[7,"ひたちなか市","1"],[7,"下妻市","1"],[7,"久慈郡","1"],[7,"北相馬郡","2"],[7,"北茨城市","1"],[7,"取手市","1"],[7,"古河市","1AM"],[7,"土浦市","1AM"],[7,"坂東市","1AM"],[7,"守谷市","1AM"],[7,"小美玉市","1"],[7,"常総市","1AM"],[7,"常陸大宮市","1"],[7,"常陸太田市","1"],[7,"日立市","1"],[7,"東茨城郡","1"],[7,"桜川市","1"],[7,"水戸市","1"],[7,"河内町","1"],[7,"潮来市","1"],[7,"牛久市","1"],[7,"猿島郡","1AM"],[7,"石岡市","1"],[7,"神栖市","1"],[7,"稲敷市","1"],[7,"稲敷郡河内町","1"],[7,"笠間市","1"],[7,"筑西市","1"],[7,"結城市","1"],[7,"結城郡","1"],[7,"美浦村","1"],[7,"行方市","1"],[7,"那珂市","1"],[7,"那珂郡","1"],[7,"鉾田市","1"],[7,"阿見町","1"],[7,"高萩市","1"],[7,"鹿嶋市","1"],[7,"龍ヶ崎市","2"],[8,"さくら市","1AM"],[8,"下都賀郡","1AM"],[8,"下野市","1"],[8,"佐野市","1AM"],[8,"塩谷町","1AM"],[8,"大田原市","1AM"],[8,"宇都宮市","1AM"],[8,"小山市","1AM"],[8,"日光市","1"],[8,"栃木市","1AM"],[8,"河内郡","1AM"],[8,"真岡市","1"],[8,"矢板市","1AM"],[8,"芳賀郡","1"],[8,"西方町","1"],[8,"足利市","1AM"],[8,"那珂川町","1"],[8,"那須塩原市","1AM"],[8,"那須烏山市","1"],[8,"那須町","1AM"],[8,"高根沢町","1"],[8,"鹿沼市","1AM"],[9,"みどり市","1"],[9,"伊勢崎市","1"],[9,"佐波郡","1AM"],[9,"利根郡","1"],[9,"前橋市","1AM"],[9,"北群馬郡","1AM"],[9,"千代田町","1"],[9,"吾妻郡","1"],[9,"多野郡","4"],[9,"大泉町","1"],[9,"太田市","1"],[9,"安中市","1"],[9,"富岡市","1"],[9,"明和町","1"],[9,"板倉町","1"],[9,"桐生市","1"],[9,"沼田市","1"],[9,"渋川市","1AM"],[9,"甘楽郡","1"],[9,"群馬郡","1AM"],[9,"藤岡市","1"],[9,"邑楽町","1"],[9,"館林市","1AM"],[9,"高崎市","1AM"],[10,"さいたま市岩槻区、西区","1AM"],[10,"さいたま市中央区","1AM"],[10,"さいたま市浦和区","1AM"],[10,"さいたま市見沼区","1AM"],[10,"さいたま市南区","1AM"],[10,"さいたま市桜区","1AM"],[10,"さいたま市緑区","1AM"],[10,"ふじみ野市","1AM"],[10,"三芳町","1AM"],[10,"三郷市","1AM"],[10,"上尾市","1AM"],[10,"久喜市","1AM"],[10,"児玉郡","1AM"],[10,"入間市","1AM"],[10,"八潮市","1AM"],[10,"加須市","1AM"],[10,"北本市","1AM"],[10,"北足立郡","1AM"],[10,"南埼玉郡","1AM"],[10,"吉川市","1AM"],[10,"吉見町","1AM"],[10,"和光市","1AM"],[10,"坂戸市","1AM"],[10,"大里郡","1AM"],[10,"富士見市","1AM"],[10,"川口市","1AM"],[10,"川島町","1AM"],[10,"川越市","1AM"],[10,"幸手市","1AM"],[10,"志木市","1AM"],[10,"戸田市","1AM"],[10,"所沢市","1AM"],[10,"新座市","1AM"],[10,"日高市","1AM"],[10,"春日部市","1AM"],[10,"朝霞市","1AM"],[10,"本庄市","1AM"],[10,"杉戸町","1AM"],[10,"東松山市","1AM"],[10,"松伏町","1AM"],[10,"桶川市","1AM"],[10,"比企郡","1AM"],[10,"毛呂山町","1AM"],[10,"深谷市","1AM"],[10,"熊谷市","1AM"],[10,"狭山市","1AM"],[10,"白岡市","1AM"],[10,"秩父市","1AM"],[10,"秩父郡","1"],[10,"羽生市","1AM"],[10,"草加市","1AM"],[10,"蓮田市","1AM"],[10,"蕨市","1AM"],[10,"行田市","1AM"],[10,"越生町","1AM"],[10,"越谷市","1AM"],[10,"飯能市","1AM"],[10,"鴻巣市","1AM"],[10,"鶴ヶ島市","1AM"],[11,"いすみ市","1PM"],[11,"九十九里町","1AM"],[11,"佐倉市","1AM"],[11,"八千代市","1AM"],[11,"八街市","1AM"],[11,"勝浦市","2"],[11,"匝瑳市","1AM"],[11,"千葉市花見川区","1AM"],[11,"千葉市中央区","1AM"],[11,"千葉市稲毛区","1AM"],[11,"千葉市美浜区","1AM"],[11,"千葉市若葉区","1AM"],[11,"千葉市緑区","1AM"],[11,"南房総市","2"],[11,"印旛郡","1AM"],[11,"印西市","1AM"],[11,"君津市","2"],[11,"四街道市","1AM"],[11,"多古町","1AM"],[11,"大網白里市","1AM"],[11,"夷隅郡","1PM"],[11,"安房郡","2"],[11,"富津市","2"],[11,"富里市","1AM"],[11,"山武市","1AM"],[11,"市原市","1AM"],[11,"市川市","1AM"],[11,"成田市","1AM"],[11,"我孫子市","1AM"],[11,"旭市","1AM"],[11,"木更津市","1"],[11,"東庄町","1AM"],[11,"東金市","1AM"],[11,"松戸市","1AM"],[11,"柏市","1AM"],[11,"横芝光町","1AM"],[11,"流山市","1AM"],[11,"浦安市","1AM"],[11,"白井市","1AM"],[11,"神崎町","1AM"],[11,"習志野市","1AM"],[11,"船橋市","1AM"],[11,"芝山町","1AM"],[11,"茂原市","1PM"],[11,"袖ヶ浦市","1AM"],[11,"野田市","1AM"],[11,"銚子市","1PM"],[11,"鎌ヶ谷市","1AM"],[11,"長生郡","1PM"],[11,"館山市","2"],[11,"香取市","1AM"],[11,"鴨川市","2"],[12,"あきる野市","1AM"],[12,"三鷹市","1AM"],[12,"世田谷区","1AM"],[12,"中央区","1AM"],[12,"中野区","1AM"],[12,"八王子市","1AM"],[12,"北区","1AM"],[12,"千代田区","1AM"],[12,"台東区","1AM"],[12,"品川区","1AM"],[12,"国分寺市","1AM"],[12,"国立市","1AM"],[12,"墨田区","1AM"],[12,"多摩市","1AM"],[12,"大田区","1AM"],[12,"小平市","1"],[12,"小金井市","1AM"],[12,"府中市","1AM"],[12,"文京区","1AM"],[12,"新宿区","1AM"],[12,"日野市","1AM"],[12,"昭島市","1AM"],[12,"杉並区","1AM"],[12,"東久留米市","1AM"],[12,"東大和市","1AM"],[12,"東村山市","1AM"],[12,"板橋区","1AM"],[12,"武蔵村山市","1AM"],[12,"武蔵野市","1"],[12,"江戸川区","1AM"],[12,"江東区","1AM"],[12,"清瀬市","1AM"],[12,"渋谷区","7","小笠原"],[12,"渋谷区","5","三宅"],[12,"渋谷区","5","八丈"],[12,"渋谷区","5","大島"],[12,"渋谷区","1AM"],[12,"港区","1AM"],[12,"狛江市","1AM"],[12,"町田市","1AM"],[12,"目黒区","1AM"],[12,"福生市","1AM"],[12,"稲城市","1AM"],[12,"立川市","1AM"],[12,"練馬区","1AM"],[12,"羽村市","1AM"],[12,"荒川区","1AM"],[12,"葛飾区","1AM"],[12,"西多摩郡","1"],[12,"西東京市","1"],[12,"調布市","1AM"],[12,"豊島区","1AM"],[12,"足立区","1AM"],[12,"足立区","1AM"],[12,"青梅市","1AM"],[13,"三浦市","1"],[13,"三浦郡","1PM"],[13,"中郡","1AM"],[13,"伊勢原市","1AM"],[13,"南足柄市","1AM"],[13,"厚木市","1AM"],[13,"大和市","1AM"],[13,"小田原市","1AM"],[13,"川崎市","1AM","川崎区東扇島"],[13,"川崎市多摩区","1AM"],[13,"川崎市麻生区","1AM"],[13,"川崎市","1AM"],[13,"平塚市","1AM"],[13,"座間市","1AM"],[13,"愛甲郡","1AM"],[13,"横浜市保土ヶ谷区","1AM"],[13,"横浜市神奈川区","1AM"],[13,"横浜市戸塚区","1AM"],[13,"横浜市港北区","1AM"],[13,"横浜市港南区","1AM"],[13,"横浜市瀬谷区","1AM"],[13,"横浜市磯子区","1AM"],[13,"横浜市都筑区","1AM"],[13,"横浜市金沢区","1AM"],[13,"横浜市鶴見区","1AM"],[13,"横浜市中区","1AM"],[13,"横浜市南区","1AM"],[13,"横浜市南区","1AM"],[13,"横浜市旭区","1AM"],[13,"横浜市栄区","1AM"],[13,"横浜市泉区","1AM"],[13,"横浜市緑区","1AM"],[13,"横浜市緑区","1AM"],[13,"横浜市西区","1AM"],[13,"横須賀市","1AM"],[13,"海老名市","1AM"],[13,"相模原市中央区","1AM"],[13,"相模原市青葉区","1AM"],[13,"秦野市","1AM"],[13,"綾瀬市","1AM"],[13,"茅ヶ崎市","1AM"],[13,"藤沢市","1AM"],[13,"足柄上郡","1AM"],[13,"足柄下郡","1AM"],[13,"逗子市","1PM"],[13,"鎌倉市","1AM"],[13,"高座郡","1AM"],[14,"三島郡","1PM"],[14,"三条市","1PM"],[14,"上越市","1PM"],[14,"中魚沼郡","1AM"],[14,"五泉市","1AM"],[14,"佐渡市","3"],[14,"刈羽郡","1AM"],[14,"加茂市","1AM"],[14,"北蒲原郡","1PM"],[14,"十日町市","1AM"],[14,"南蒲原郡","1PM"],[14,"南魚沼市","1PM"],[14,"南魚沼郡","1PM"],[14,"妙高市","1PM"],[14,"小千谷市","1AM"],[14,"新潟市中央区","1AM"],[14,"新潟市江南区","1AM"],[14,"新潟市秋葉区","1AM"],[14,"新潟市西蒲区","1AM"],[14,"新潟市北区","1PM"],[14,"新潟市南区","1AM"],[14,"新潟市東区","1AM"],[14,"新潟市西区","1AM"],[14,"新発田市","1PM"],[14,"村上市","1PM"],[14,"東蒲原郡","1"],[14,"柏崎市","1AM"],[14,"栗島浦村","1"],[14,"燕市","1AM"],[14,"糸魚川市","1AM"],[14,"胎内市","1PM"],[14,"西蒲原郡","1AM"],[14,"見附市","1PM"],[14,"長岡市","1AM"],[14,"関川村","1"],[14,"阿賀野市","1PM"],[14,"魚沼市","1PM"],[15,"下新川郡","1PM"],[15,"中新川郡","1"],[15,"南砺市","1"],[15,"富山市","1AM"],[15,"射水市","1AM"],[15,"小矢部市","1AM"],[15,"氷見市","1"],[15,"滑川市","1AM"],[15,"砺波市","1AM"],[15,"高岡市","1AM"],[15,"魚津市","1PM"],[15,"黒部市","1PM"],[16,"かほく市","1AM"],[16,"七尾市","1AM"],[16,"加賀市","1"],[16,"小松市","1AM"],[16,"河北郡","1"],[16,"珠洲市","1"],[16,"珠洲郡","1PM"],[16,"白山市","1"],[16,"石川郡","1PM"],[16,"羽咋市","1AM"],[16,"羽咋郡","1"],[16,"能美市","1AM"],[16,"能美郡","1AM"],[16,"輪島市","1"],[16,"野々市市","1AM"],[16,"金沢市","1AM"],[16,"鳳珠郡","1"],[16,"鹿島郡","1AM"],[17,"あわら市","1AM"],[17,"三方上中郡","1AM"],[17,"三方郡","1AM"],[17,"丹生郡","1AM"],[17,"今立郡","1PM"],[17,"勝山市","1"],[17,"南条郡","1PM"],[17,"吉田郡","1AM"],[17,"坂井市","1AM"],[17,"大野市","1"],[17,"大飯郡","2"],[17,"小浜市","1AM"],[17,"敦賀市","1AM"],[17,"福井市","1"],[17,"越前市","1AM"],[17,"鯖江市","1AM"],[18,"上野原市","1AM"],[18,"中央市","1AM"],[18,"中巨摩郡","1AM"],[18,"北杜市","1PM"],[18,"北都留郡","1PM"],[18,"南アルプス市","1AM"],[18,"南巨摩郡","1"],[18,"南都留郡","1PM"],[18,"大月市","1AM"],[18,"富士吉田市","1AM"],[18,"山梨市","1AM"],[18,"東八代郡","1"],[18,"甲州市","1AM"],[18,"甲府市","1AM"],[18,"甲斐市","1AM"],[18,"笛吹市","1AM"],[18,"西八代郡","1AM"],[18,"都留市","1AM"],[18,"韮崎市","1AM"],[19,"上伊那郡","1"],[19,"上水内郡","1"],[19,"上田市","1AM"],[19,"上高井郡","1"],[19,"下伊那郡","1"],[19,"下水内郡","1"],[19,"下高井郡","1"],[19,"中野市","1AM"],[19,"伊那市","1AM"],[19,"佐久市","1AM"],[19,"北佐久郡","1"],[19,"北安曇郡","2"],[19,"千曲市","1AM"],[19,"南佐久郡","1"],[19,"埴科郡","1AM"],[19,"塩尻市","1AM"],[19,"大町市","1"],[19,"安曇野市","1AM"],[19,"小県郡","1"],[19,"小諸市","1AM"],[19,"岡谷市","1AM"],[19,"木曽郡","2"],[19,"東御市","1AM"],[19,"東筑摩郡","1"],[19,"松本市","1"],[19,"松本市","1"],[19,"茅野市","1"],[19,"諏訪市","1AM"],[19,"諏訪郡","1AM"],[19,"長野市","1AM"],[19,"須坂市","1AM"],[19,"飯山市","1AM"],[19,"飯田市","1AM"],[19,"駒ヶ根市","1"],[20,"三島市","1AM"],[20,"下田市","1AM"],[20,"伊東市","1AM"],[20,"伊豆の国市","1AM"],[20,"伊豆市","1AM"],[20,"周智郡","1AM"],[20,"富士宮市","1AM"],[20,"富士市","1AM"],[20,"小山町","1AM"],[20,"島田市","1AM"],[20,"御前崎市","1AM"],[20,"御殿場市","1AM"],[20,"掛川市","1AM"],[20,"榛原郡","1AM"],[20,"沼津市","1","井田"],[20,"沼津市","1","戸田"],[20,"沼津市","1AM"],[20,"浜松市天竜区","1"],[20,"浜松市浜北区","1AM"],[20,"浜松市中区","1AM"],[20,"浜松市北区","1AM"],[20,"浜松市南区","1AM"],[20,"浜松市東区","1AM"],[20,"浜松市西区","1AM"],[20,"清水町","1AM"],[20,"湖西市","1AM"],[20,"焼津市","1AM"],[20,"熱海市","1AM"],[20,"牧之原市","1AM"],[20,"田方郡","1AM"],[20,"磐田市","1AM"],[20,"菊川市","1AM"],[20,"藤枝市","1AM"],[20,"袋井市","1AM"],[20,"裾野市","1AM"],[20,"賀茂郡","1"],[20,"長泉町","1AM"],[20,"静岡市","1AM","清水区蒲原"],[20,"静岡市清水区","1AM"],[20,"静岡市駿河区","1AM"],[20,"静岡市葵区","1AM"],[21,"あま市","1AM"],[21,"一宮市","1AM"],[21,"名古屋市中村区","1AM"],[21,"丹羽郡","1AM"],[21,"今伊勢町","1AM"],[21,"刈谷市","1AM"],[21,"北名古屋市","1AM"],[21,"北方町","1AM"],[21,"北設楽郡","4","豊根村"],[21,"北設楽郡","1"],[21,"半田市","1"],[21,"名古屋市中川区","1AM"],[21,"名古屋市千種区","1AM"],[21,"名古屋市名東区","1AM"],[21,"名古屋市天白区","1AM"],[21,"名古屋市守山区","1AM"],[21,"名古屋市昭和区","1AM"],[21,"名古屋市熱田区","1AM"],[21,"名古屋市熱田区","1AM"],[21,"名古屋市瑞穂区","1AM"],[21,"名古屋市中区","1AM"],[21,"名古屋市北区","1AM"],[21,"名古屋市南区","1AM"],[21,"名古屋市東区","1AM"],[21,"名古屋市港区","1AM"],[21,"名古屋市緑区","1AM"],[21,"名古屋市西区","1AM"],[21,"大府市","1AM"],[21,"安城市","1AM"],[21,"小牧市","1AM"],[21,"尾張旭市","1AM"],[21,"岡崎市","1AM"],[21,"岩倉市","1AM"],[21,"常滑市","1AM"],[21,"弥富市","1AM"],[21,"愛西市","1AM"],[21,"新城市","1"],[21,"日進市","1"],[21,"春日井市","1AM"],[21,"木曽川町","1AM"],[21,"東海市","1AM"],[21,"東郷町","1"],[21,"江南市","1AM"],[21,"津島市","1AM"],[21,"海部郡","1AM"],[21,"清須市","1AM"],[21,"瀬戸市","1PM"],[21,"犬山市","1AM"],[21,"田原市","1"],[21,"知多市","1AM"],[21,"知多郡","1AM"],[21,"知立市","1AM"],[21,"碧南市","1AM"],[21,"稲沢市","1AM"],[21,"蒲郡市","1"],[21,"西加茂郡","1AM"],[21,"西尾市","1AM"],[21,"西春日井郡","1AM"],[21,"豊川市","1AM"],[21,"豊明市","1AM"],[21,"豊根村","1"],[21,"豊橋市","1AM"],[21,"豊田市","1"],[21,"豊田市","1"],[21,"長久手市","1"],[21,"額田郡","1"],[21,"高浜市","1AM"],[22,"下呂市","1AM"],[22,"不破郡","1AM"],[22,"中津川市","1","加子母"],[22,"中津川市","2"],[22,"付知町","1"],[22,"加茂郡","1"],[22,"可児市","1AM"],[22,"可児郡","1AM"],[22,"各務原市","1AM"],[22,"土岐市","1AM"],[22,"坂祝町","1"],[22,"多治見市","1AM"],[22,"大垣市","1AM"],[22,"大野郡","5"],[22,"安八郡","1AM"],[22,"富加町","1AM"],[22,"山県市","1AM"],[22,"岐阜市","1AM"],[22,"恵那市","1"],[22,"揖斐郡","1"],[22,"本巣市","1"],[22,"本巣郡","1"],[22,"海津市","1AM"],[22,"瑞浪市","1AM"],[22,"瑞穂市","1"],[22,"笠置町","2"],[22,"美濃加茂市","1AM"],[22,"美濃市","1AM"],[22,"羽島市","1AM"],[22,"羽島郡","1AM"],[22,"郡上市","1AM"],[22,"関市","1AM"],[22,"飛騨市","1"],[22,"養老郡","1AM"],[22,"高山市","1AM"],[23,"いなべ市","1"],[23,"三重郡","1AM"],[23,"亀山市","1AM"],[23,"伊勢市","1AM"],[23,"伊賀市","1AM"],[23,"北牟婁郡","1"],[23,"南牟婁郡","1"],[23,"名張市","1AM"],[23,"員弁郡","1AM"],[23,"四日市市","1AM"],[23,"多気郡","1AM"],[23,"尾鷲市","1"],[23,"度会郡","1AM"],[23,"志摩市","1"],[23,"松阪市","1AM"],[23,"桑名市","1"],[23,"桑名郡","1"],[23,"津市","1AM"],[23,"熊野市","1"],[23,"鈴鹿市","1AM"],[23,"鳥羽市","1"],[24,"大津市","1AM"],[24,"守山市","1AM"],[24,"彦根市","1AM"],[24,"愛知郡","1AM"],[24,"東近江市","1AM"],[24,"栗東市","1AM"],[24,"湖南市","1AM"],[24,"犬上郡","1AM"],[24,"甲賀市","1"],[24,"米原市","1AM"],[24,"草津市","1AM"],[24,"蒲生郡","1AM"],[24,"近江八幡市","1AM"],[24,"野洲市","1AM"],[24,"長浜市","1AM"],[24,"高島市","1"],[25,"与謝郡","1"],[25,"久世郡","1AM"],[25,"乙訓郡","1AM"],[25,"亀岡市","1"],[25,"京丹後市","1"],[25,"京田辺市","1AM"],[25,"京都市上京区","1AM"],[25,"京都市下京区","1AM"],[25,"京都市中京区","1AM"],[25,"京都市伏見区","1AM"],[25,"京都市右京区","1AM"],[25,"京都市山科区","1AM"],[25,"京都市左京区","1AM"],[25,"京都市東山区","1AM"],[25,"京都市西京区","1AM"],[25,"京都市北区","1AM"],[25,"京都市南区","1AM"],[25,"八幡市","1AM"],[25,"南丹市","1"],[25,"向日市","1AM"],[25,"城陽市","1AM"],[25,"宇治市","1AM"],[25,"宮津市","1"],[25,"木津川市","1"],[25,"相楽郡","1"],[25,"福知山市","1"],[25,"綴喜郡","1AM"],[25,"綾部市","1"],[25,"舞鶴市","1"],[25,"船井郡","1"],[25,"長岡京市","1AM"],[26,"三島郡","1AM"],[26,"堺市中区","1AM"],[26,"交野市","1AM"],[26,"八尾市","1AM"],[26,"堺市南区","1AM"],[26,"南河内郡","1AM"],[26,"吹田市","1AM"],[26,"和泉市","1AM"],[26,"四條畷市","1AM"],[26,"堺市美原区","1AM"],[26,"堺市堺区","1AM"],[26,"大東市","1AM"],[26,"大阪市住之江区","1AM"],[26,"大阪市天王寺区","1AM"],[26,"大阪市東住吉区","1AM"],[26,"大阪市東淀川区","1AM"],[26,"大阪市西淀川区","1AM"],[26,"大阪市阿倍野区","1AM"],[26,"大阪市中央区","1AM"],[26,"大阪市住吉区","1AM"],[26,"大阪市城東区","1AM"],[26,"大阪市大正区","1AM"],[26,"大阪市平野区","1AM"],[26,"大阪市東成区","1AM"],[26,"大阪市此花区","1AM"],[26,"大阪市浪速区","1AM"],[26,"大阪市淀川区","1AM"],[26,"大阪市生野区","1AM"],[26,"大阪市福島区","1AM"],[26,"大阪市西成区","1AM"],[26,"大阪市都島区","1AM"],[26,"大阪市鶴見区","1AM"],[26,"大阪市北区","1AM"],[26,"大阪市北区","1AM"],[26,"大阪市旭区","1AM"],[26,"大阪市港区","1AM"],[26,"大阪市西区","1AM"],[26,"大阪市西区","1AM"],[26,"大阪狭山市","1AM"],[26,"守口市","1AM"],[26,"富田林市","1AM"],[26,"寝屋川市","1AM"],[26,"岸和田市","1AM"],[26,"摂津市","1AM"],[26,"堺市東区","1AM"],[26,"東大阪市","1AM"],[26,"松原市","1AM"],[26,"枚方市","1AM"],[26,"柏原市","1AM"],[26,"池田市","1AM"],[26,"河内長野市","1AM"],[26,"泉佐野市","1AM"],[26,"泉北郡","1AM"],[26,"泉南市","1AM"],[26,"泉南郡","1AM"],[26,"泉大津市","1AM"],[26,"箕面市","1AM"],[26,"羽曳野市","1AM"],[26,"茨木市","1AM"],[26,"藤井寺市","1AM"],[26,"豊中市","1AM"],[26,"豊能郡","1AM"],[26,"貝塚市","1AM"],[26,"門真市","1AM"],[26,"阪南市","1AM"],[26,"高槻市","1AM"],[26,"高石市","1AM"],[27,"たつの市","1AM"],[27,"一宮町","1PM"],[27,"三木市","1AM"],[27,"三田市","1AM"],[27,"丹波市","1"],[27,"丹波篠山市","1AM"],[27,"伊丹市","1AM"],[27,"佐用郡","1AM"],[27,"加古川市","1AM"],[27,"加古郡","1AM"],[27,"加東市","1AM"],[27,"加西市","1AM"],[27,"千種町","1PM"],[27,"南あわじ市","1AM"],[27,"多可郡","1AM"],[27,"姫路市","1AM"],[27,"宝塚市","1AM"],[27,"小野市","1AM"],[27,"尼崎市","1AM"],[27,"山口町","1AM"],[27,"山崎町","1AM"],[27,"川西市","1AM"],[27,"川辺郡","1AM"],[27,"揖保郡","1AM"],[27,"明石市","1AM"],[27,"朝来市","1AM"],[27,"波賀町","1PM"],[27,"洲本市","1AM"],[27,"淡路市","1AM"],[27,"相生市","1AM"],[27,"神崎郡","1AM"],[27,"神戸市中央区","1AM"],[27,"神戸市兵庫区","1AM"],[27,"神戸市垂水区","1AM"],[27,"神戸市東灘区","1AM"],[27,"神戸市長田区","1AM"],[27,"神戸市須磨区","1AM"],[27,"神戸市北区","1AM"],[27,"神戸市灘区","1AM"],[27,"神戸市西区","1AM"],[27,"篠山市","1AM"],[27,"美方郡","2"],[27,"芦屋市","1AM"],[27,"西宮市","1AM","すみれ台"],[27,"西宮市","1AM","北六甲台"],[27,"西宮市","1AM"],[27,"西脇市","1AM"],[27,"豊岡市","1AM"],[27,"赤穂市","1AM"],[27,"赤穂郡","1AM"],[27,"養父市","1AM"],[27,"香美町香住区","1AM"],[27,"高砂市","1AM"],[28,"五條市","1"],[28,"北葛城郡","1AM"],[28,"吉野郡","2"],[28,"大和郡山市","1AM"],[28,"大和高田市","1AM"],[28,"天理市","1AM"],[28,"奈良市","1AM"],[28,"宇陀市","1"],[28,"宇陀郡","1"],[28,"山辺郡","1"],[28,"御所市","1AM"],[28,"桜井市","1AM"],[28,"橿原市","1AM"],[28,"生駒市","1AM"],[28,"生駒郡","1AM"],[28,"磯城郡","1AM"],[28,"葛城市","1AM"],[28,"香芝市","1AM"],[28,"高市郡","1AM"],[29,"みなべ町","2"],[29,"伊都郡","2"],[29,"北山村","2"],[29,"印南町","2PM"],[29,"和歌山市","2"],[29,"太地町","2"],[29,"岩出市","2"],[29,"御坊市","2"],[29,"新宮市","1"],[29,"日高川町","2PM"],[29,"日高町","2PM"],[29,"有田市","2"],[29,"有田郡","2"],[29,"橋本市","2"],[29,"海南市","2"],[29,"海草郡","2"],[29,"田辺市","2"],[29,"由良町","2PM"],[29,"紀の川市","2"],[29,"美浜町","2PM"],[29,"西牟婁郡","2"],[29,"那智勝浦町","2"],[30,"倉吉市","2"],[30,"八頭郡","2"],[30,"境港市","2"],[30,"岩美郡","2"],[30,"日野郡","2"],[30,"東伯郡","2"],[30,"米子市","2"],[30,"西伯郡","2"],[30,"鳥取市","2"],[31,"仁多郡","2PM"],[31,"出雲市","2"],[31,"大田市","2AM"],[31,"安来市","2"],[31,"川本町","2"],[31,"松江市","2"],[31,"江津市","2AM"],[31,"浜田市","2AM"],[31,"益田市","2AM"],[31,"美郷町","2","村之郷"],[31,"美郷町","2","宮内"],[31,"美郷町","2","比敷"],[31,"美郷町美郷町","2PM"],[31,"能義郡","2"],[31,"邑南町","2"],[31,"隠岐郡","3"],[31,"雲南市","2"],[31,"飯石郡","2PM"],[31,"鹿足郡","2"],[32,"久米郡","1"],[32,"井原市","1AM","瀬戸町"],[32,"井原市","1AM","建部"],[32,"井原市","1AM","御津"],[32,"井原市","1AM"],[32,"井原市","1AM"],[32,"井原市","1AM"],[32,"井原市","1AM"],[32,"倉敷市","1AM","児島宇野津"],[32,"倉敷市","1AM","下津井"],[32,"倉敷市","1AM","児島"],[32,"倉敷市","1AM","大畠"],[32,"倉敷市","1AM","菰池"],[32,"倉敷市","1AM"],[32,"備前市","1PM"],[32,"加賀郡","1AM"],[32,"勝田郡","1AM"],[32,"和気郡","1AM"],[32,"小田郡","1AM"],[32,"岡山市中区","1AM"],[32,"岡山市北区","1AM"],[32,"岡山市南区","1AM"],[32,"岡山市東区","1AM"],[32,"新見市","1AM"],[32,"津山市","1AM"],[32,"浅口市","1AM"],[32,"浅口郡","1AM"],[32,"瀬戸内市","1AM"],[32,"玉野市","1AM"],[32,"真庭市","1"],[32,"真庭郡","1"],[32,"笠岡市","1AM"],[32,"総社市","1AM","下倉"],[32,"総社市","1AM","中尾"],[32,"総社市","1AM","宇山"],[32,"総社市","1AM","延原"],[32,"総社市","1AM","日羽"],[32,"総社市","1AM","種井"],[32,"総社市","1AM","美袋"],[32,"総社市","1AM","原"],[32,"総社市","1AM","影"],[32,"総社市","1AM","槁"],[32,"総社市","1AM"],[32,"美作市","1"],[32,"苫田郡","1"],[32,"英田郡","1"],[32,"赤磐市","1AM"],[32,"都窪郡","1AM"],[32,"鋼管町","1AM"],[32,"高梁市","1","ゼノー"],[32,"高梁市","1","テック"],[32,"高梁市","1AM"],[33,"三原市","1PM","久井町"],[33,"三原市","2"],[33,"三次市","2AM"],[33,"世羅郡","2AM"],[33,"呉市","2","天応大浜"],[33,"呉市","2AM"],[33,"大竹市","2"],[33,"安芸郡","2AM"],[33,"安芸高田市","2AM"],[33,"尾道市","2","離島"],[33,"尾道市","2AM"],[33,"山県郡","1PM"],[33,"広島市安佐北区","2AM"],[33,"広島市安佐南区","2AM"],[33,"広島市佐伯区","2AM"],[33,"広島市安芸区","2AM"],[33,"広島市安芸区","2AM"],[33,"広島市安芸区","2AM"],[33,"広島市安芸区","2AM"],[33,"広島市安芸区","2AM"],[33,"広島市安芸区","2AM"],[33,"広島市安芸区","2AM"],[33,"広島市安芸区","2AM"],[33,"広島市中区","2AM"],[33,"広島市南区","2AM"],[33,"広島市東区","2AM"],[33,"広島市西区","2AM"],[33,"庄原市","2"],[33,"府中市","2"],[33,"廿日市市","2AM"],[33,"東広島市","2","河内町"],[33,"東広島市","2AM"],[33,"江田島市","2AM"],[33,"神石郡","2"],[33,"福山市","1AM"],[33,"竹原市","2AM"],[33,"豊田郡","2AM"],[34,"下松市","2AM"],[34,"下関市","2AM","豊北町"],[34,"下関市","2AM","豊田町"],[34,"下関市","3"],[34,"光市","2AM"],[34,"周南市","2AM"],[34,"大島郡","2AM"],[34,"宇部市","2","小野"],[34,"宇部市","2AM"],[34,"山口市","2AM","阿東〇〇"],[34,"山口市","2AM","徳地町"],[34,"山口市","2AM"],[34,"山陽小野田市","2AM"],[34,"岩国市","2AM","周東町"],[34,"岩国市","2AM"],[34,"柳井市","2AM"],[34,"熊毛郡","2AM"],[34,"玖珂郡","2AM"],[34,"美祢市","2AM"],[34,"萩市","2AM"],[34,"長門市","2AM"],[34,"防府市","2AM"],[34,"阿武郡","2AM"],[35,"三好市","2AM"],[35,"三好郡","2AM"],[35,"上板町","2"],[35,"勝浦郡","2"],[35,"吉野川市","2AM"],[35,"吉野町","2"],[35,"名東郡","2"],[35,"名西郡","2"],[35,"土成町","2"],[35,"小松島市","2AM"],[35,"徳島市","2AM"],[35,"板野郡","2AM"],[35,"海部郡","2"],[35,"美馬市","2AM"],[35,"美馬郡","2AM"],[35,"那賀郡","2"],[35,"阿南市","2AM"],[35,"阿波市","2AM"],[35,"鳴門市","2AM"],[36,"さぬき市","1PM"],[36,"三豊市","2AM"],[36,"丸亀市","2AM"],[36,"仲多度郡","2AM"],[36,"善通寺市","2AM"],[36,"坂出市","2AM"],[36,"小豆郡","2"],[36,"庵治町","2AM"],[36,"木田郡","2AM"],[36,"東かがわ市","2AM"],[36,"牟礼町","2AM"],[36,"綾歌郡","2AM"],[36,"観音寺市","2AM"],[36,"香川郡","2AM"],[36,"高松市","1AM"],[37,"上浮穴郡","2"],[37,"今治市","2","宮窪町四阪島"],[37,"今治市","1PM"],[37,"伊予市","2PM"],[37,"八幡浜市","2"],[37,"北宇和郡","2AM"],[37,"南宇和郡","2"],[37,"喜多郡","2"],[37,"四国中央市","2AM"],[37,"大洲市","2PM"],[37,"宇和島市","2"],[37,"新居浜市","2AM"],[37,"東温市","1PM"],[37,"松前町","2PM"],[37,"松山市","2AM"],[37,"砥部町","2PM"],[37,"西予市","2"],[37,"西宇和郡","2"],[37,"西条市","2AM"],[37,"越智郡","2PM"],[38,"中土佐町","2"],[38,"佐川町","2"],[38,"南国市","2"],[38,"吾川郡","2"],[38,"四万十市","2AM"],[38,"四万十町","2"],[38,"四万十町","2"],[38,"土佐市","2"],[38,"土佐清水市","2AM"],[38,"土佐郡","2"],[38,"安芸市","2"],[38,"安芸郡","2"],[38,"室戸市","2"],[38,"宿毛市","2AM"],[38,"幡多郡","2AM"],[38,"日高村","2"],[38,"梼原町","2"],[38,"津野村","2"],[38,"越知町","2"],[38,"長岡郡","2"],[38,"須崎市","2AM"],[38,"香南市","2"],[38,"香美市","2"],[38,"高知市","2"],[39,"うきは市","2AM"],[39,"みやま市","2AM"],[39,"三井郡","2AM"],[39,"三潴郡","2AM"],[39,"中間市","2AM"],[39,"久留米市","2AM"],[39,"久留米市","2AM"],[39,"京都郡","2AM"],[39,"八女市","2AM"],[39,"八女郡","2AM"],[39,"前原市","2AM"],[39,"北九州市八幡東区","2AM"],[39,"北九州市八幡西区","2AM"],[39,"北九州市小倉北区","2AM"],[39,"北九州市小倉南区","2AM"],[39,"北九州市戸畑区","2AM"],[39,"北九州市若松区","2AM"],[39,"北九州市門司区","2AM"],[39,"古賀市","2AM"],[39,"嘉穂郡","2AM"],[39,"嘉麻市","2AM"],[39,"大川市","2AM"],[39,"大牟田市","2AM"],[39,"大野城市","2AM"],[39,"太宰府市","2AM"],[39,"宇美町","2AM"],[39,"宗像市","2AM"],[39,"宮若市","2AM"],[39,"小郡市","2AM"],[39,"志免町","2AM"],[39,"新宮町","2AM"],[39,"春日市","2AM"],[39,"朝倉市","2AM"],[39,"朝倉郡","2AM"],[39,"柳川市","2AM"],[39,"田川市","2AM"],[39,"田川郡","2AM"],[39,"直方市","2AM"],[39,"福岡市早良区","2","玄界島"],[39,"福岡市中央区","2AM"],[39,"福岡市博多区","2AM"],[39,"福岡市城南区","2AM"],[39,"福岡市早良区","2AM"],[39,"福岡市早良区","2AM"],[39,"福岡市南区","2AM"],[39,"福岡市東区","2AM"],[39,"福岡市西区","2AM"],[39,"福津市","2AM"],[39,"筑後市","2AM"],[39,"筑紫郡","2AM"],[39,"筑紫野市","2AM"],[39,"築上郡","2AM"],[39,"糟屋郡","2AM"],[39,"糸島市","2AM"],[39,"行橋市","2AM"],[39,"豊前市","2AM"],[39,"遠賀郡","2AM"],[39,"那珂川市","2AM"],[39,"鞍手郡","2AM"],[39,"須恵町","2AM"],[39,"飯塚市","2AM"],[40,"三養基郡","2AM"],[40,"伊万里市","2AM"],[40,"佐賀市","2AM","三瀬村"],[40,"佐賀市","2AM"],[40,"唐津市","2AM"],[40,"多久市","2AM"],[40,"嬉野市","2AM"],[40,"小城市","2AM"],[40,"東松浦郡","2AM"],[40,"杵島郡","2AM"],[40,"武雄市","2AM"],[40,"神埼市","2AM"],[40,"神埼郡","2AM"],[40,"藤津郡","2"],[40,"西松浦郡","2AM"],[40,"鳥栖市","2AM"],[40,"鹿島市","2AM"],[41,"五島市","3"],[41,"佐世保市","2AM"],[41,"北松浦郡","3"],[41,"南島原市","2"],[41,"南松浦郡","3"],[41,"壱岐市","3"],[41,"大村市","2AM"],[41,"対馬市","3"],[41,"島原市","2AM"],[41,"平戸市","2"],[41,"東彼杵郡","2AM"],[41,"松浦市","2"],[41,"西彼杵郡","2AM"],[41,"西海市","2AM"],[41,"諫早市","2AM"],[41,"長崎市","2AM"],[41,"長崎市","2AM"],[41,"雲仙市","2AM"],[42,"上天草市","2"],[42,"上益城郡","2AM"],[42,"下益城郡","2"],[42,"人吉市","2AM"],[42,"八代市","2AM"],[42,"八代郡","2AM"],[42,"合志市","2AM"],[42,"天草市","2"],[42,"天草郡","2"],[42,"宇土市","2AM"],[42,"宇城市","2AM"],[42,"山都町","2"],[42,"山鹿市","2AM"],[42,"水俣市","2AM"],[42,"熊本市中央区","2AM"],[42,"熊本市北区","2AM"],[42,"熊本市南区","2AM"],[42,"熊本市東区","2AM"],[42,"熊本市西区","2AM"],[42,"熊本市","2AM"],[42,"玉名市","2AM"],[42,"玉名郡","2AM"],[42,"球磨郡","2AM"],[42,"益城町","2AM"],[42,"荒尾市","2AM"],[42,"菊池市","2AM"],[42,"菊池郡","2AM"],[42,"葦北郡","2AM"],[42,"阿蘇市","2"],[42,"阿蘇郡","2"],[43,"中津市","2AM"],[43,"佐伯市","2AM"],[43,"別府市","2AM"],[43,"国東市","2"],[43,"大分市","2AM"],[43,"宇佐市","2AM"],[43,"山香町","2"],[43,"日田市","2AM"],[43,"東国東郡","3"],[43,"杵築市","2","大田"],[43,"杵築市","2AM"],[43,"津久見市","2AM"],[43,"玖珠郡","2"],[43,"由布市","2AM"],[43,"竹田市","2"],[43,"臼杵市","2AM"],[43,"豊後大野市","2"],[43,"豊後高田市","2"],[43,"速見郡","2AM"],[44,"えびの市","2AM"],[44,"串間市","2AM"],[44,"児湯郡","2AM"],[44,"北諸県郡","2AM"],[44,"宮崎市","2AM"],[44,"小林市","2AM"],[44,"延岡市","2AM"],[44,"日南市","2"],[44,"日向市","2AM"],[44,"東臼杵郡","2AM"],[44,"東諸県郡","2AM"],[44,"西臼杵郡","2"],[44,"西諸県郡","2AM"],[44,"西都市","2AM"],[44,"都城市","2AM"],[45,"いちき串木野市","2AM"],[45,"下甑町","4"],[45,"伊佐市","2AM"],[45,"出水市","2AM"],[45,"出水郡","2AM"],[45,"南さつま市","2AM"],[45,"南九州市","2AM"],[45,"喜入○○町","2AM"],[45,"垂水市","2AM"],[45,"大島郡","3"],[45,"奄美市","3"],[45,"姶良市","2AM"],[45,"姶良郡","2AM"],[45,"志布志市","2AM"],[45,"指宿市","2AM"],[45,"日置市","2AM"],[45,"曽於市","2AM","大隅町"],[45,"曽於市","2AM","末吉町"],[45,"曽於市","2AM","財部町"],[45,"曽於郡","2"],[45,"枕崎市","2"],[45,"熊毛郡","3"],[45,"肝属郡","2AM"],[45,"薩摩川内市","4","上甑"],[45,"薩摩川内市","2AM"],[45,"薩摩郡","2AM"],[45,"西之表市","3"],[45,"里町","4"],[45,"阿久根市","2AM"],[45,"霧島市","2AM","横川町"],[45,"霧島市","2AM"],[45,"鹿児島市","2AM"],[45,"鹿児島郡","4"],[45,"鹿屋市","2AM"],[45,"鹿島町","4"],[46,"うるま市","5AM","","別途手数料地域"],[46,"中頭郡","4AM","","別途手数料地域"],[46,"八重山郡","6","","別途手数料地域"],[46,"南城市","5AM","","別途手数料地域"],[46,"名護市","5AM","","別途手数料地域"],[46,"国頭郡","5","","別途手数料地域"],[46,"宜野湾市","5AM","","別途手数料地域"],[46,"宮古島市","6","","別途手数料地域"],[46,"宮古郡","6","","別途手数料地域"],[46,"島尻郡","6","","別途手数料地域"],[46,"沖縄市","5AM","","別途手数料地域"],[46,"浦添市","5AM","","別途手数料地域"],[46,"石垣市","6","","別途手数料地域"],[46,"糸満市","5AM","","別途手数料地域"],[46,"豊見城市","5AM","","別途手数料地域"],[46,"那覇市","5AM","","別途手数料地域"]]};
+
+// 参照用ショートカット（マッピングUIは computed 列を除いた列を使う）
+const OUTPUT_COLUMNS = CONFIG.outputColumns.filter(c => !c.computed);
+const ALL_COLUMNS = CONFIG.outputColumns;
+const KNOWN_MAPPINGS = CONFIG.columnAliases;
+
+// ============================================================
+// 祝日・営業日ユーティリティ（lead-time.html の移植）
+// ============================================================
+let HOLIDAYS = {};
+
+function fmtIso(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function fmtSlash(d) {
+  return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+}
+function parseYmd(s) {
+  const m = String(s).trim().match(/^(\d{2,4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (!m) return null;
+  let y = +m[1];
+  if (y < 100) y += 2000;
+  return new Date(y, +m[2] - 1, +m[3]);
+}
+function isNonBiz(d) {
+  const w = d.getDay();
+  return w === 0 || w === 6 || (fmtIso(d) in HOLIDAYS);
+}
+
+// ルールベース祝日計算（APIが使えないときのフォールバック）
+function genHol(y) {
+  const a = (m, n) => { HOLIDAYS[y + '-' + String(m).padStart(2, '0') + '-' + String(n).padStart(2, '0')] = 1; };
+  const mon = (m, w) => {  // 第w月曜
+    let d = new Date(y, m - 1, 1), c = 0;
+    while (c < w) { if (d.getDay() === 1) c++; if (c < w) d.setDate(d.getDate() + 1); }
+    return d.getDate();
+  };
+  // 春分・秋分（近似式、2000-2099）
+  const se = Math.floor(20.8431 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+  const ae = Math.floor(23.2488 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+  a(1, 1); a(2, 11); a(2, 23); a(4, 29); a(5, 3); a(5, 4); a(5, 5);
+  a(8, 11); a(11, 3); a(11, 23);
+  a(1, mon(1, 2)); a(7, mon(7, 3)); a(9, mon(9, 3)); a(10, mon(10, 2));
+  a(3, se); a(9, ae);
+  const ds = y + '-';
+  // 振替休日: 祝日が日曜なら翌月曜
+  Object.keys(HOLIDAYS).filter(k => k.startsWith(ds)).forEach(k => {
+    const d = new Date(k);
+    if (d.getDay() === 0) { const nx = new Date(d); nx.setDate(nx.getDate() + 1); HOLIDAYS[fmtIso(nx)] = 1; }
+  });
+  // 国民の休日: 祝日に挟まれた平日
+  Object.keys(HOLIDAYS).filter(k => k.startsWith(ds)).forEach(k => {
+    const d = new Date(k); d.setDate(d.getDate() + 2); const k2 = fmtIso(d);
+    if (k2 in HOLIDAYS) {
+      const mid = new Date(k); mid.setDate(mid.getDate() + 1); const mk = fmtIso(mid);
+      if (!(mk in HOLIDAYS) && mid.getDay() !== 0) HOLIDAYS[mk] = 1;
+    }
+  });
+}
+
+const holidaysReady = (async () => {
+  try {
+    const r = await fetch(CONFIG.leadTime.holidayApiUrl);
+    if (r.ok) HOLIDAYS = await r.json();
+  } catch (e) { /* オフライン時はフォールバック */ }
+  const thisYear = new Date().getFullYear();
+  for (let y = thisYear; y <= thisYear + 2; y++) {
+    if (!Object.keys(HOLIDAYS).some(k => k.startsWith(y + '-'))) genHol(y);
+  }
+  // ※ 出荷日は自動入力しない（当日出荷の場合もあるため、ユーザーが明示的に設定する）
+})();
+
+// 翌営業日（明日から数えて最初の平日・非祝日）
+function nextBizIso() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  while (isNonBiz(d)) d.setDate(d.getDate() + 1);
+  return fmtIso(d);
+}
+
+// ============================================================
+// リードタイム検索・着日計算（lead-time.html の移植）
+// ============================================================
+// 都道府県+住所からLTコードを返す（最長一致、例外地区エントリより本体優先）
+// データの市区町村名は「さいたま市岩槻区、西区」のように「、」区切りの場合がある
+function findLeadTime(pref, address) {
+  if (typeof LEADTIME === 'undefined' || !pref || !address) return null;
+  const pi = LEADTIME.p.indexOf(pref);
+  if (pi < 0) return null;
+  const addr = String(address).replace(/[\s　]/g, '');
+  const entries = LEADTIME.d.filter(r => r[0] == pi);
+
+  let best = null, bestScore = -1;
+  for (const r of entries) {
+    const parts = String(r[1]).split('、');
+    // 2つ目以降の区名は先頭の市名を引き継ぐ（例:「さいたま市岩槻区、西区」→さいたま市西区）
+    const cityPrefix = (parts[0].match(/^(.*?[市郡])/) || [, ''])[1];
+    for (let i = 0; i < parts.length; i++) {
+      let nm = parts[i];
+      if (i > 0 && cityPrefix && !addr.startsWith(nm)) nm = cityPrefix + nm;
+      if (!nm || !addr.startsWith(nm)) continue;
+      const score = nm.length + (r[3] ? 0 : 0.5);  // 同点なら本体（例外地区なし）優先
+      if (score > bestScore) { bestScore = score; best = r; }
+    }
+  }
+  if (best) return best[2];
+
+  // フォールバック: 同じ市/郡のエントリが全て同じLTなら、区名がデータに無くてもそれを使う
+  const cityM = addr.match(/^(.*?[市郡])/);
+  if (cityM) {
+    const codes = new Set();
+    for (const r of entries) {
+      if (String(r[1]).split('、').some(p => p.startsWith(cityM[1]))) codes.add(r[2]);
+    }
+    if (codes.size === 1) return [...codes][0];
+  }
+  return null;
+}
+
+// 着日計算: カレンダー日で加算し、着日が非営業日なら翌営業日へ
+function calcArrival(shipDate, ltCode) {
+  const m = String(ltCode).match(/^(\d+)(AM|PM)?$/);
+  if (!m) return null;
+  // new Date('2026-06-15')はUTC解釈で日本時間9:00になり、納期(0:00)との比較が
+  // 同日でも「超過」扱いになってしまうため、必ずローカル0:00で組み立てる
+  const a = parseYmd(shipDate);
+  if (!a) return null;
+  a.setDate(a.getDate() + parseInt(m[1]));
+  while (isNonBiz(a)) a.setDate(a.getDate() + 1);
+  return a;
+}
+
+// ============================================================
+// 郵便番号の自動取得（HeartRails Geo API / 空白の行のみ）
+// ============================================================
+function zipKeyword(address) {
+  // 住所の数字より前の部分（市区町村+町名）で検索する
+  const s = String(address).replace(/[\s　]/g, '');
+  const cut = s.search(/[0-9０-９一二三四五六七八九]+(丁目|番|号|-|－|‐)/);
+  const head = cut > 0 ? s.slice(0, cut) : s;
+  return head.replace(/[-－‐0-9０-９]+$/, '');
+}
+
+async function fetchZipcode(pref, address) {
+  const kw = zipKeyword(address);
+  if (!kw) return '';
+  try {
+    const r = await fetch(CONFIG.zipcode.apiUrl + encodeURIComponent(kw));
+    if (!r.ok) return '';
+    const json = await r.json();
+    const locs = json?.response?.location;
+    if (!Array.isArray(locs)) return '';
+    // 都道府県が一致し、市区町村+町名が住所の先頭に最も長く一致するものを採用
+    const addr = String(address).replace(/[\s　]/g, '');
+    let best = null, bestLen = -1;
+    for (const loc of locs) {
+      if (pref && loc.prefecture !== pref) continue;
+      const key = (loc.city || '') + (loc.town || '');
+      const len = addr.startsWith(key) ? key.length : (addr.startsWith(loc.city || '') ? (loc.city || '').length : -1);
+      if (len > bestLen) { bestLen = len; best = loc; }
+    }
+    if (!best || !best.postal) return '';
+    const pc = String(best.postal).replace(/[^\d]/g, '');
+    return pc.length === 7 ? pc.slice(0, 3) + '-' + pc.slice(3) : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+// ============================================================
+// State
+// ============================================================
+// files = [{ name, size, headers, rows, mapping }] ファイルごとに独立してマッピングを持つ
+let files = [];
+let activeMappingFile = 0;   // マッピングUIで編集中のファイル index
+let processedFiles = [];     // 変換結果: [{ name, rows }]
+
+// ============================================================
+// DOM
+// ============================================================
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const rawSection = document.getElementById('rawSection');
+const rawTableWrapper = document.getElementById('rawTableWrapper');
+const mappingSection = document.getElementById('mappingSection');
+const mappingTabs = document.getElementById('mappingTabs');
+const mappingGrid = document.getElementById('mappingGrid');
+const mappingBadge = document.getElementById('mappingBadge');
+const previewSection = document.getElementById('previewSection');
+const tableWrapper = document.getElementById('tableWrapper');
+
+// ============================================================
+// File handling
+// ============================================================
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleFiles(e.target.files);
+});
+document.getElementById('btnReset').addEventListener('click', resetAll);
+// ボックス全体クリックでカレンダーを開く（アイコン以外の部分でも確実に開く）
+document.getElementById('shipDate').addEventListener('click', function() {
+  try { this.showPicker(); } catch(_) {}
+});
+document.getElementById('btnApplyMapping').addEventListener('click', applyMappingAndPreview);
+
+// 出荷日設定ボタン（Excel版の「出荷日設定」ボタンと同じ役割）
+document.getElementById('btnApplyShipDate').addEventListener('click', async () => {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+  const v = document.getElementById('shipDate').value;
+  if (!v) { showToast('出荷日を選択してください', 'error'); return; }
+  await holidaysReady;
+  const changed = applyShipDateToRows(v);
+  if (lastStats) lastStats.deliveryChanged = changed;
+  renderSummaryBar(processedFiles.flatMap(pf => pf.rows), lastStats || {});
+  renderPreviewTable(processedFiles);
+  updatePrintHeader();
+  // 納期チェック結果は自動で消さない（クリックで閉じる）
+  showToast(changed
+    ? `出荷日 ${fmtSlash(parseYmd(v))} で納期チェック: ${changed}件の納期を変更（黄色）`
+    : `出荷日 ${fmtSlash(parseYmd(v))}: 全行、指定納期に間に合います`, changed ? '' : 'success', true);
+});
+
+// 「📅 出荷日を設定」が未実行（出荷日セルが空白の行がある）かどうか。
+// 保存・印刷の前に必ずチェックする（出荷日なしの帳票・CSVを作らせない）
+function shipDateMissing() {
+  const rows = processedFiles.flatMap(pf => pf.rows);
+  return !rows.length || rows.some(r => !(r.shipDate || '').trim());
+}
+const SHIP_DATE_MSG = '出荷日セルが空白の行があります。「📅 出荷日を設定」ボタンを押してください';
+
+// 印刷ボタン（A4横。出荷日+商品集計が表の上に印刷される）
+document.getElementById('btnPrint').addEventListener('click', () => {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return; }
+  updatePrintHeader();
+  window.print();
+});
+
+// 印刷時のみ、日付セルの西暦を省く（2026/6/15 → 6/15）。印刷後は元に戻す
+function stripYearForPrint() {
+  tableWrapper.querySelectorAll('td[data-k="requestDate"], td[data-k="deliveryDate"], td[data-k="shipDate"]').forEach(td => {
+    const text = (td.textContent || '').trim();
+    const m = text.match(/^\d{4}\/(\d{1,2}\/\d{1,2})$/);
+    if (m) { td.dataset.fullDate = text; td.textContent = m[1]; }
+  });
+}
+function restoreYearAfterPrint() {
+  tableWrapper.querySelectorAll('td[data-full-date]').forEach(td => {
+    td.textContent = td.dataset.fullDate;
+    delete td.dataset.fullDate;
+  });
+}
+
+// 印刷時: テーブルの実幅からzoom倍率を計算して全列をA4横1ページ幅に収める
+// （Ctrl+P直接印刷でも効くよう beforeprint/afterprint で着脱する）
+window.addEventListener('beforeprint', () => {
+  const table = tableWrapper.querySelector('table');
+  if (!table) return;
+  stripYearForPrint();  // 西暦を省いてから幅を測る
+  // 右スクロール状態でも左端から印刷されるようスクロールをリセット
+  tableWrapper.scrollLeft = 0;
+  table.style.zoom = 1;
+  const printableWidthPx = (297 - 16) * 96 / 25.4;  // A4横297mm - 余白8mm×2 → px換算
+  const scale = Math.min(1, printableWidthPx / table.scrollWidth);
+  table.style.zoom = scale;
+});
+window.addEventListener('afterprint', () => {
+  const table = tableWrapper.querySelector('table');
+  if (table) table.style.zoom = '';
+  restoreYearAfterPrint();
+});
+
+// Excel保存ボタン
+// ファイル名: [YYYYMMDD出荷分商品名+商品名.xlsx]（日付は出荷日）
+document.getElementById('btnExcel').addEventListener('click', () => {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+  const shipIso = document.getElementById('shipDate').value;
+  if (!shipIso) { showToast('出荷日を設定してください（ファイル名に使います）', 'error'); return; }
+  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return; }
+
+  const d = new Date(shipIso);
+  const ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  const allRows = processedFiles.flatMap(pf => pf.rows);
+  const products = [...new Set(allRows.map(r => (r.product || '').trim()).filter(Boolean))];
+  const fileName = `${ymd}出荷分${products.join('+')}.xlsx`;
+
+  // ヘッダー + データ（複数ファイル時はVBA版同様ファイル名区切り行を入れる。
+  // 列名行はファイル名行の下に、ファイルごとに繰り返し出す）
+  // meta[i] = その行の種別（'header'/'sep'/データ行オブジェクト）。スタイル適用に使う
+  const multi = processedFiles.length > 1;
+  const aoa = [];
+  const meta = [];
+  if (!multi) { aoa.push(ALL_COLUMNS.map(c => c.label)); meta.push('header'); }
+  for (const pf of processedFiles) {
+    if (multi) {
+      const totalQty = pf.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
+      aoa.push([`${pf.name}　データ${pf.rows.length}件　個数合計${totalQty}件`]);
+      meta.push('sep');
+      aoa.push(ALL_COLUMNS.map(c => c.label));
+      meta.push('header');
+    }
+    for (const r of pf.rows) {
+      aoa.push(ALL_COLUMNS.map(c => {
+        const v = r[c.key] ?? '';
+        // 数量は数値として出力（Excelで合計できるように）
+        if (c.key === 'quantity' && v !== '' && !isNaN(parseFloat(v))) return parseFloat(v);
+        return v;
+      }));
+      meta.push(r);
+    }
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // ─── 画面の見た目をそのまま再現するスタイル（xlsx-js-style） ───
+  const C = CONFIG.colors;
+  const hex = c => c.replace('#', '').toUpperCase();
+  const fill = c => ({ patternType: 'solid', fgColor: { rgb: hex(c) } });
+  const thin = { style: 'thin', color: { rgb: '595959' } };
+  const border = { top: thin, bottom: thin, left: thin, right: thin };
+  const rowHeights = [];
+
+  for (let R = 0; R < aoa.length; R++) {
+    const m = meta[R];
+
+    // ヘッダー行: 背景色なし・黒太字（印刷出力と同じ見た目）
+    if (m === 'header') {
+      rowHeights.push({ hpt: 20 });
+      for (let Cn = 0; Cn < ALL_COLUMNS.length; Cn++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: R, c: Cn })];
+        if (cell) cell.s = {
+          font: { bold: true, sz: 11 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border,
+        };
+      }
+      continue;
+    }
+
+    // ファイル名区切り行: 太字・大きめ
+    if (m === 'sep') {
+      rowHeights.push({ hpt: 24 });
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: 0 })];
+      if (cell) cell.s = { font: { bold: true, sz: 11 }, alignment: { vertical: 'bottom' } };
+      continue;
+    }
+
+    // データ行: 会社名の改行数に応じて行の高さを確保（wrapTextで折り返し表示）
+    // 1行なら18ptを維持、改行分は1行あたり12pt（文字9ptに合わせて控えめに増やす）
+    const r = m;
+    const lines = ((r.companyName || '').match(/\n/g) || []).length + 1;
+    rowHeights.push({ hpt: Math.max(18, lines * 12 + 6) });
+    const isYupack = (r.carrier || '').trim() === 'ゆうパック';
+
+    for (let Cn = 0; Cn < ALL_COLUMNS.length; Cn++) {
+      const key = ALL_COLUMNS[Cn].key;
+      const addr = XLSX.utils.encode_cell({ r: R, c: Cn });
+      let cell = ws[addr];
+      if (!cell) cell = ws[addr] = { t: 's', v: '' };  // 空セルにも色・罫線を付けるため生成
+      const val = String(cell.v ?? '');
+
+      const s = { font: { sz: 11 }, alignment: { vertical: 'center', wrapText: true }, border };
+      if (isYupack) s.fill = fill(C.yupackRow);                                   // ゆうパック行 → ピンク
+      if (CONFIG.emptyCheckColumns.includes(key) && val.trim() === '') s.fill = fill(C.emptyCell);  // 必須空白 → 赤
+      if (key === 'quantity') {
+        const q = parseFloat(val);
+        if (!q) s.fill = fill(C.emptyCell);                                       // 数量空白/0 → 赤
+        else if (q >= 2) { s.fill = fill(C.quantityHigh); s.font.bold = true; }   // 2以上 → 緑太字
+        s.alignment.horizontal = 'center';
+      }
+      if (['requestDate', 'deliveryDate', 'shipDate'].includes(key)) s.alignment.horizontal = 'center';
+      if (key === 'deliveryDate' && r.deliveryChanged) { s.fill = fill(C.deliveryChanged); s.font.bold = true; }  // 納期変更 → 黄
+      if (key === 'carrier' && isYupack) { s.font.color = { rgb: hex(C.yupackText) }; s.font.bold = true; }       // ゆうパック文字 → 赤太字
+      cell.s = s;
+    }
+  }
+  ws['!rows'] = rowHeights;
+
+  // 列幅（文字数ベース）
+  const colWidths = {
+    product: 22, quantity: 6, requestDate: 11, deliveryDate: 11, shipDate: 11,
+    companyName: 32, phone1: 14, postalCode: 10, prefecture: 8,
+    address: 32, building: 22, carrier: 10, duplicate: 9,
+  };
+  // 文字を小さくした分、列幅も10%詰める
+  ws['!cols'] = ALL_COLUMNS.map(c => ({ wch: Math.round((colWidths[c.key] || 12) * 0.9 * 10) / 10 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '出荷データ');
+  XLSX.writeFile(wb, fileName);
+  showToast(`保存: ${fileName}`, 'success');
+});
+
+// ============================================================
+// 送り状CSV出力（福山通運 送り状発行ソフト エントリーデータ）
+// 流れ: 「🚚 送り状CSV」→ 変換結果を26列にマッピングしてプレビュー表示
+//       → セルを手修正 → 「📥 CSVをダウンロード」で Shift-JIS・CRLF 保存
+// ゆうパック行（excludeCarriers）は福通で送らないため出力しない。
+// まとめ梱包ルール（例: ニオイしま栓！2ケース1梱包）はプレビュー生成時に分割する。
+// ============================================================
+
+// 日付文字列("2026/6/8"等)を送り状ソフトの形式に整形
+function fmtInvoiceDate(s) {
+  const d = s instanceof Date ? s : parseYmd(s);
+  if (!d) return '';
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+  return CONFIG.invoiceCsv.dateFormat === 'yyyymmdd' ? `${y}${m}${dd}` : `${y}/${m}/${dd}`;
+}
+
+// 製品マスタ検索（製品名の完全一致。＆/&の全角半角は同一視）
+function findProductMaster(product) {
+  const norm = s => String(s || '').trim().replace(/＆/g, '&');
+  const p = norm(product);
+  return CONFIG.invoiceCsv.productMaster.find(m => m.製品名.some(n => norm(n) === p)) || null;
+}
+
+// 変換結果1行 → 送り状CSVレコード（列名→値）の配列
+// まとめ梱包ルールがある製品は数量に応じて送り状を分割する
+// （例: ニオイしま栓！×5 → 「2ケース1梱包」2件 + 1ケース1件 の計3件）
+// ExcelAPI（Cloudflare Workers プロキシ経由）で住所分割を取得
+//   - 戻り値: { zipcode, parts: [都道府県, 市区町村, 町名, 番地以降] } / 失敗時 null
+//   - 元Excel VBA と同じく maxRetries 回まで再試行（API応答不安定対策）
+//   - proxyUrl 未設定ならスキップして null を返す
+async function fetchAddressLookup(address, currentZip) {
+  const cfg = CONFIG.addressLookup;
+  if (!cfg.enabled || !cfg.proxyUrl || !address) return null;
+  const url = cfg.proxyUrl
+    + (cfg.proxyUrl.includes('?') ? '&' : '?')
+    + 'address=' + encodeURIComponent(address)
+    + (currentZip ? '&zipcode=' + encodeURIComponent(currentZip) : '');
+  for (let attempt = 0; attempt < cfg.maxRetries; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        // parts のいずれかが取れていればOK（zipcode は既知の場合 currentZip エコー）
+        if (json && Array.isArray(json.parts) && json.parts.some(p => p)) return json;
+      }
+    } catch (_) { /* 通信エラーはリトライへ */ }
+    if (attempt < cfg.maxRetries - 1) await sleep(cfg.retryWaitMs);
+  }
+  return null;
+}
+
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+// 全角文字数カウント（半角=0.5）。送り状ソフトの全角20文字制限チェック用
+function zenkakuLen(s) {
+  let n = 0;
+  for (const ch of String(s || '')) {
+    n += /[\x00-\x7F｡-ﾟ]/.test(ch) ? 0.5 : 1;
+  }
+  return Math.ceil(n);
+}
+
+function buildInvoiceRecords(r, shipDate, today) {
+  const cfg = CONFIG.invoiceCsv;
+  const master = findProductMaster(r.product);
+  // 名前/名前2: 会社名の改行で分割（例: 大東建託リーシング株式会社⏎○○店）
+  const nameLines = (r.companyName || '').split('\n').map(s => s.trim()).filter(Boolean);
+
+  // 住所分割が取れているなら 住所1=都道府県+市区町村郡、住所2=町名+番地、住所3=建物名
+  //   （ExcelAPI address-separate 経由。市単位で改行するとバランス良く印刷される）
+  // 取れていない場合は従来通り 住所1=都道府県、住所2=合算住所、住所3=建物名
+  const parts = r._addrParts;
+  const addr1 = parts ? ((parts[0] || '') + (parts[1] || '')) : (r.prefecture || '');
+  const addr2 = parts ? ((parts[2] || '') + (parts[3] || '')) : (r.address || '');
+
+  const make = (qty, item2) => {
+    const rec = { ...cfg.fixedValues };
+    rec['電話番号']     = r.phone1 || '';
+    rec['住所']         = addr1;                        // 住所1=都道府県(+市区町村郡)
+    rec['住所2']        = addr2;                        // 住所2=町名番地 or 合算住所
+    rec['住所3']        = r.building || '';            // 住所3=建物名など
+    rec['名前']         = nameLines[0] || '';
+    rec['名前2']        = nameLines.slice(1).join(' ');
+    rec['郵便番号']     = r.postalCode || '';
+    const baseShipperCode = master ? master.荷送人コード : '';
+    const srcRule = CONFIG.fileSourceRules.find(rule => rule.source === r._fileSource);
+    rec['荷送人コード'] = (srcRule?.invoiceOverrides?.['荷送人コード']) || baseShipperCode;
+    rec['個数']         = String(qty);
+    rec['品名記事1']    = master ? master.品名記事1 : '';
+    rec['品名記事2']    = item2;
+    rec['品名記事3']    = master ? master.品名記事3 : '';
+    rec['配達指定日']   = fmtInvoiceDate(r.deliveryDate);
+    rec['出荷日付']     = fmtInvoiceDate(shipDate);
+    rec['登録日付']     = fmtInvoiceDate(today);
+    if (master?.保険金額 !== undefined) rec['保険金額'] = master.保険金額;
+    return rec;
+  };
+
+  const qty = parseInt(r.quantity, 10) || 0;
+  const unit = (master && parseInt(master.まとめ梱包, 10)) || 1;  // 1=まとめない
+  if (unit >= 2 && qty >= unit) {
+    const recs = [];
+    const bundles = Math.floor(qty / unit);
+    const rest = qty % unit;
+    for (let i = 0; i < bundles; i++) recs.push(make(1, master.まとめ梱包の品名記事2));  // 1梱包 = 送り状1件
+    if (rest) recs.push(make(rest, master.品名記事2));
+    return recs;
+  }
+  return [make(qty || r.quantity || '', master ? master.品名記事2 : '')];
+}
+
+// CSVフィールドのエスケープ（改行は除去、カンマ/引用符は引用する）
+function csvField(v) {
+  const s = String(v ?? '').replace(/\r?\n/g, ' ');
+  return /[",]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+let invoiceRows = [];      // プレビュー中のレコード（セル修正はここに書き戻される）
+let invoiceFileName = '';
+
+function hideInvoiceSection() {
+  document.getElementById('invoiceSection').classList.remove('visible');
+  invoiceRows = [];
+}
+
+// 🚚 ボタン: 変換結果から送り状レコードを生成してプレビュー表示（この時点では保存しない）
+document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+  const shipIso = document.getElementById('shipDate').value;
+  if (!shipIso) { showToast('出荷日を設定してください（出荷日付・ファイル名に使います）', 'error'); return; }
+  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return; }
+
+  const cfg = CONFIG.invoiceCsv;
+  const shipDate = parseYmd(shipIso);
+  const today = new Date();
+  const allRows = processedFiles.flatMap(pf => pf.rows);
+
+  // ゆうパック等、福通以外で送る行は出力対象外
+  const targetRows = allRows.filter(r => !cfg.excludeCarriers.includes((r.carrier || '').trim()));
+  if (!targetRows.length) { showToast('出力対象の行がありません（全行がゆうパック等の除外対象）', 'error'); return; }
+
+  // 住所分割（ExcelAPI）: proxyUrl 設定済みの場合のみ。失敗行は従来挙動にフォールバック
+  const lkCfg = CONFIG.addressLookup;
+  if (lkCfg.enabled && lkCfg.proxyUrl) {
+    const lookupTargets = targetRows.filter(r => !r._addrParts && (r.address || r.prefecture));
+    if (lookupTargets.length) {
+      showToast(`住所を分割中... (${lookupTargets.length}件)`, '');
+      let ok = 0;
+      for (const r of lookupTargets) {
+        // 住所セルに建物名が混入していても合算で投げる（元Excelと同じ思想）
+        const full = (r.prefecture || '') + (r.address || '');
+        const res = await fetchAddressLookup(full, r.postalCode);
+        if (res) {
+          r._addrParts = res.parts;
+          // 郵便番号が空ならExcelAPI側の結果で埋める（2段階目フォールバック）
+          if (!r.postalCode && res.zipcode) {
+            const z = String(res.zipcode).replace(/[^\d]/g, '');
+            if (z.length === 7) r.postalCode = z.slice(0, 3) + '-' + z.slice(3);
+          }
+          ok++;
+        }
+        await sleep(lkCfg.requestIntervalMs);
+      }
+      if (ok < lookupTargets.length) {
+        showToast(`住所分割: ${ok}/${lookupTargets.length}件成功（未取得行は従来形式）`, '');
+      }
+    }
+  }
+
+  invoiceRows = targetRows.flatMap(r => buildInvoiceRecords(r, shipDate, today));
+  invoiceFileName = cfg.filenamePattern
+    .replace('{M}', shipDate.getMonth() + 1)
+    .replace('{D}', shipDate.getDate());
+
+  // 注記: 除外・まとめ梱包分割・マスタ未登録（未登録でも出力はする。該当欄が空欄になる）
+  const skipped = allRows.length - targetRows.length;
+  const split = invoiceRows.length - targetRows.length;
+  const noMaster = [...new Set(targetRows
+    .filter(r => !findProductMaster(r.product))
+    .map(r => (r.product || '').trim() || '（商品名空白）'))];
+  const notes = [];
+  // ゆうパック除外は見落とすと送り漏れになるので赤太字・1.3倍で目立たせる
+  if (skipped) notes.push(`<span style="color:#e74c3c;font-weight:700;font-size:1.3em;">ゆうパック等 ${skipped}件は出力対象外</span>`);
+  if (split > 0) notes.push(escapeHtml(`まとめ梱包ルールで送り状 ${split}件 分割`));
+  if (noMaster.length) notes.push(escapeHtml(`⚠ マスタ未登録の商品: ${noMaster.join('、')}（荷送人コード・品名記事が空欄です）`));
+  if (invoiceMissingList().length) {
+    notes.push('<span style="color:#e74c3c;font-weight:700;">⚠ 必須項目が空白の行があります（赤いセル）。修正しないとCSVを保存できません</span>');
+  }
+  document.getElementById('invoiceNotes').innerHTML = notes.join(' ／ ');
+  document.getElementById('invoiceNotes').style.display = notes.length ? '' : 'none';
+  document.getElementById('invoiceCount').textContent = `(${invoiceRows.length} 件 → ${invoiceFileName})`;
+
+  renderInvoiceTable();
+  const sec = document.getElementById('invoiceSection');
+  sec.classList.add('visible');
+  sec.scrollIntoView({ behavior: 'smooth' });
+});
+
+// 必須項目が空白の行を列挙（例: "3行目: 電話番号・郵便番号"）
+function invoiceMissingList() {
+  const req = CONFIG.invoiceCsv.requiredColumns;
+  const errs = [];
+  invoiceRows.forEach((rec, i) => {
+    const miss = req.filter(c => !String(rec[c] ?? '').trim());
+    if (miss.length) errs.push(`${i + 1}行目: ${miss.join('・')}`);
+  });
+  return errs;
+}
+
+// セルの背景色とtitleを文字数制限・必須項目に合わせて算出
+function invoiceCellStyle(col, val) {
+  const cfg = CONFIG.invoiceCsv;
+  const v = String(val ?? '');
+  // 空白の必須項目 → 赤（修正しないと保存不可）
+  if (cfg.requiredColumns.includes(col) && !v.trim()) {
+    return { bg: CONFIG.colors.emptyCell, title: '必須項目です' };
+  }
+  // 文字数超過 → 橙（警告のみ）
+  const lim = cfg.lengthLimits && cfg.lengthLimits[col];
+  if (lim && v.trim()) {
+    const len = zenkakuLen(v);
+    if (len > lim) {
+      return { bg: CONFIG.colors.overLength, title: `送り状ソフトの上限を超過: 全角${len}文字 > 上限${lim}文字` };
+    }
+  }
+  return { bg: '', title: '' };
+}
+
+// プレビューテーブル（全セル編集可。必須項目が空白のセルは赤、文字数超過は橙）
+function renderInvoiceTable() {
+  const cols = CONFIG.invoiceCsv.columns;
+  let html = '<table class="data-table"><thead><tr><th>#</th>';
+  cols.forEach(c => { html += `<th>${escapeHtml(c)}</th>`; });
+  html += '</tr></thead><tbody>';
+  invoiceRows.forEach((rec, i) => {
+    html += `<tr><td style="color:#999;">${i + 1}</td>`;
+    cols.forEach(c => {
+      const v = String(rec[c] ?? '');
+      const { bg, title } = invoiceCellStyle(c, v);
+      const style = bg ? ` style="background:${bg};"` : '';
+      const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+      html += `<td${style}${titleAttr} contenteditable="true" data-i="${i}" data-col="${escapeHtml(c)}">${escapeHtml(v)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('invoiceTableWrapper').innerHTML = html;
+}
+
+// プレビューセルの直接編集（focusoutでレコードに書き戻す）
+document.getElementById('invoiceTableWrapper').addEventListener('focusout', e => {
+  const td = e.target.closest ? e.target.closest('td[data-col]') : null;
+  if (!td) return;
+  const rec = invoiceRows[+td.dataset.i];
+  if (!rec) return;
+  rec[td.dataset.col] = td.innerText.replace(/ /g, ' ').replace(/\n+/g, ' ').trim();
+  // 赤（空白）/橙（超過）/無色 を再計算
+  const { bg, title } = invoiceCellStyle(td.dataset.col, rec[td.dataset.col]);
+  td.style.background = bg;
+  if (title) td.title = title; else td.removeAttribute('title');
+});
+
+// 📥 ダウンロード: プレビュー（手修正後）の内容をShift-JIS・CRLFのCSVで保存
+// 必須項目が空白の行があればエラーで止める（不完全なエントリーデータを作らせない）
+document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
+  if (!invoiceRows.length) { showToast('先に「🚚 送り状CSV」でプレビューを作成してください', 'error'); return; }
+  const missing = invoiceMissingList();
+  if (missing.length) {
+    showToast(`保存できません。必須項目が空白です（赤いセルを修正してください） → ${missing.slice(0, 5).join(' ／ ')}${missing.length > 5 ? ' ほか' : ''}`, 'error', true);
+    return;
+  }
+  const cfg = CONFIG.invoiceCsv;
+  const lines = [];
+  if (cfg.includeHeader) lines.push(cfg.columns.join(','));
+  for (const rec of invoiceRows) lines.push(cfg.columns.map(c => csvField(rec[c])).join(','));
+  const csvText = lines.join('\r\n') + '\r\n';
+
+  // Shift-JIS（CP932）で出力（送り状ソフトがWindows用のため）
+  let blob;
+  if (cfg.encoding === 'SJIS' && typeof Encoding !== 'undefined') {
+    const sjis = Encoding.convert(Encoding.stringToCode(csvText), { to: 'SJIS', from: 'UNICODE' });
+    blob = new Blob([new Uint8Array(sjis)], { type: 'text/csv' });
+  } else {
+    blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = invoiceFileName;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast(`送り状CSV保存: ${invoiceFileName}（${invoiceRows.length}件）`, 'success');
+});
+
+document.getElementById('btnInvoiceClose').addEventListener('click', hideInvoiceSection);
+
+// 変換結果セルの直接編集（focusoutで行データに書き戻す）
+tableWrapper.addEventListener('focusout', e => {
+  const td = e.target.closest ? e.target.closest('td[data-k]') : null;
+  if (!td) return;
+  const row = processedFiles[+td.dataset.f]?.rows[+td.dataset.r];
+  if (!row) return;
+  const key = td.dataset.k;
+  let val = td.innerText.replace(/ /g, ' ');
+  if (key !== 'companyName') val = val.replace(/\n+/g, ' ').trim();
+  if (row[key] === val) return;
+  row[key] = val;
+  // 住所・都道府県・建物名を手で直したら住所分割キャッシュを破棄（次の送り状CSV生成時に再分割）
+  if (key === 'address' || key === 'prefecture' || key === 'building') delete row._addrParts;
+  // 納期を手で直したら「自動変更」扱いを解除（黄色を消す）
+  if (key === 'deliveryDate') {
+    row.deliveryChanged = false;
+    delete row.deliveryDateOrig;
+    td.style.background = '';
+    td.style.fontWeight = '';
+    td.removeAttribute('title');
+  }
+  // 数量や商品の修正は集計バーに即反映
+  if (lastStats) renderSummaryBar(processedFiles.flatMap(pf => pf.rows), lastStats);
+});
+
+// 印刷ヘッダーを更新
+// 1行目: 「6/15 (月) 出荷」 / 2行目: 商品別個数「ニオイしま栓！×5」（件数は出さない）
+function updatePrintHeader() {
+  const v = document.getElementById('shipDate').value;
+  const d = v ? parseYmd(v) : null;
+  document.getElementById('printHeader').textContent = d
+    ? `${d.getMonth() + 1}/${d.getDate()} (${'日月火水木金土'[d.getDay()]}) 出荷`
+    : '出荷日未設定';
+  const summary = buildProductSummary(processedFiles.flatMap(pf => pf.rows));
+  document.getElementById('printSummary').textContent =
+    [...summary.entries()].map(([name, s]) => `${name}×${s.quantity}`).join('　');
+}
+document.getElementById('btnAutoMap').addEventListener('click', () => {
+  const f = files[activeMappingFile];
+  if (f) { f.mapping = autoDetectMapping(f.headers); addExtraMappings(f); }
+  buildMappingUI();
+});
+document.getElementById('btnToggleMapping').addEventListener('click', () => {
+  setRawCollapsed(false);  // 折りたたみ中なら開く
+  const open = mappingSection.classList.toggle('visible');
+  document.getElementById('btnToggleMapping').textContent =
+    open ? '列マッピングを閉じる ▾' : '列マッピングを確認・編集 ▸';
+});
+// 「元データ」タイトルクリックで開閉
+document.getElementById('rawTitle').addEventListener('click', () => {
+  setRawCollapsed(!rawSection.classList.contains('collapsed'));
+});
+
+function setRawCollapsed(collapsed) {
+  rawSection.classList.toggle('collapsed', collapsed);
+  document.getElementById('rawToggleIcon').textContent = collapsed ? '▸' : '▾';
+}
+
+// 複数ファイルをまとめて読み込む（最大 CONFIG.maxFiles ファイル）
+async function handleFiles(fileList) {
+  const arr = Array.from(fileList);
+  if (arr.length > CONFIG.maxFiles) {
+    showToast(`一度に読み込めるのは ${CONFIG.maxFiles} ファイルまでです（選択: ${arr.length}件）`, 'error');
+    return;
+  }
+
+  const loaded = [];
+  for (const file of arr) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    try {
+      let parsed;
+      if (ext === 'csv') {
+        parsed = await readCSV(file);
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        parsed = await readExcel(file);
+      } else {
+        showToast(`${file.name}: CSV または Excel ファイルではありません`, 'error');
+        continue;
+      }
+      if (!parsed) {
+        showToast(`${file.name}: データが不足しています`, 'error');
+        continue;
+      }
+      loaded.push({ name: file.name, size: file.size, headers: parsed.headers, rows: parsed.rows, mapping: {} });
+    } catch (err) {
+      console.error(err);
+      showToast(`${file.name}: 読み込みに失敗しました`, 'error');
+    }
+  }
+
+  if (loaded.length === 0) return;
+  files = loaded;
+  activeMappingFile = 0;
+  onFilesLoaded();
+}
+
+function readCSV(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = function(e) {
+      const uint8 = new Uint8Array(e.target.result);
+      const text = decodeWithDetection(uint8);
+      Papa.parse(text, {
+        header: false,
+        skipEmptyLines: true,
+        complete: function(results) {
+          if (results.data.length < 2) { resolve(null); return; }
+          const headers = results.data[0].map(h => h.trim());
+          const rows = results.data.slice(1).filter(row => row.some(cell => cell.trim() !== ''));
+          resolve({ headers, rows });
+        }
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function readExcel(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        // cellDates: 日付セルをシリアル値(46161等)ではなくDateとして読み、"2026/6/8" 形式に整形する
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        if (json.length < 2) { resolve(null); return; }
+        const headers = json[0].map(h => String(h).trim());
+        const rows = json.slice(1)
+          .map(row => row.map(cell => cell instanceof Date ? fmtSlash(cell) : cell))
+          .filter(row => row.some(cell => String(cell).trim() !== ''));
+        resolve({ headers, rows });
+      } catch (err) { reject(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Shift-JIS / UTF-8 auto detection
+function decodeWithDetection(uint8) {
+  // BOM check
+  if (uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) {
+    return new TextDecoder('utf-8').decode(uint8);
+  }
+  // Try UTF-8 first
+  const utf8 = new TextDecoder('utf-8', { fatal: true });
+  try {
+    const text = utf8.decode(uint8);
+    if (!text.includes('�')) return text;
+  } catch (e) {}
+  // Fallback to Shift-JIS (CP932)
+  return new TextDecoder('shift_jis').decode(uint8);
+}
+
+function totalRowCount() {
+  return files.reduce((s, f) => s + f.rows.length, 0);
+}
+
+function onFilesLoaded() {
+  const total = totalRowCount();
+  const fileMsg = files.length > 1 ? `${files.length}ファイル ` : '';
+  showToast(`${fileMsg}${total} 件のデータを読み込みました`, 'success');
+  setStep(2);
+
+  // 前回の変換結果・送り状プレビューをクリア
+  processedFiles = [];
+  previewSection.classList.remove('visible');
+  hideInvoiceSection();
+  setRawCollapsed(false);
+
+  // 元データをそのまま表示（Excelで開いた状態と同じ）
+  // ファイル情報（件数・サイズ）もこのタイトル行に集約する
+  dropZone.style.display = 'none';
+  rawSection.classList.add('visible');
+  const totalSize = files.reduce((s, f) => s + f.size, 0);
+  const sizeLabel = totalSize < 1024 ? `${totalSize} B`
+    : totalSize < 1048576 ? `${(totalSize / 1024).toFixed(1)} KB`
+    : `${(totalSize / 1048576).toFixed(1)} MB`;
+  document.getElementById('rawCount').textContent =
+    files.length > 1
+      ? `(${files.length}ファイル / ${sizeLabel} / データ合計: ${total}行)`
+      : `(${files[0].name} / ${sizeLabel} / ${total}行)`;
+  renderRawTables();
+
+  // マッピングは裏でファイルごとに自動実行。認識できない必須列があるときだけ開く
+  files.forEach(f => {
+    f.mapping = autoDetectMapping(f.headers);
+    addExtraMappings(f);
+  });
+  buildMappingUI();
+}
+
+// 元データのテーブル表示（複数ファイルは縦に並べ、ファイル名見出しを付ける）
+function renderRawTables() {
+  let html = '';
+  for (const f of files) {
+    if (files.length > 1) {
+      html += `<div class="raw-file-title">📄 ${escapeHtml(f.name)} (${f.rows.length}件)</div>`;
+    }
+    html += rawTableHtml(f);
+  }
+  rawTableWrapper.innerHTML = html;
+}
+
+function rawTableHtml(f) {
+  const limitPerFile = files.length > 1 ? 100 : 200;
+  let html = '<table class="data-table"><thead><tr><th class="row-num">#</th>';
+  f.headers.forEach(h => { html += `<th>${escapeHtml(h)}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  const limit = Math.min(f.rows.length, limitPerFile);
+  for (let i = 0; i < limit; i++) {
+    html += `<tr><td class="row-num">${i + 1}</td>`;
+    f.headers.forEach((_, ci) => {
+      html += `<td>${escapeHtml(String(f.rows[i][ci] ?? ''))}</td>`;
+    });
+    html += '</tr>';
+  }
+  if (f.rows.length > limitPerFile) {
+    html += `<tr><td colspan="${f.headers.length + 1}" style="text-align:center;color:#999;padding:12px;">
+      ... 他 ${f.rows.length - limitPerFile} 件（表示は${limitPerFile}件まで）</td></tr>`;
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+// ============================================================
+// Column mapping UI（ファイルごとに独立、タブで切り替え）
+// ============================================================
+function buildMappingUI() {
+  renderMappingTabs();
+  renderMappingGrid();
+  updateMappingStatus();
+}
+
+function renderMappingTabs() {
+  if (files.length <= 1) {
+    mappingTabs.classList.remove('visible');
+    mappingTabs.innerHTML = '';
+    return;
+  }
+  mappingTabs.classList.add('visible');
+  mappingTabs.innerHTML = '';
+  files.forEach((f, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'file-tab' + (idx === activeMappingFile ? ' active' : '');
+    if (requiredMissing(f).length > 0) btn.classList.add('warn');
+    btn.textContent = f.name;
+    btn.addEventListener('click', () => {
+      activeMappingFile = idx;
+      buildMappingUI();
+    });
+    mappingTabs.appendChild(btn);
+  });
+}
+
+function renderMappingGrid() {
+  const f = files[activeMappingFile];
+  if (!f) { mappingGrid.innerHTML = ''; return; }
+
+  // 住所列（市区町村郡町名番地）は市区町村郡+町名+番地の連結 or 住所列の自動認識で
+  // 作られるため、認識できているときはマッピングUIに出さない（未認識のときだけ表示）
+  const addressSatisfied =
+    f.mapping.address !== undefined ||
+    (f.mapping.city !== undefined && f.mapping.town !== undefined && f.mapping.block !== undefined);
+
+  mappingGrid.innerHTML = '';
+  OUTPUT_COLUMNS.forEach(col => {
+    if (col.key === 'address' && addressSatisfied) return;
+    const item = document.createElement('div');
+    item.className = 'mapping-item';
+
+    const currentVal = f.mapping[col.key];
+    const isAutoMapped = currentVal !== undefined && currentVal !== '';
+    item.classList.add(isAutoMapped ? 'auto-mapped' : 'unmapped');
+
+    const badge = col.required
+      ? '<span class="required-badge">必須</span>'
+      : '<span class="optional-badge">任意</span>';
+
+    let options = `<option value="">-- なし（空白列） --</option>`;
+    f.headers.forEach((h, idx) => {
+      const selected = (currentVal === idx) ? 'selected' : '';
+      options += `<option value="${idx}" ${selected}>${escapeHtml(h)}</option>`;
+    });
+
+    // Show sample data if mapped
+    let sampleHtml = '';
+    if (isAutoMapped && f.rows.length > 0) {
+      const samples = f.rows.slice(0, 3).map(row => row[currentVal] || '').join(' / ');
+      sampleHtml = `<div class="sample-data">例: ${escapeHtml(samples)}</div>`;
+    }
+
+    item.innerHTML = `
+      <label>${col.label}${badge}</label>
+      <select data-key="${col.key}">${options}</select>
+      ${sampleHtml}
+    `;
+
+    const select = item.querySelector('select');
+    select.addEventListener('change', function() {
+      const key = this.dataset.key;
+      const val = this.value;
+      if (val === '') {
+        delete f.mapping[key];
+        item.className = 'mapping-item unmapped';
+      } else {
+        f.mapping[key] = parseInt(val);
+        item.className = 'mapping-item mapped';
+      }
+      updateSampleData(item, key, f);
+      updateMappingStatus();
+      renderMappingTabs();
+    });
+
+    mappingGrid.appendChild(item);
+  });
+}
+
+// 電話番号の補助列（電話番号1が空のときのフォールバック用、UIには出さない）
+function addExtraMappings(f) {
+  ['phone2', 'contactPhone', 'inquiryPhone'].forEach(key => {
+    if (f.mapping[key] !== undefined) return;
+    const idx = f.headers.findIndex(h =>
+      KNOWN_MAPPINGS[key]?.some(pattern => h === pattern)
+    );
+    if (idx >= 0) f.mapping[key] = idx;
+  });
+}
+
+function autoDetectMapping(headers) {
+  const mapping = {};
+  const normalizeHeader = h => h.replace(/[\s　]/g, '').replace(/[Ａ-Ｚａ-ｚ０-９]/g, s =>
+    String.fromCharCode(s.charCodeAt(0) - 0xFEE0)
+  );
+
+  // Phase 1: exact match on known mappings
+  for (const [key, patterns] of Object.entries(KNOWN_MAPPINGS)) {
+    for (const pattern of patterns) {
+      const idx = headers.findIndex(h => h === pattern);
+      if (idx >= 0 && !Object.values(mapping).includes(idx)) {
+        mapping[key] = idx;
+        break;
+      }
+    }
+  }
+
+  // Phase 2: normalized match for remaining
+  for (const [key, patterns] of Object.entries(KNOWN_MAPPINGS)) {
+    if (mapping[key] !== undefined) continue;
+    for (const pattern of patterns) {
+      const normalizedPattern = normalizeHeader(pattern);
+      const idx = headers.findIndex(h => normalizeHeader(h) === normalizedPattern);
+      if (idx >= 0 && !Object.values(mapping).includes(idx)) {
+        mapping[key] = idx;
+        break;
+      }
+    }
+  }
+
+  return mapping;
+}
+
+function updateSampleData(item, key, f) {
+  const existing = item.querySelector('.sample-data');
+  if (existing) existing.remove();
+
+  const idx = f.mapping[key];
+  if (idx !== undefined && f.rows.length > 0) {
+    const samples = f.rows.slice(0, 3).map(row => row[idx] || '').join(' / ');
+    const div = document.createElement('div');
+    div.className = 'sample-data';
+    div.textContent = `例: ${samples}`;
+    item.appendChild(div);
+  }
+}
+
+// 必須列のうち未マッピングのものを返す（ファイル単位）
+function requiredMissing(f) {
+  const required = OUTPUT_COLUMNS.filter(c => c.required);
+  const m = f.mapping;
+  return required.filter(c => {
+    if (c.key === 'address') {
+      // address is satisfied if directly mapped OR if city+town+block are all present
+      if (m.address !== undefined) return false;
+      return !(m.city !== undefined && m.town !== undefined && m.block !== undefined);
+    }
+    if (c.key === 'phone1') {
+      // 電話番号系の列がどれか1つでもマッピングされていればOK
+      return !CONFIG.phonePriority.some(k => m[k] !== undefined);
+    }
+    return m[c.key] === undefined;
+  }).map(c => c.label);
+}
+
+function updateMappingStatus() {
+  const requiredCount = OUTPUT_COLUMNS.filter(c => c.required).length;
+  const status = document.getElementById('mappingStatus');
+  const btn = document.getElementById('btnApplyMapping');
+
+  // アクティブファイルの状態（マッピング編集画面用）
+  const f = files[activeMappingFile];
+  const activeMissing = f ? requiredMissing(f) : [];
+  status.textContent = `必須列: ${requiredCount - activeMissing.length}/${requiredCount} 設定済み`;
+  if (activeMissing.length) {
+    status.textContent += ` (不足: ${activeMissing.join(', ')})`;
+    status.style.color = '#e74c3c';
+  } else {
+    status.style.color = '#27ae60';
+  }
+
+  // 全ファイルの状態（バッジ・変換ボタン用）
+  const badFiles = files.filter(fl => requiredMissing(fl).length > 0);
+  const allOk = badFiles.length === 0;
+  btn.disabled = !allOk;
+
+  if (!allOk) {
+    const first = badFiles[0];
+    const label = files.length > 1 ? `「${first.name}」` : '';
+    mappingBadge.textContent = `⚠ ${label}未認識の列: ${requiredMissing(first).join(', ')}`;
+    mappingBadge.className = 'mapping-badge warn';
+    // 認識できない列があるファイルを表示してマッピングを自動で開く
+    if (!mappingSection.classList.contains('visible')) {
+      activeMappingFile = files.indexOf(first);
+      renderMappingTabs();
+      renderMappingGrid();
+      mappingSection.classList.add('visible');
+      document.getElementById('btnToggleMapping').textContent = '列マッピングを閉じる ▾';
+    }
+  } else {
+    mappingBadge.textContent = files.length > 1
+      ? `✓ 全${files.length}ファイル 列の自動認識OK`
+      : '✓ 列の自動認識OK';
+    mappingBadge.className = 'mapping-badge ok';
+  }
+}
+
+// ============================================================
+// 電話番号ユーティリティ
+// ============================================================
+function normalizePhone(s) {
+  return s.trim()
+    .replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
+    .replace(/[－ー]/g, '-');
+}
+
+function isValidPhone(s) {
+  if (CONFIG.invalidPhoneValues.includes(s)) return false;
+  if (s.length < 3) return false;
+  return /\d/.test(s);
+}
+
+// ============================================================
+// データ処理パイプライン（VBAマクロの処理チェーンを再現）
+// ファイル単位で実行する（重複統合はファイル内で完結）
+// 順序: 運送会社判定 → 重複統合 → 会社名処理
+// ※ 出荷日/納期チェックは「出荷日を設定」ボタンで実行（applyShipDateToRows）
+// ============================================================
+function processData(rows) {
+  const stats = { merged: 0, yupack: 0, storeAdded: 0, lineBreaks: 0, deliveryChanged: 0 };
+
+  // --- 1. 運送会社の自動判定（CONFIG.carrierRules）---
+  rows.forEach(r => {
+    r.carrier = '';
+    r.duplicate = '';
+    for (const rule of CONFIG.carrierRules) {
+      const hit = rule.checkFields.some(field =>
+        rule.keywords.some(kw => (r[field] || '').includes(kw))
+      );
+      if (hit) {
+        r.carrier = rule.carrier;
+        stats.yupack++;
+        break;
+      }
+    }
+  });
+
+  // --- 2. 重複注文の統合（CONFIG.duplicateMergeKeys が全一致 → 数量合算）---
+  const groups = new Map();
+  const merged = [];
+  for (const r of rows) {
+    const qty = parseFloat(r.quantity);
+    if (!qty) {
+      // 数量が空白・0の行は統合対象外でそのまま残す
+      merged.push(r);
+      continue;
+    }
+    const key = CONFIG.duplicateMergeKeys.map(k => (r[k] || '').trim()).join('|');
+    if (groups.has(key)) {
+      const first = groups.get(key);
+      first.quantity = String(parseFloat(first.quantity) + qty);
+      first.duplicate = '数量合算';
+      stats.merged++;
+    } else {
+      groups.set(key, r);
+      merged.push(r);
+    }
+  }
+
+  // --- 3. 会社名処理（製品ルール + ㈱改行）---
+  merged.forEach(r => {
+    let name = r.companyName;
+
+    // 製品ルール（例: ジェット＆ディフューザー → リーシング〇〇店）
+    for (const rule of CONFIG.productRules) {
+      if (rule.productNames.includes(r.product.trim()) && !name.includes(rule.skipIfCompanyIncludes)) {
+        name = rule.companyPrefix + name + rule.companySuffix;
+        stats.storeAdded++;
+      }
+    }
+
+    // 「㈱ 」「㈱　」の後に改行
+    for (const lb of CONFIG.companyLineBreakMarkers) {
+      if (name.includes(lb) && !name.includes(lb + '\n')) {
+        name = name.split(lb).join(lb + '\n');
+        stats.lineBreaks++;
+      }
+    }
+
+    r.companyName = name;
+  });
+
+  return { rows: merged, stats };
+}
+
+// ============================================================
+// 出荷日の設定 + リードタイムによる納期チェック
+// 着日（出荷日+LT、非営業日は翌営業日）が指定納期より後なら、
+// 指定納期を着日に変更して黄色表示する（手作業の納期確認を自動化）
+// 何度でも実行可能（元の納期を基準に再計算する）
+// ============================================================
+function applyShipDateToRows(shipDateIso) {
+  const shipLabel = fmtSlash(new Date(shipDateIso));
+  let changed = 0;
+  for (const pf of processedFiles) {
+    for (const r of pf.rows) {
+      r.shipDate = shipLabel;
+      if (!CONFIG.leadTime.enabled) continue;
+      if (CONFIG.leadTime.skipIfCarrierSet && r.carrier) continue;  // ゆうパック等は対象外
+      const baseStr = r.deliveryChanged ? r.deliveryDateOrig : r.deliveryDate;
+      const due = parseYmd(baseStr);
+      const lt = findLeadTime(r.prefecture, r.address);
+      if (!due || !lt) continue;
+      const arrival = calcArrival(shipDateIso, lt);
+      if (!arrival) continue;
+      if (arrival.getTime() > due.getTime()) {
+        if (!r.deliveryChanged) r.deliveryDateOrig = r.deliveryDate;
+        r.deliveryDate = fmtSlash(arrival);
+        r.deliveryChanged = true;
+        changed++;
+      } else if (r.deliveryChanged) {
+        // 出荷日を早めて間に合うようになった場合は元の納期に戻す
+        r.deliveryDate = r.deliveryDateOrig;
+        delete r.deliveryDateOrig;
+        r.deliveryChanged = false;
+      }
+    }
+  }
+  return changed;
+}
+
+// 商品別集計（印刷ヘッダー用: 商品名 / 件数 / 合計数量）
+function buildProductSummary(rows) {
+  const summary = new Map();
+  for (const r of rows) {
+    const name = (r.product || '').trim();
+    const qty = parseFloat(r.quantity);
+    if (!name || !qty) continue;
+    if (!summary.has(name)) summary.set(name, { count: 0, quantity: 0 });
+    const s = summary.get(name);
+    s.count++;
+    s.quantity += qty;
+  }
+  return summary;
+}
+
+// ============================================================
+// マッピング確定 → 整形処理（ファイル単位） → プレビュー
+// ============================================================
+let lastStats = null;
+
+function detectFileSource(f) {
+  for (const rule of CONFIG.fileSourceRules) {
+    if (rule.filenameKeywords.some(kw => f.name.includes(kw))) return rule.source;
+    if (rule.signatureColumns.some(col => f.headers.includes(col))) return rule.source;
+  }
+  return null;
+}
+
+async function applyMappingAndPreview() {
+  setRawCollapsed(true);  // 変換ボタン押下と同時に元データを隠す
+  previewSection.classList.add('visible');
+  hideInvoiceSection();  // 古い送り状プレビューが残らないように閉じる
+
+  // 祝日データの読み込みを待つ（通常は一瞬）
+  await holidaysReady;
+
+  const totalStats = { merged: 0, yupack: 0, storeAdded: 0, lineBreaks: 0, deliveryChanged: 0, zipFilled: 0 };
+  processedFiles = [];
+
+  for (const f of files) {
+    const mappedData = buildMappedData(f);
+    const { rows, stats } = processData(mappedData);
+    Object.keys(totalStats).forEach(k => { totalStats[k] += (stats[k] || 0); });
+    const fileSource = detectFileSource(f);
+    if (fileSource) rows.forEach(r => { r._fileSource = fileSource; });
+    processedFiles.push({ name: f.name, rows });
+  }
+
+  // 同じ商品のファイルが隣り合うように並び替え（先頭行の商品名→ファイル名順）
+  processedFiles.sort((a, b) => {
+    const pa = (a.rows[0]?.product || ''), pb = (b.rows[0]?.product || '');
+    return pa.localeCompare(pb, 'ja') || a.name.localeCompare(b.name, 'ja');
+  });
+
+  // 出荷日が入力済みなら納期チェックも実行（未入力ならスキップ）
+  const shipDateIso = document.getElementById('shipDate').value;
+  if (shipDateIso) {
+    totalStats.deliveryChanged = applyShipDateToRows(shipDateIso);
+  }
+
+  const allRows = processedFiles.flatMap(pf => pf.rows);
+  lastStats = totalStats;
+
+  // 郵便番号が空白の行をAPIで補完（順次・待ち時間あり）
+  // 1段階目: HeartRails Geo API（CORS対応・高速だが字名等で取得できない場合あり）
+  if (CONFIG.zipcode.enabled) {
+    const targets = allRows.filter(r => !r.postalCode && r.address);
+    if (targets.length) {
+      showToast(`郵便番号を取得中 (1/2 HeartRails)... (${targets.length}件)`, '');
+      for (const r of targets) {
+        const zip = await fetchZipcode(r.prefecture, r.address);
+        if (zip) { r.postalCode = zip; totalStats.zipFilled++; }
+        await new Promise(res => setTimeout(res, CONFIG.zipcode.requestIntervalMs));
+      }
+    }
+  }
+  // 2段階目: ExcelAPI プロキシ（郵便番号補完 + 住所分割を1回のAPI呼び出しで同時取得）
+  // - HeartRailsで取れなかった郵便番号を補完（字名を含む住所など網羅性が高い）
+  // - 住所分割(_addrParts)も保存 → 送り状CSV生成時に住所1/2/3のバランス配置に利用
+  const lkCfg = CONFIG.addressLookup;
+  if (lkCfg.enabled && lkCfg.proxyUrl) {
+    const exTargets = allRows.filter(r =>
+      (!r.postalCode || !r._addrParts) && (r.address || r.prefecture));
+    if (exTargets.length) {
+      showToast(`ExcelAPI 住所処理中... (${exTargets.length}件)`, '');
+      let zipOk = 0, partsOk = 0;
+      for (const r of exTargets) {
+        const full = (r.prefecture || '') + (r.address || '');
+        const res = await fetchAddressLookup(full, r.postalCode);
+        if (res) {
+          if (!r.postalCode && res.zipcode) {
+            const z = String(res.zipcode).replace(/[^\d]/g, '');
+            if (z.length === 7) { r.postalCode = z.slice(0, 3) + '-' + z.slice(3); totalStats.zipFilled++; zipOk++; }
+          }
+          if (Array.isArray(res.parts) && res.parts.some(p => p)) { r._addrParts = res.parts; partsOk++; }
+        }
+        await sleep(lkCfg.requestIntervalMs);
+      }
+      const msgs = [];
+      if (zipOk) msgs.push(`郵便番号 ${zipOk}件補完`);
+      msgs.push(`住所分割 ${partsOk}/${exTargets.length}件`);
+      showToast(`ExcelAPI: ${msgs.join('・')}`, '');
+    }
+  }
+
+  renderSummaryBar(allRows, totalStats);
+  renderPreviewTable(processedFiles);
+  updatePrintHeader();
+
+  document.getElementById('previewCount').textContent =
+    files.length > 1
+      ? `(${files.length}ファイル / ${allRows.length} 件)`
+      : `(${allRows.length} 件)`;
+  setStep(3);
+
+  // 元データは1行に折りたたむ（見たいのは変換結果なので）
+  setRawCollapsed(true);
+  mappingSection.classList.remove('visible');
+  document.getElementById('btnToggleMapping').textContent = '列マッピングを確認・編集 ▸';
+
+  let msg = `整形完了: ${allRows.length}件`;
+  if (totalStats.merged > 0) msg += ` / 重複統合 ${totalStats.merged}件`;
+  if (totalStats.yupack > 0) msg += ` / ゆうパック ${totalStats.yupack}件`;
+  showToast(msg, 'success');
+
+  previewSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// 商品別集計バーの表示（全ファイル合算）
+function renderSummaryBar(rows, stats) {
+  const summary = buildProductSummary(rows);
+  let el = document.getElementById('summaryBar');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'summaryBar';
+    el.style.cssText = 'background:#eaf4fd;border:1px solid #bcdcf5;border-radius:6px;padding:12px 16px;margin-bottom:12px;font-size:16px;line-height:1.8;';
+    tableWrapper.parentNode.insertBefore(el, tableWrapper);
+  }
+  const parts = [];
+  for (const [name, s] of summary) {
+    parts.push(`<strong>${escapeHtml(name)}</strong>: ${s.count}件 ${s.quantity}個`);
+  }
+  let html = parts.join(' ｜ ');
+  const notes = [];
+  if (stats.merged > 0) notes.push(`重複統合: ${stats.merged}件`);
+  if (stats.yupack > 0) notes.push(`ゆうパック: ${stats.yupack}件`);
+  if (stats.deliveryChanged > 0) notes.push(`<span style="background:${CONFIG.colors.deliveryChanged};padding:0 4px;">納期変更: ${stats.deliveryChanged}件</span>`);
+  // 郵便番号取得◯件は表示しない（取得できなかった行は郵便番号セルが赤になる）
+  // 注記行（ゆうパック件数など）は印刷時には出さない（.summary-notes を@media printで非表示）
+  if (notes.length) html += `<br><span class="summary-notes" style="color:#666;font-size:13px;">${notes.join(' ／ ')}</span>`;
+  el.innerHTML = html;
+}
+
+function buildMappedData(f) {
+  return f.rows.map(row => {
+    const mapped = {};
+    OUTPUT_COLUMNS.forEach(col => {
+      const idx = f.mapping[col.key];
+      if (idx !== undefined) {
+        mapped[col.key] = String(row[idx] ?? '').trim();
+      } else {
+        mapped[col.key] = '';
+      }
+    });
+
+    // 電話番号統合: CONFIG.phonePriority の順でデータが入っている最初のものを採用
+    mapped.phone1 = '';
+    for (const phoneKey of CONFIG.phonePriority) {
+      const idx = f.mapping[phoneKey];
+      if (idx === undefined) continue;
+      const val = normalizePhone(String(row[idx] ?? ''));
+      if (isValidPhone(val)) { mapped.phone1 = val; break; }
+    }
+
+    // 住所結合: 市区町村郡 + 町名 + 番地 が個別列の場合は結合
+    if (!mapped.address || mapped.address === '') {
+      const cityIdx = f.mapping.city;
+      const townIdx = f.mapping.town;
+      const blockIdx = f.mapping.block;
+      const parts = [];
+      if (cityIdx !== undefined) parts.push(String(row[cityIdx] ?? '').trim());
+      if (townIdx !== undefined) parts.push(String(row[townIdx] ?? '').trim());
+      if (blockIdx !== undefined) parts.push(String(row[blockIdx] ?? '').trim());
+      mapped.address = parts.join('').replace(/[\s　]/g, '');
+    }
+
+    // 都道府県分割: 結合住所の先頭から47都道府県を検出して分離
+    if (!mapped.prefecture || mapped.prefecture === '') {
+      const pref = CONFIG.prefectures.find(p => mapped.address.startsWith(p));
+      if (pref) {
+        mapped.prefecture = pref;
+        mapped.address = mapped.address.slice(pref.length);
+      }
+    }
+
+    // Postal code: strip non-numeric except hyphen, format
+    if (mapped.postalCode) {
+      let pc = mapped.postalCode.replace(/[^\d]/g, '');
+      if (pc.length === 7) {
+        mapped.postalCode = pc.slice(0, 3) + '-' + pc.slice(3);
+      }
+    }
+
+    // 日付フィールドを YYYY/M/D に正規化（印刷での年剥ぎ・Excel出力の統一のため）
+    ['requestDate', 'deliveryDate'].forEach(key => {
+      if (mapped[key]) {
+        const d = parseYmd(mapped[key]);
+        if (d) mapped[key] = fmtSlash(d);
+      }
+    });
+
+    return mapped;
+  });
+}
+
+// 変換結果テーブル（複数ファイルはVBA版同様、ファイル名行で区切る）
+function renderPreviewTable(fileResults) {
+  const allCount = fileResults.reduce((s, fr) => s + fr.rows.length, 0);
+  if (allCount === 0) {
+    tableWrapper.innerHTML = '<p style="padding:20px;color:#999;">データがありません</p>';
+    return;
+  }
+
+  const totalCols = ALL_COLUMNS.length + 2;  // # + 出力列 + 削除ボタン列
+  const headRowHtml = () => {
+    let h = '<tr class="col-head-row"><th class="row-num">#</th>';
+    ALL_COLUMNS.forEach(col => { h += `<th data-k="${col.key}">${escapeHtml(col.label)}</th>`; });
+    return h + '<th class="del-col"></th></tr>';
+  };
+  const multi = fileResults.length > 1;
+  // 複数ファイル時は「ファイル名行 → 列名行 → データ」の順で繰り返す（列名の上にファイル名）
+  let html = '<table class="data-table">'
+    + (multi ? '<tbody>' : '<thead>' + headRowHtml() + '</thead><tbody>');
+
+  let rendered = 0;
+  const renderLimit = 500;
+
+  for (let fi = 0; fi < fileResults.length; fi++) {
+    const fr = fileResults[fi];
+    // ファイル名行（VBA版: ファイル名　データn件　個数合計n件）→ その下に列名行
+    if (multi) {
+      const totalQty = fr.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
+      html += `<tr class="file-sep-row"><td colspan="${totalCols}">📄 ${escapeHtml(fr.name)}　データ${fr.rows.length}件　個数合計${totalQty}件</td></tr>`;
+      html += headRowHtml();
+    }
+    for (let i = 0; i < fr.rows.length; i++) {
+      if (rendered >= renderLimit) break;
+      html += renderDataRow(fr.rows[i], i, fi);
+      rendered++;
+    }
+    if (rendered >= renderLimit) break;
+  }
+
+  if (allCount > renderLimit) {
+    html += `<tr><td colspan="${totalCols}" style="text-align:center;color:#999;padding:12px;">
+      ... 他 ${allCount - renderLimit} 件（表示は${renderLimit}件まで）</td></tr>`;
+  }
+
+  html += '</tbody></table>';
+  tableWrapper.innerHTML = html;
+}
+
+function renderDataRow(row, i, fi) {
+  const C = CONFIG.colors;
+  const isYupack = (row.carrier || '').trim() === 'ゆうパック';
+  const rowStyle = isYupack ? `background:${C.yupackRow};` : '';
+
+  let html = `<tr><td class="row-num" style="${rowStyle}">${i + 1}</td>`;
+
+  ALL_COLUMNS.forEach(col => {
+    const val = row[col.key] || '';
+    let style = rowStyle;
+
+    // 空白チェック対象列が空白 → 赤
+    if (CONFIG.emptyCheckColumns.includes(col.key) && val.trim() === '') {
+      style = `background:${C.emptyCell};`;
+    }
+
+    // 数量: 空白/0 → 赤、2以上 → 緑太字
+    if (col.key === 'quantity') {
+      const qty = parseFloat(val);
+      if (!qty) {
+        style = `background:${C.emptyCell};`;
+      } else if (qty >= 2) {
+        style = rowStyle + `background:${C.quantityHigh};font-weight:bold;`;
+      }
+      style += 'text-align:center;';
+    }
+
+    // 日付列は中央揃え
+    if (['requestDate', 'deliveryDate', 'shipDate'].includes(col.key)) {
+      style += 'text-align:center;';
+    }
+
+    // リードタイム的に間に合わず納期を変更したセル → 黄色
+    let title = '';
+    if (col.key === 'deliveryDate' && row.deliveryChanged) {
+      style += `background:${CONFIG.colors.deliveryChanged};font-weight:bold;`;
+      title = ` title="元の指定納期: ${escapeHtml(row.deliveryDateOrig || '')}（リードタイム的に間に合わないため変更）"`;
+    }
+
+    // ゆうパックの運送会社セル → 赤太字
+    if (col.key === 'carrier' && isYupack) {
+      style += `color:${C.yupackText};font-weight:bold;`;
+    }
+
+    // 会社名の改行を <br> で表示
+    const display = col.key === 'companyName'
+      ? escapeHtml(val).replace(/\n/g, '<br>')
+      : escapeHtml(val);
+
+    // セルは直接編集可能（focusoutで行データに書き戻す）
+    html += `<td style="${style}"${title} contenteditable="true" data-f="${fi}" data-r="${i}" data-k="${col.key}">${display}</td>`;
+  });
+  // 行削除ボタン（保留・在庫切れなどでこの出荷から外したいとき用。印刷には出ない）
+  html += `<td class="del-col"><button class="row-del" data-f="${fi}" data-r="${i}" title="この行を削除">🗑</button></td></tr>`;
+  return html;
+}
+
+// 行削除（確認ダイアログつき。再変換すると元に戻る）
+// 右クリック時にセルへフォーカス + 全選択 → ブラウザ標準の右クリックメニュー
+// （コピー/貼り付け項目を確実に表示。preventDefault しないので OS の挙動はそのまま）
+tableWrapper.addEventListener('contextmenu', e => {
+  const td = e.target.closest && e.target.closest('td[contenteditable]');
+  if (!td) return;
+  if (document.activeElement !== td) td.focus();
+  // 既に範囲選択中ならその選択を尊重、空ならセル全体を選択（コピー対象を明確化）
+  const sel = window.getSelection();
+  if (!sel.toString()) {
+    const range = document.createRange();
+    range.selectNodeContents(td);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+});
+
+tableWrapper.addEventListener('click', e => {
+  const btn = e.target.closest ? e.target.closest('.row-del') : null;
+  if (!btn) return;
+  const pf = processedFiles[+btn.dataset.f];
+  const row = pf?.rows[+btn.dataset.r];
+  if (!row) return;
+  const label = [(row.product || '').trim(), (row.companyName || '').split('\n').join(' ').trim()]
+    .filter(Boolean).join(' / ');
+  if (!confirm(`この行を削除しますか？\n\n${label}\n\n（保留・在庫切れなどで今回の出荷から外す場合。再変換すると元に戻ります）`)) return;
+  pf.rows.splice(+btn.dataset.r, 1);
+  renderPreviewTable(processedFiles);
+  if (lastStats) renderSummaryBar(processedFiles.flatMap(p => p.rows), lastStats);
+  updatePrintHeader();
+  showToast('1行削除しました（再変換すると元に戻ります）', 'success');
+});
+
+// ============================================================
+// UI helpers
+// ============================================================
+function resetAll() {
+  files = [];
+  activeMappingFile = 0;
+  processedFiles = [];
+  dropZone.style.display = '';
+  rawSection.classList.remove('visible');
+  setRawCollapsed(false);
+  mappingSection.classList.remove('visible');
+  previewSection.classList.remove('visible');
+  hideInvoiceSection();
+  document.getElementById('btnToggleMapping').textContent = '列マッピングを確認・編集 ▸';
+  document.getElementById('shipDate').value = '';
+  fileInput.value = '';
+  setStep(1);
+}
+
+function setStep(n) {
+  document.querySelectorAll('.step').forEach((el, i) => {
+    el.classList.remove('active', 'done');
+    if (i + 1 < n) el.classList.add('done');
+    if (i + 1 === n) el.classList.add('active');
+  });
+}
+
+let toastTimer = null;
+// sticky=true にすると自動で消えない（クリックで閉じる。納期チェック結果などに使う）
+function showToast(msg, type = '', sticky = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = sticky ? msg + '　✕' : msg;
+  toast.className = 'toast show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = sticky ? null : setTimeout(() => toast.classList.remove('show'), 3000);
+}
+document.getElementById('toast').addEventListener('click', () => {
+  document.getElementById('toast').classList.remove('show');
+});
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ============================================================
+// メール文モーダル
+// ============================================================
+(() => {
+  const overlay = document.getElementById('mailOverlay');
+  const preview = document.getElementById('mailPreview');
+  const btnCopy = document.getElementById('btnCopyMail');
+  let plainTextCache = '';
+
+  function currentTime15() {
+    const now = new Date();
+    let mins = Math.round(now.getMinutes() / 15) * 15;
+    let hours = now.getHours() + Math.floor(mins / 60);
+    mins = mins % 60;
+    return `${hours}：${String(mins).padStart(2, '0')}`;
+  }
+
+  function buildMailLines() {
+    const rows = processedFiles.flatMap(pf => pf.rows);
+    const summary = buildProductSummary(rows);
+    const shipDate = document.getElementById('shipDate').value;
+
+    const DAYS_JA = ['㈰', '㈪', '㈫', '㈬', '㈭', '㈮', '㈯'];
+    let dateStr = '';
+    if (shipDate) {
+      const d = new Date(shipDate);
+      dateStr = `${d.getMonth() + 1}/${d.getDate()}${DAYS_JA[d.getDay()]}`;
+    }
+
+    const productNames = [...summary.keys()].join('、') + `(${currentTime15()}現在)`;
+    const hasDeliveryChange = lastStats && lastStats.deliveryChanged > 0;
+
+    const lines = [];
+    lines.push('ピュアライフホールディングス株式会社　御中');
+    lines.push('');
+    lines.push('いつも大変お世話になっております。');
+    lines.push('');
+    lines.push('');
+    lines.push(`${dateStr}分出荷指示を承りました。`);
+    lines.push('');
+    lines.push(productNames);
+    lines.push('');
+    if (hasDeliveryChange) {
+      lines.push('納品日を最短納期に変更させていただき、準備させていただきます。');
+      lines.push('（添付Excel内「指定納期」部分を黄色に着色させていただいております。）');
+      lines.push('');
+    }
+    lines.push('よろしくお願いいたします。');
+    lines.push('');
+    lines.push('株式会社シーク');
+
+    return lines;
+  }
+
+  function renderMailHtml(lines) {
+    return lines.map(l =>
+      l === ''
+        ? '<div style="margin:0;line-height:1.75em">&nbsp;</div>'
+        : `<div style="margin:0">${escapeHtml(l)}</div>`
+    ).join('');
+  }
+
+  document.getElementById('btnMailText').addEventListener('click', () => {
+    const shipDate = document.getElementById('shipDate').value;
+    if (!shipDate) {
+      showToast('出荷日を設定してからメール文を開いてください', 'error');
+      return;
+    }
+    const lines = buildMailLines();
+    plainTextCache = lines.join('\n');
+    preview.innerHTML = renderMailHtml(lines);
+    overlay.classList.add('open');
+  });
+
+  document.getElementById('mailClose').addEventListener('click', () => overlay.classList.remove('open'));
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+
+  btnCopy.addEventListener('click', () => {
+    navigator.clipboard.writeText(plainTextCache).then(() => {
+      btnCopy.textContent = '✓ コピーしました！';
+      btnCopy.classList.add('copied');
+      setTimeout(() => {
+        btnCopy.textContent = 'コピー';
+        btnCopy.classList.remove('copied');
+      }, 2500);
+    });
+  });
+})();
+
+// ============================================================
+// 設定ビューア（CONFIG をテーブル表示）
+// ============================================================
+(() => {
+  const overlay = document.getElementById('cfgOverlay');
+  const tabs = document.getElementById('cfgTabs');
+
+  document.getElementById('btnOpenConfig').addEventListener('click', () => {
+    renderConfigPanels();
+    overlay.classList.add('open');
+  });
+  document.getElementById('cfgClose').addEventListener('click', () => overlay.classList.remove('open'));
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+
+  tabs.addEventListener('click', e => {
+    const tab = e.target.closest('.cfg-tab');
+    if (!tab) return;
+    tabs.querySelectorAll('.cfg-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.cfg-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(tab.dataset.tab).classList.add('active');
+  });
+
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function tags(arr, cls) { return arr.map(v => `<span class="cfg-tag${cls?' '+cls:''}">${esc(v)}</span>`).join(' '); }
+
+  function renderConfigPanels() {
+    // ── 製品マスタ ──
+    const pm = CONFIG.invoiceCsv.productMaster;
+    let h = '<h3>製品マスタ（荷送人・品名記事・梱包ルール）</h3>';
+    h += '<p class="cfg-note">送り状CSV生成時に使用。製品名の表記ゆれ（＆/&）は自動で同一視されます。</p>';
+    h += '<table class="cfg-table"><thead><tr>';
+    h += '<th>製品名</th><th>荷送人名</th><th>荷送人コード</th><th>品名記事1</th><th>品名記事2</th><th>品名記事3</th><th>まとめ梱包</th>';
+    h += '</tr></thead><tbody>';
+    pm.forEach(p => {
+      const bundleLabel = p.まとめ梱包 === 1 ? 'なし（1:1）'
+        : `${p.まとめ梱包}ケース1梱包`;
+      const bundleClass = p.まとめ梱包 > 1 ? ' class="cfg-tag orange"' : '';
+      h += '<tr>';
+      h += `<td>${tags(p.製品名)}</td>`;
+      h += `<td>${esc(p.荷送人名)}</td>`;
+      h += `<td style="font-family:monospace;font-size:12px">${esc(p.荷送人コード)}</td>`;
+      h += `<td>${esc(p.品名記事1)}</td>`;
+      h += `<td>${esc(p.品名記事2)}</td>`;
+      h += `<td>${esc(p.品名記事3)}</td>`;
+      h += `<td><span${bundleLabel !== 'なし（1:1）' ? ' class="cfg-tag orange"' : ''}>${esc(bundleLabel)}</span>`;
+      if (p.まとめ梱包 > 1 && p.まとめ梱包の品名記事2) {
+        h += `<br><span style="font-size:11px;color:#888">品名記事2: ${esc(p.まとめ梱包の品名記事2)}</span>`;
+      }
+      h += '</td></tr>';
+    });
+    h += '</tbody></table>';
+
+    // 製品ルール（会社名変換）
+    if (CONFIG.productRules.length) {
+      h += '<h3>製品ルール（会社名の自動変換）</h3>';
+      h += '<table class="cfg-table"><thead><tr><th>対象製品</th><th>処理内容</th></tr></thead><tbody>';
+      CONFIG.productRules.forEach(r => {
+        h += `<tr><td>${tags(r.productNames)}</td><td>${esc(r.description)}</td></tr>`;
+      });
+      h += '</tbody></table>';
+    }
+    document.getElementById('cfgProduct').innerHTML = h;
+
+    // ── 変換ルール ──
+    h = '<h3>出力列の定義</h3>';
+    h += '<table class="cfg-table"><thead><tr><th>内部キー</th><th>列名</th><th>種別</th></tr></thead><tbody>';
+    CONFIG.outputColumns.forEach(c => {
+      const kind = c.computed ? '<span class="cfg-tag green">自動生成</span>'
+        : c.required ? '<span class="cfg-tag">必須</span>'
+        : '<span class="cfg-tag" style="background:#f0f0f0;color:#888">任意</span>';
+      h += `<tr><td style="font-family:monospace">${esc(c.key)}</td><td>${esc(c.label)}</td><td>${kind}</td></tr>`;
+    });
+    h += '</tbody></table>';
+
+    h += '<h3>列名エイリアス（入力ファイル列名 → 内部キー）</h3>';
+    h += '<p class="cfg-note">ジェット形式・ruum形式など、入力ファイルの列名が異なる場合に自動マッピングで使用。</p>';
+    h += '<table class="cfg-table"><thead><tr><th>内部キー</th><th>認識する列名</th></tr></thead><tbody>';
+    Object.entries(CONFIG.columnAliases).forEach(([k, v]) => {
+      h += `<tr><td style="font-family:monospace">${esc(k)}</td><td>${tags(v)}</td></tr>`;
+    });
+    h += '</tbody></table>';
+
+    h += '<h3>電話番号の優先順位</h3>';
+    h += '<p class="cfg-note">上から順にデータが入っている最初のものを採用。無効値: ' + tags(CONFIG.invalidPhoneValues.filter(v=>v), 'red') + '</p>';
+    h += '<table class="cfg-table"><thead><tr><th>順位</th><th>内部キー</th></tr></thead><tbody>';
+    CONFIG.phonePriority.forEach((k, i) => {
+      h += `<tr><td style="text-align:center">${i + 1}</td><td style="font-family:monospace">${esc(k)}</td></tr>`;
+    });
+    h += '</tbody></table>';
+
+    h += '<h3>運送会社の自動判定ルール</h3>';
+    h += '<table class="cfg-table"><thead><tr><th>運送会社</th><th>判定キーワード</th><th>チェック対象</th><th>説明</th></tr></thead><tbody>';
+    CONFIG.carrierRules.forEach(r => {
+      h += `<tr><td>${esc(r.carrier)}</td><td>${tags(r.keywords, 'orange')}</td><td>${tags(r.checkFields)}</td><td>${esc(r.description)}</td></tr>`;
+    });
+    h += '</tbody></table>';
+
+    h += '<h3>重複注文の統合キー</h3>';
+    h += '<p class="cfg-note">以下のキーが全て一致する行は数量を合算して1行に統合（ファイル単位）。</p>';
+    h += '<p>' + tags(CONFIG.duplicateMergeKeys) + '</p>';
+
+    h += '<h3>条件付き書式（色ルール）</h3>';
+    h += '<table class="cfg-table"><thead><tr><th>条件</th><th>色</th><th>サンプル</th></tr></thead><tbody>';
+    const colorDescs = {
+      emptyCell: '必須セルが空白', quantityHigh: '数量2以上',
+      yupackRow: 'ゆうパック行', yupackText: 'ゆうパック文字',
+      deliveryChanged: '納期変更済み',
+    };
+    Object.entries(CONFIG.colors).forEach(([k, v]) => {
+      h += `<tr><td>${esc(colorDescs[k] || k)}</td><td style="font-family:monospace">${esc(v)}</td>`;
+      h += `<td><span style="display:inline-block;width:60px;height:20px;background:${v};border:1px solid #ccc;border-radius:3px"></span></td></tr>`;
+    });
+    h += '</tbody></table>';
+
+    h += '<h3>空白チェック対象列</h3>';
+    h += '<p>' + tags(CONFIG.emptyCheckColumns) + '</p>';
+
+    document.getElementById('cfgRules').innerHTML = h;
+
+    // ── 送り状CSV設定 ──
+    h = '<h3>基本設定</h3>';
+    h += '<table class="cfg-table"><tbody>';
+    h += `<tr><th>ファイル名パターン</th><td style="font-family:monospace">${esc(CONFIG.invoiceCsv.filenamePattern)}</td></tr>`;
+    h += `<tr><th>文字コード</th><td>${esc(CONFIG.invoiceCsv.encoding)}</td></tr>`;
+    h += `<tr><th>日付形式</th><td style="font-family:monospace">${esc(CONFIG.invoiceCsv.dateFormat)}</td></tr>`;
+    h += `<tr><th>ヘッダー行</th><td>${CONFIG.invoiceCsv.includeHeader ? 'あり' : 'なし'}</td></tr>`;
+    h += `<tr><th>除外運送会社</th><td>${tags(CONFIG.invoiceCsv.excludeCarriers, 'orange')}</td></tr>`;
+    h += '</tbody></table>';
+
+    h += '<h3>出力列（送り状ソフトの取込順序）</h3>';
+    h += '<p class="cfg-note">必須列は青タグ、任意列はグレー。</p>';
+    const req = new Set(CONFIG.invoiceCsv.requiredColumns);
+    h += '<p>' + CONFIG.invoiceCsv.columns.map(c =>
+      req.has(c) ? `<span class="cfg-tag">${esc(c)}</span>` : `<span class="cfg-tag" style="background:#f0f0f0;color:#888">${esc(c)}</span>`
+    ).join(' ') + '</p>';
+
+    h += '<h3>固定値マスタ</h3>';
+    h += '<p class="cfg-note">全行で共通の固定値。空欄は送り状ソフト側で未使用の列。</p>';
+    h += '<table class="cfg-table"><thead><tr><th>列名</th><th>値</th></tr></thead><tbody>';
+    Object.entries(CONFIG.invoiceCsv.fixedValues).forEach(([k, v]) => {
+      const display = v === '' ? '<span style="color:#ccc">（空欄）</span>' : esc(v);
+      h += `<tr><td>${esc(k)}</td><td>${display}</td></tr>`;
+    });
+    h += '</tbody></table>';
+
+    h += '<h3>リードタイム・郵便番号API</h3>';
+    h += '<table class="cfg-table"><tbody>';
+    h += `<tr><th>リードタイムチェック</th><td>${CONFIG.leadTime.enabled ? '有効' : '無効'}</td></tr>`;
+    h += `<tr><th>運送会社確定行は除外</th><td>${CONFIG.leadTime.skipIfCarrierSet ? 'はい' : 'いいえ'}</td></tr>`;
+    h += `<tr><th>郵便番号自動取得</th><td>${CONFIG.zipcode.enabled ? '有効' : '無効'}</td></tr>`;
+    h += `<tr><th>APIリクエスト間隔</th><td>${CONFIG.zipcode.requestIntervalMs}ms</td></tr>`;
+    h += '</tbody></table>';
+
+    document.getElementById('cfgInvoice').innerHTML = h;
+  }
+})();
+</script>
+</body>
+</html>
