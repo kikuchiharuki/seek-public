@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ピュアライフ出荷ツール</title>
+<title>CSV整形ツール</title>
 <!-- xlsx-js-style: SheetJS 0.18.5互換 + セル背景色/フォント/罫線などのスタイル出力対応 -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -132,18 +132,19 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .file-tab.active.warn { background: #e67e22; color: #fff; }
 
 .mapping-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
 }
 .mapping-item {
-  border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px;
-  background: #fafafa;
+  border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 14px;
+  background: #fafafa; display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap;
 }
 .mapping-item.mapped { border-color: #27ae60; background: #f0faf0; }
 .mapping-item.unmapped { border-color: #e67e22; background: #fef9f0; }
 .mapping-item.auto-mapped { border-color: #3498db; background: #f0f7fe; }
 .mapping-item label {
-  display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;
+  font-size: 13px; font-weight: 600; white-space: nowrap; min-width: 160px;
+  flex-shrink: 0;
 }
 .mapping-item .required-badge {
   font-size: 11px; color: #e74c3c; font-weight: normal; margin-left: 4px;
@@ -152,12 +153,15 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   font-size: 11px; color: #999; font-weight: normal; margin-left: 4px;
 }
 .mapping-item select {
-  width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;
+  flex: 1; min-width: 180px; padding: 8px; border: 1px solid #ddd; border-radius: 6px;
   font-size: 13px; background: #fff;
 }
 .mapping-item .sample-data {
-  font-size: 11px; color: #888; margin-top: 4px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; color: #888; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; flex-basis: 100%;
+}
+.mapping-item .mapping-hint {
+  font-size: 11px; color: #888; flex-basis: 100%; margin-top: -4px;
 }
 
 .mapping-actions {
@@ -398,7 +402,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 <body>
 
 <div class="app-header">
-  <h1>ピュアライフ出荷ツール</h1>
+  <h1>CSV整形ツール</h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -457,7 +461,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         </label>
         <button class="btn-primary" id="btnApplyShipDate">📅 出荷日を設定</button>
         <button class="btn-secondary" id="btnExcel">📥 Excel保存</button>
-        <button class="btn-secondary" id="btnMailText">✉ メール文</button>
+        <button class="btn-secondary" id="btnMailText">✉ 承りメール文</button>
         <button class="btn-secondary" id="btnInvoiceCsv">🚚 送り状CSV</button>
         <button class="btn-secondary" id="btnPrint">🖨 印刷</button>
       </div>
@@ -493,7 +497,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   <div class="mail-modal">
     <div class="mail-modal-header">
       <button class="mail-close" id="mailClose">&times;</button>
-      <h3>✉ メール文</h3>
+      <h3>✉ 承りメール文</h3>
       <button class="btn-copy" id="btnCopyMail">コピー</button>
     </div>
     <div class="mail-body">
@@ -653,7 +657,7 @@ const CONFIG = {
     yupackRow:       '#ffccff',   // ゆうパック行 → ピンク
     yupackText:      '#ff0000',   // ゆうパックの文字 → 赤太字
     deliveryChanged: '#ffff00',   // リードタイム的に間に合わず指定納期を変更したセル → 黄色
-    overLength:      '#ffd591',   // 送り状ソフトの文字数上限超過セル → 橙（警告・保存はできる）
+    overLength:      '#ff5d5d',   // 送り状ソフトの文字数上限超過セル → 赤（エラー・保存不可）
   },
 
   // 空白チェック対象列（空白だと赤色表示になる列）
@@ -694,6 +698,20 @@ const CONFIG = {
     requestIntervalMs: 200,   // ExcelAPI負荷軽減（元Excel版と同じ間隔）
     maxRetries: 3,            // 取得失敗時のリトライ回数（元Excel版と同じ）
     retryWaitMs: 500,         // リトライ間の待機
+  },
+
+  // ──────────────────────────────────────────────
+  // ⑫ Alrit Cloud メール連携（承りメール自動返信）
+  //    出荷依頼メール（ReadLine.page）の「出荷ツールで処理」ボタンから遷移してきた場合、
+  //    変換完了後に承りメール本文を自動生成し、元メールへの返信を作成する。
+  //    Tampermonkey スクリプト（alrit-mail-highlight.user.js v3.0+）と連携。
+  // ──────────────────────────────────────────────
+  alrit: {
+    baseUrl: 'https://fifth.alrit-cloud.com/smail/Index.page',
+    // 承りメールの宛先（autoReply = 返信なので通常はAlrit側で自動設定される。
+    // 新規作成(autoCompose)フォールバック時に使う）
+    ukeMailTo: 'cyumon@purelife-hd.com',
+    ukeMailCc: 'seek-order@seek-inc.co.jp,chiba@seek-inc.co.jp',
   },
 
   // ──────────────────────────────────────────────
@@ -1004,6 +1022,22 @@ async function fetchZipcode(pref, address) {
 let files = [];
 let activeMappingFile = 0;   // マッピングUIで編集中のファイル index
 let processedFiles = [];     // 変換結果: [{ name, rows }]
+
+// Alrit連携: ReadLine.page「出荷ツールで処理」から遷移してきた場合のメールコンテキスト
+let alritMailContext = null;
+(() => {
+  if (!new URLSearchParams(location.search).has('fromAlrit')) return;
+  try {
+    const raw = localStorage.getItem('alrit-shipment-mailContext');
+    if (!raw) return;
+    const ctx = JSON.parse(raw);
+    if (Date.now() - ctx.timestamp > 300000) { localStorage.removeItem('alrit-shipment-mailContext'); return; }
+    alritMailContext = ctx;
+    localStorage.removeItem('alrit-shipment-mailContext');
+    history.replaceState(null, '', location.pathname);
+    console.log('📦 Alrit連携: メールコンテキスト取得', alritMailContext);
+  } catch(e) { console.log('⚠️ Alrit連携: コンテキスト読取失敗', e); }
+})();
 
 // ============================================================
 // DOM
@@ -1415,6 +1449,9 @@ document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
   if (invoiceMissingList().length) {
     notes.push('<span style="color:#e74c3c;font-weight:700;">⚠ 必須項目が空白の行があります（赤いセル）。修正しないとCSVを保存できません</span>');
   }
+  if (invoiceOverLengthList().length) {
+    notes.push('<span style="color:#e74c3c;font-weight:700;">⚠ 文字数上限を超過している列があります（赤いセル）。修正しないとCSVを保存できません</span>');
+  }
   document.getElementById('invoiceNotes').innerHTML = notes.join(' ／ ');
   document.getElementById('invoiceNotes').style.display = notes.length ? '' : 'none';
   document.getElementById('invoiceCount').textContent = `(${invoiceRows.length} 件 → ${invoiceFileName})`;
@@ -1436,6 +1473,20 @@ function invoiceMissingList() {
   return errs;
 }
 
+function invoiceOverLengthList() {
+  const lims = CONFIG.invoiceCsv.lengthLimits;
+  if (!lims) return [];
+  const errs = [];
+  invoiceRows.forEach((rec, i) => {
+    const over = Object.keys(lims).filter(c => {
+      const v = String(rec[c] ?? '').trim();
+      return v && zenkakuLen(v) > lims[c];
+    });
+    if (over.length) errs.push(`${i + 1}行目: ${over.map(c => `${c}(${zenkakuLen(String(rec[c]??''))}>${lims[c]}文字)`).join('・')}`);
+  });
+  return errs;
+}
+
 // セルの背景色とtitleを文字数制限・必須項目に合わせて算出
 function invoiceCellStyle(col, val) {
   const cfg = CONFIG.invoiceCsv;
@@ -1444,7 +1495,7 @@ function invoiceCellStyle(col, val) {
   if (cfg.requiredColumns.includes(col) && !v.trim()) {
     return { bg: CONFIG.colors.emptyCell, title: '必須項目です' };
   }
-  // 文字数超過 → 橙（警告のみ）
+  // 文字数超過 → 赤（エラー・保存不可）
   const lim = cfg.lengthLimits && cfg.lengthLimits[col];
   if (lim && v.trim()) {
     const len = zenkakuLen(v);
@@ -1494,8 +1545,12 @@ document.getElementById('invoiceTableWrapper').addEventListener('focusout', e =>
 document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
   if (!invoiceRows.length) { showToast('先に「🚚 送り状CSV」でプレビューを作成してください', 'error'); return; }
   const missing = invoiceMissingList();
-  if (missing.length) {
-    showToast(`保存できません。必須項目が空白です（赤いセルを修正してください） → ${missing.slice(0, 5).join(' ／ ')}${missing.length > 5 ? ' ほか' : ''}`, 'error', true);
+  const overLen = invoiceOverLengthList();
+  if (missing.length || overLen.length) {
+    const msgs = [];
+    if (missing.length) msgs.push(`必須項目が空白 → ${missing.slice(0, 3).join(' ／ ')}${missing.length > 3 ? ' ほか' : ''}`);
+    if (overLen.length) msgs.push(`文字数超過 → ${overLen.slice(0, 3).join(' ／ ')}${overLen.length > 3 ? ' ほか' : ''}`);
+    showToast(`保存できません（赤いセルを修正してください）。${msgs.join('。')}`, 'error', true);
     return;
   }
   const cfg = CONFIG.invoiceCsv;
@@ -1772,7 +1827,7 @@ function renderMappingTabs() {
   files.forEach((f, idx) => {
     const btn = document.createElement('button');
     btn.className = 'file-tab' + (idx === activeMappingFile ? ' active' : '');
-    if (requiredMissing(f).length > 0) btn.classList.add('warn');
+    if (unmappedList(f).length > 0) btn.classList.add('warn');
     btn.textContent = f.name;
     btn.addEventListener('click', () => {
       activeMappingFile = idx;
@@ -1786,15 +1841,48 @@ function renderMappingGrid() {
   const f = files[activeMappingFile];
   if (!f) { mappingGrid.innerHTML = ''; return; }
 
-  // 住所列（市区町村郡町名番地）は市区町村郡+町名+番地の連結 or 住所列の自動認識で
-  // 作られるため、認識できているときはマッピングUIに出さない（未認識のときだけ表示）
-  const addressSatisfied =
-    f.mapping.address !== undefined ||
-    (f.mapping.city !== undefined && f.mapping.town !== undefined && f.mapping.block !== undefined);
+  // 電話番号の補助列キー（phone1以外でマッピング可能な電話番号列）
+  const phoneExtraKeys = CONFIG.phonePriority.filter(k => k !== 'phone1');
+  // 住所の分割列キー
+  const addressPartKeys = ['city', 'town', 'block'];
+
+  // マッピングUIに出す列リストを構築（OUTPUT_COLUMNS + 電話番号補助列 + 住所分割列）
+  const uiColumns = [];
+  for (const col of OUTPUT_COLUMNS) {
+    if (col.key === 'phone1') {
+      // 電話番号グループ: phone1 + 優先順位付きの補助列
+      uiColumns.push({ key: 'phone1', label: '電話番号1', hint: '優先度1（最優先で採用）', group: 'phone' });
+      phoneExtraKeys.forEach((k, i) => {
+        const aliases = CONFIG.columnAliases[k];
+        const label = aliases ? aliases[0] : k;
+        uiColumns.push({ key: k, label, hint: `優先度${i + 2}（電話番号1が空のとき採用）`, group: 'phone' });
+      });
+    } else if (col.key === 'address') {
+      // 住所グループ: address直接 or city+town+block 分割
+      uiColumns.push({ key: 'address', label: '住所（結合列）', hint: '1列に住所全体が入っている場合', group: 'address' });
+      uiColumns.push({ key: 'city', label: '市区町村郡', hint: '住所が分割されている場合（3列を結合）', group: 'address' });
+      uiColumns.push({ key: 'town', label: '町名', hint: '住所が分割されている場合（3列を結合）', group: 'address' });
+      uiColumns.push({ key: 'block', label: '番地', hint: '住所が分割されている場合（3列を結合）', group: 'address' });
+    } else {
+      uiColumns.push({ key: col.key, label: col.label });
+    }
+  }
 
   mappingGrid.innerHTML = '';
-  OUTPUT_COLUMNS.forEach(col => {
-    if (col.key === 'address' && addressSatisfied) return;
+  let lastGroup = null;
+  uiColumns.forEach(col => {
+    // グループヘッダー
+    if (col.group && col.group !== lastGroup) {
+      lastGroup = col.group;
+      const header = document.createElement('div');
+      header.style.cssText = 'font-size:12px;color:#666;font-weight:600;margin-top:8px;padding:4px 8px;background:#f0f0f0;border-radius:4px;';
+      if (col.group === 'phone') header.textContent = '📞 電話番号（上から優先。データがある最初の列を採用）';
+      if (col.group === 'address') header.textContent = '📍 住所（「住所」列 or 「市区町村郡＋町名＋番地」の結合。どちらかでOK）';
+      mappingGrid.appendChild(header);
+    } else if (!col.group) {
+      lastGroup = null;
+    }
+
     const item = document.createElement('div');
     item.className = 'mapping-item';
 
@@ -1802,27 +1890,24 @@ function renderMappingGrid() {
     const isAutoMapped = currentVal !== undefined && currentVal !== '';
     item.classList.add(isAutoMapped ? 'auto-mapped' : 'unmapped');
 
-    const badge = col.required
-      ? '<span class="required-badge">必須</span>'
-      : '<span class="optional-badge">任意</span>';
-
     let options = `<option value="">-- なし（空白列） --</option>`;
     f.headers.forEach((h, idx) => {
       const selected = (currentVal === idx) ? 'selected' : '';
       options += `<option value="${idx}" ${selected}>${escapeHtml(h)}</option>`;
     });
 
-    // Show sample data if mapped
     let sampleHtml = '';
     if (isAutoMapped && f.rows.length > 0) {
       const samples = f.rows.slice(0, 3).map(row => row[currentVal] || '').join(' / ');
       sampleHtml = `<div class="sample-data">例: ${escapeHtml(samples)}</div>`;
     }
 
+    const hintHtml = col.hint ? `<div class="mapping-hint">${escapeHtml(col.hint)}</div>` : '';
+
     item.innerHTML = `
-      <label>${col.label}${badge}</label>
+      <label>${escapeHtml(col.label)}</label>
       <select data-key="${col.key}">${options}</select>
-      ${sampleHtml}
+      ${sampleHtml}${hintHtml}
     `;
 
     const select = item.querySelector('select');
@@ -1845,7 +1930,7 @@ function renderMappingGrid() {
   });
 }
 
-// 電話番号の補助列（電話番号1が空のときのフォールバック用、UIには出さない）
+// 電話番号の補助列（autoDetectMapping で漏れた場合のフォールバック）
 function addExtraMappings(f) {
   ['phone2', 'contactPhone', 'inquiryPhone'].forEach(key => {
     if (f.mapping[key] !== undefined) return;
@@ -1903,51 +1988,54 @@ function updateSampleData(item, key, f) {
   }
 }
 
-// 必須列のうち未マッピングのものを返す（ファイル単位）
-function requiredMissing(f) {
-  const required = OUTPUT_COLUMNS.filter(c => c.required);
+// 未マッピングの主要列を返す（ファイル単位。変換はブロックしない、警告のみ）
+function unmappedList(f) {
   const m = f.mapping;
-  return required.filter(c => {
+  const missing = [];
+  for (const c of OUTPUT_COLUMNS) {
     if (c.key === 'address') {
-      // address is satisfied if directly mapped OR if city+town+block are all present
-      if (m.address !== undefined) return false;
-      return !(m.city !== undefined && m.town !== undefined && m.block !== undefined);
+      if (m.address === undefined && !(m.city !== undefined && m.town !== undefined && m.block !== undefined)) {
+        missing.push('住所');
+      }
+    } else if (c.key === 'phone1') {
+      if (!CONFIG.phonePriority.some(k => m[k] !== undefined)) {
+        missing.push('電話番号');
+      }
+    } else {
+      if (m[c.key] === undefined) missing.push(c.label);
     }
-    if (c.key === 'phone1') {
-      // 電話番号系の列がどれか1つでもマッピングされていればOK
-      return !CONFIG.phonePriority.some(k => m[k] !== undefined);
-    }
-    return m[c.key] === undefined;
-  }).map(c => c.label);
+  }
+  return missing;
 }
 
 function updateMappingStatus() {
-  const requiredCount = OUTPUT_COLUMNS.filter(c => c.required).length;
+  const totalCols = OUTPUT_COLUMNS.length;
   const status = document.getElementById('mappingStatus');
   const btn = document.getElementById('btnApplyMapping');
 
-  // アクティブファイルの状態（マッピング編集画面用）
   const f = files[activeMappingFile];
-  const activeMissing = f ? requiredMissing(f) : [];
-  status.textContent = `必須列: ${requiredCount - activeMissing.length}/${requiredCount} 設定済み`;
+  const activeMissing = f ? unmappedList(f) : [];
+  const mappedCount = totalCols - activeMissing.length;
+  status.textContent = `列設定: ${mappedCount}/${totalCols} 設定済み`;
   if (activeMissing.length) {
-    status.textContent += ` (不足: ${activeMissing.join(', ')})`;
-    status.style.color = '#e74c3c';
+    status.textContent += ` (未設定: ${activeMissing.join(', ')})`;
+    status.style.color = '#e67e22';
   } else {
     status.style.color = '#27ae60';
   }
 
-  // 全ファイルの状態（バッジ・変換ボタン用）
-  const badFiles = files.filter(fl => requiredMissing(fl).length > 0);
+  // 変換ボタンは常に有効（未マッピング列は空白で出力される）
+  btn.disabled = false;
+
+  const badFiles = files.filter(fl => unmappedList(fl).length > 0);
   const allOk = badFiles.length === 0;
-  btn.disabled = !allOk;
 
   if (!allOk) {
     const first = badFiles[0];
     const label = files.length > 1 ? `「${first.name}」` : '';
-    mappingBadge.textContent = `⚠ ${label}未認識の列: ${requiredMissing(first).join(', ')}`;
+    mappingBadge.textContent = `⚠ ${label}未設定の列あり: ${unmappedList(first).join(', ')}（空白で出力されます）`;
     mappingBadge.className = 'mapping-badge warn';
-    // 認識できない列があるファイルを表示してマッピングを自動で開く
+    // 未設定列があるときはマッピングを自動で開いて確認を促す
     if (!mappingSection.classList.contains('visible')) {
       activeMappingFile = files.indexOf(first);
       renderMappingTabs();
@@ -2213,6 +2301,11 @@ async function applyMappingAndPreview() {
   showToast(msg, 'success');
 
   previewSection.scrollIntoView({ behavior: 'smooth' });
+
+  // Alrit連携: 出荷依頼メールから遷移してきた場合、承りメール返信を自動提案
+  if (alritMailContext) {
+    setTimeout(() => triggerAlritReply(), 1500);
+  }
 }
 
 // 商品別集計バーの表示（全ファイル合算）
@@ -2538,6 +2631,7 @@ function escapeHtml(str) {
 
     return lines;
   }
+  window._buildMailLines = buildMailLines;
 
   function renderMailHtml(lines) {
     return lines.map(l =>
@@ -2573,6 +2667,34 @@ function escapeHtml(str) {
     });
   });
 })();
+
+// ============================================================
+// Alrit連携: 承りメール自動返信（autoReply）
+// ============================================================
+function triggerAlritReply() {
+  if (!alritMailContext) return;
+
+  const shipDate = document.getElementById('shipDate').value;
+  if (!shipDate) {
+    showToast('出荷日が未設定のため承りメール送信をスキップしました', 'error');
+    return;
+  }
+
+  const lines = window._buildMailLines();
+  const body = lines.join('\n');
+
+  const params = new URLSearchParams();
+  params.set('autoReply', 'true');
+  params.set('acMailId', alritMailContext.mailId);
+  if (alritMailContext.accountId) params.set('acAccountId', alritMailContext.accountId);
+  if (alritMailContext.folderId)  params.set('acFolderId', alritMailContext.folderId);
+  params.set('acBody', body);
+
+  const url = CONFIG.alrit.baseUrl + '?' + params.toString();
+  window.open(url, '_blank');
+  showToast('📧 Alritで承りメール（返信）を作成中…');
+  alritMailContext = null;
+}
 
 // ============================================================
 // 設定ビューア（CONFIG をテーブル表示）
