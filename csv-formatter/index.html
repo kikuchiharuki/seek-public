@@ -183,6 +183,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .btn-orange:hover { background: #d35400; }
+.btn-fixed { width: 140px; text-align: center; box-sizing: border-box; padding-left: 0; padding-right: 0; }
 
 .mapping-status { font-size: 13px; color: #666; margin-left: auto; }
 
@@ -464,10 +465,10 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
           <input type="date" id="shipDate">
         </label>
         <button class="btn-primary" id="btnApplyShipDate">📅 出荷日を設定</button>
-        <button class="btn-secondary" id="btnExcel">📥 Excel保存</button>
-        <button class="btn-secondary" id="btnMailText">✉ 承りメール文</button>
-        <button class="btn-orange" id="btnInvoiceCsv">🚚 福山通運CSV</button>
-        <button class="btn-secondary" id="btnPrint">🖨 印刷</button>
+        <button class="btn-secondary btn-fixed" id="btnExcel">📥 Excel保存</button>
+        <button class="btn-secondary btn-fixed" id="btnMailText">✉ 承りメール文</button>
+        <button class="btn-orange btn-fixed" id="btnInvoiceCsv">🚚 福山通運CSV</button>
+        <button class="btn-secondary btn-fixed" id="btnPrint">🖨 印刷</button>
       </div>
     </div>
     <div class="print-only" id="printHeader"></div>
