@@ -1216,11 +1216,15 @@ document.getElementById('btnExcel').addEventListener('click', () => {
       continue;
     }
 
-    // データ行: 会社名の改行数に応じて行の高さを確保（wrapTextで折り返し表示）
-    // 1行なら18ptを維持、改行分は1行あたり12pt（文字9ptに合わせて控えめに増やす）
     const r = m;
-    const lines = ((r.companyName || '').match(/\n/g) || []).length + 1;
-    rowHeights.push({ hpt: Math.max(18, lines * 12 + 6) });
+    let maxLines = 1;
+    for (let Cn = 0; Cn < ALL_COLUMNS.length; Cn++) {
+      const cellAddr = XLSX.utils.encode_cell({ r: R, c: Cn });
+      const cellVal = ws[cellAddr] ? String(ws[cellAddr].v ?? '') : '';
+      const nl = (cellVal.match(/\n/g) || []).length + 1;
+      if (nl > maxLines) maxLines = nl;
+    }
+    rowHeights.push({ hpt: Math.max(20, maxLines * 14 + 6) });
     const isYupack = (r.carrier || '').trim() === 'ゆうパック';
 
     for (let Cn = 0; Cn < ALL_COLUMNS.length; Cn++) {
