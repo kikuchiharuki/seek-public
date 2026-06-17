@@ -1160,22 +1160,24 @@ document.getElementById('btnExcel').addEventListener('click', () => {
   const multi = processedFiles.length > 1;
   const aoa = [];
   const meta = [];
-  if (!multi) { aoa.push(ALL_COLUMNS.map(c => c.label)); meta.push('header'); }
+  let rowNum = 0;
+  if (!multi) { aoa.push(['#', ...ALL_COLUMNS.map(c => c.label)]); meta.push('header'); }
   for (const pf of processedFiles) {
     if (multi) {
       const totalQty = pf.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
       aoa.push([`${pf.name}　データ${pf.rows.length}件　個数合計${totalQty}件`]);
       meta.push('sep');
-      aoa.push(ALL_COLUMNS.map(c => c.label));
+      aoa.push(['#', ...ALL_COLUMNS.map(c => c.label)]);
       meta.push('header');
+      rowNum = 0;
     }
     for (const r of pf.rows) {
-      aoa.push(ALL_COLUMNS.map(c => {
+      rowNum++;
+      aoa.push([rowNum, ...ALL_COLUMNS.map(c => {
         const v = r[c.key] ?? '';
-        // 数量は数値として出力（Excelで合計できるように）
         if (c.key === 'quantity' && v !== '' && !isNaN(parseFloat(v))) return parseFloat(v);
         return v;
-      }));
+      })]);
       meta.push(r);
     }
   }
@@ -1193,10 +1195,12 @@ document.getElementById('btnExcel').addEventListener('click', () => {
   for (let R = 0; R < aoa.length; R++) {
     const m = meta[R];
 
+    const totalCols = ALL_COLUMNS.length + 1; // +1 for # column
+
     // ヘッダー行: 背景色なし・黒太字（印刷出力と同じ見た目）
     if (m === 'header') {
       rowHeights.push({ hpt: 20 });
-      for (let Cn = 0; Cn < ALL_COLUMNS.length; Cn++) {
+      for (let Cn = 0; Cn < totalCols; Cn++) {
         const cell = ws[XLSX.utils.encode_cell({ r: R, c: Cn })];
         if (cell) cell.s = {
           font: { bold: true, sz: 11 },
@@ -1217,7 +1221,7 @@ document.getElementById('btnExcel').addEventListener('click', () => {
 
     const r = m;
     let maxLines = 1;
-    for (let Cn = 0; Cn < ALL_COLUMNS.length; Cn++) {
+    for (let Cn = 0; Cn < totalCols; Cn++) {
       const cellAddr = XLSX.utils.encode_cell({ r: R, c: Cn });
       const cellVal = ws[cellAddr] ? String(ws[cellAddr].v ?? '') : '';
       const nl = (cellVal.match(/\n/g) || []).length + 1;
@@ -1226,25 +1230,33 @@ document.getElementById('btnExcel').addEventListener('click', () => {
     rowHeights.push({ hpt: Math.max(20, maxLines * 14 + 6) });
     const isYupack = (r.carrier || '').trim() === 'ゆうパック';
 
+    // # 列 (col 0) のスタイル
+    const numAddr = XLSX.utils.encode_cell({ r: R, c: 0 });
+    let numCell = ws[numAddr];
+    if (!numCell) numCell = ws[numAddr] = { t: 'n', v: '' };
+    numCell.s = { font: { sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' }, border };
+    if (isYupack) numCell.s.fill = fill(C.yupackRow);
+
+    // データ列 (col 1〜)
     for (let Cn = 0; Cn < ALL_COLUMNS.length; Cn++) {
       const key = ALL_COLUMNS[Cn].key;
-      const addr = XLSX.utils.encode_cell({ r: R, c: Cn });
+      const addr = XLSX.utils.encode_cell({ r: R, c: Cn + 1 });
       let cell = ws[addr];
-      if (!cell) cell = ws[addr] = { t: 's', v: '' };  // 空セルにも色・罫線を付けるため生成
+      if (!cell) cell = ws[addr] = { t: 's', v: '' };
       const val = String(cell.v ?? '');
 
       const s = { font: { sz: 11 }, alignment: { vertical: 'center', wrapText: true }, border };
-      if (isYupack) s.fill = fill(C.yupackRow);                                   // ゆうパック行 → ピンク
-      if (CONFIG.emptyCheckColumns.includes(key) && val.trim() === '') s.fill = fill(C.emptyCell);  // 必須空白 → 赤
+      if (isYupack) s.fill = fill(C.yupackRow);
+      if (CONFIG.emptyCheckColumns.includes(key) && val.trim() === '') s.fill = fill(C.emptyCell);
       if (key === 'quantity') {
         const q = parseFloat(val);
-        if (!q) s.fill = fill(C.emptyCell);                                       // 数量空白/0 → 赤
-        else if (q >= 2) { s.fill = fill(C.quantityHigh); s.font.bold = true; }   // 2以上 → 緑太字
+        if (!q) s.fill = fill(C.emptyCell);
+        else if (q >= 2) { s.fill = fill(C.quantityHigh); s.font.bold = true; }
         s.alignment.horizontal = 'center';
       }
       if (['requestDate', 'deliveryDate', 'shipDate'].includes(key)) s.alignment.horizontal = 'center';
-      if (key === 'deliveryDate' && r.deliveryChanged) { s.fill = fill(C.deliveryChanged); s.font.bold = true; }  // 納期変更 → 黄
-      if (key === 'carrier' && isYupack) { s.font.color = { rgb: hex(C.yupackText) }; s.font.bold = true; }       // ゆうパック文字 → 赤太字
+      if (key === 'deliveryDate' && r.deliveryChanged) { s.fill = fill(C.deliveryChanged); s.font.bold = true; }
+      if (key === 'carrier' && isYupack) { s.font.color = { rgb: hex(C.yupackText) }; s.font.bold = true; }
       cell.s = s;
     }
   }
@@ -1252,12 +1264,11 @@ document.getElementById('btnExcel').addEventListener('click', () => {
 
   // 列幅（文字数ベース）
   const colWidths = {
-    product: 22, quantity: 6, requestDate: 11, deliveryDate: 11, shipDate: 11,
+    product: 30, quantity: 6, requestDate: 11, deliveryDate: 11, shipDate: 11,
     companyName: 32, phone1: 14, postalCode: 10, prefecture: 8,
     address: 32, building: 22, carrier: 10, duplicate: 9,
   };
-  // 文字を小さくした分、列幅も10%詰める
-  ws['!cols'] = ALL_COLUMNS.map(c => ({ wch: Math.round((colWidths[c.key] || 12) * 0.9 * 10) / 10 }));
+  ws['!cols'] = [{ wch: 4 }, ...ALL_COLUMNS.map(c => ({ wch: colWidths[c.key] || 12 }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '出荷データ');
   XLSX.writeFile(wb, fileName);
