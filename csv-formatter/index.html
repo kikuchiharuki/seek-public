@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CSV整形ツール</title>
+<title>ピュアライフ出荷ツール</title>
 <!-- xlsx-js-style: SheetJS 0.18.5互換 + セル背景色/フォント/罫線などのスタイル出力対応 -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -178,6 +178,11 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   border-radius: 6px; font-size: 14px; cursor: pointer;
 }
 .btn-secondary:hover { background: #f5f5f5; }
+.btn-orange {
+  background: #e67e22; color: #fff; border: none; padding: 10px 16px;
+  border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-orange:hover { background: #d35400; }
 
 .mapping-status { font-size: 13px; color: #666; margin-left: auto; }
 
@@ -401,7 +406,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 <body>
 
 <div class="app-header">
-  <h1>CSV整形ツール</h1>
+  <h1>ピュアライフ出荷ツール</h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -461,7 +466,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         <button class="btn-primary" id="btnApplyShipDate">📅 出荷日を設定</button>
         <button class="btn-secondary" id="btnExcel">📥 Excel保存</button>
         <button class="btn-secondary" id="btnMailText">✉ 承りメール文</button>
-        <button class="btn-secondary" id="btnInvoiceCsv">🚚 送り状CSV</button>
+        <button class="btn-orange" id="btnInvoiceCsv">🚚 福山通運CSV</button>
         <button class="btn-secondary" id="btnPrint">🖨 印刷</button>
       </div>
     </div>
