@@ -1041,16 +1041,6 @@ let alritMailContext = null;
     localStorage.removeItem('alrit-shipment-mailContext');
     history.replaceState(null, '', location.pathname);
     console.log('📦 Alrit連携: メールコンテキスト取得', alritMailContext);
-    if (new URLSearchParams(location.search).has('autoLoad')) {
-      const pending = localStorage.getItem('alrit-shipment-pendingFiles');
-      localStorage.removeItem('alrit-shipment-pendingFiles');
-      let info = '';
-      try { const p = JSON.parse(pending); info = p.fileNames.join(', '); } catch(_) {}
-      setTimeout(() => {
-        showToast(`📎 ダウンロードされたファイルを選択してください${info ? '：' + info : ''}`, 'info', true);
-        document.getElementById('fileInput').click();
-      }, 800);
-    }
   } catch(e) { console.log('⚠️ Alrit連携: コンテキスト読取失敗', e); }
 })();
 
