@@ -100,18 +100,27 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 }
 .btn-convert:hover { background: #229954; }
 .btn-convert:disabled { background: #bdc3c7; box-shadow: none; cursor: not-allowed; }
-.ship-date-label {
-  font-size: 13px; color: #444; display: flex; align-items: center; gap: 6px;
-  font-weight: 600;
+/* 出荷日まわり一式（カレンダー＋設定＋明日出荷）を1つの透明ボックスにまとめ、
+   ブラウザ幅が変わっても要素がバラけず一体で折り返すようにする */
+.ship-date-group {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px; border: 1.5px dashed #c4d3e6; border-radius: 10px;
+  background: rgba(52, 152, 219, 0.05);
 }
+/* カレンダー入力と「出荷日を設定」ボタンは隙間なく連結して1つの部品に見せる */
+.ship-date-set { display: flex; align-items: stretch; }
 /* 出荷日の日付ボックス: 隣の「出荷日を設定」ボタンと同じ青背景・同じ高さ(41px)に揃える */
-.ship-date-label input {
+.ship-date-set #shipDate {
   height: 41px; box-sizing: border-box;
-  padding: 0 10px; border: none; border-radius: 6px; font-size: 14px;
+  padding: 0 10px; border: none; border-radius: 6px 0 0 6px; font-size: 14px;
   font-family: inherit; font-weight: 600;
   background: #3498db; color: #fff; cursor: pointer;
   color-scheme: dark;  /* カレンダーアイコンも白系にする */
-  min-width: 140px;    /* テキスト部分も十分クリックできる幅を確保 */
+  min-width: 150px;    /* テキスト部分も十分クリックできる幅を確保 */
+}
+.ship-date-set #btnApplyShipDate {
+  border-radius: 0 6px 6px 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.4);  /* 連結部の境目を細線で示す */
 }
 
 /* 複数ファイル時の元データ見出し */
@@ -354,6 +363,39 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .toast.error { background: #e74c3c; }
 .toast.success { background: #27ae60; }
 
+/* ── 出荷日 反映フィードバック（中央に一瞬ポップするカード＋テーブルの点滅） ──
+   変換ボタンの全面オーバーレイほど大げさにせず、見落とさない程度の「動き」を出す */
+.apply-pop {
+  position: fixed; inset: 0; z-index: 2500;
+  display: none; align-items: center; justify-content: center;
+  pointer-events: none;  /* 背面のクリックは妨げない */
+}
+.apply-pop.on { display: flex; }
+.apply-pop-card {
+  background: #fff; border-radius: 14px; padding: 20px 34px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  border-top: 5px solid #3498db; text-align: center; min-width: 240px;
+  animation: apply-pop-in 1s cubic-bezier(.2, .8, .25, 1) forwards;
+}
+.apply-pop-card.changed { border-top-color: #f1c40f; }
+.apply-pop-icon  { font-size: 30px; line-height: 1; margin-bottom: 8px; }
+.apply-pop-title { font-size: 17px; font-weight: 700; color: #2c3e50; }
+.apply-pop-sub   { font-size: 13px; color: #666; margin-top: 5px; }
+@keyframes apply-pop-in {
+  0%   { opacity: 0; transform: scale(0.82) translateY(8px); }
+  16%  { opacity: 1; transform: scale(1.05) translateY(0); }
+  30%  { transform: scale(1); }
+  76%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.96) translateY(-6px); }
+}
+/* 反映時に結果テーブルを一瞬ふちどって、どこが更新されたか目を向けさせる */
+.table-wrapper.flash { animation: table-flash 0.85s ease-out; }
+@keyframes table-flash {
+  0%   { box-shadow: inset 0 0 0 0 rgba(52, 152, 219, 0); }
+  25%  { box-shadow: inset 0 0 0 3px rgba(52, 152, 219, 0.55); }
+  100% { box-shadow: inset 0 0 0 0 rgba(52, 152, 219, 0); }
+}
+
 /* ── 変換中オーバーレイ ── */
 .proc-overlay {
   position: fixed; inset: 0; z-index: 2000;
@@ -538,11 +580,13 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         <span class="edit-hint">※ セルはクリックして直接修正できます</span>
       </h2>
       <div class="preview-actions">
-        <label class="ship-date-label">出荷日
-          <input type="date" id="shipDate">
-        </label>
-        <button class="btn-primary" id="btnApplyShipDate">出荷日を設定</button>
-        <button class="btn-green" id="btnNextBizShip">明日出荷で設定</button>
+        <div class="ship-date-group">
+          <span class="ship-date-set">
+            <input type="date" id="shipDate" aria-label="出荷日">
+            <button class="btn-primary" id="btnApplyShipDate">出荷日を設定</button>
+          </span>
+          <button class="btn-green" id="btnNextBizShip">明日出荷で設定</button>
+        </div>
         <button class="btn-secondary btn-fixed" id="btnExcel">📥 Excel保存</button>
         <button class="btn-secondary btn-fixed" id="btnMailText">✉ 承りメール文</button>
         <button class="btn-orange btn-fixed" id="btnInvoiceCsv">🚚 福山通運CSV</button>
@@ -615,6 +659,15 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
     <div class="proc-spinner"></div>
     <div class="proc-title">処理中です。完了までお待ちください</div>
     <div class="proc-log" id="procLog"></div>
+  </div>
+</div>
+
+<!-- 出荷日 反映フィードバック（applyShipDateAndRender から表示） -->
+<div class="apply-pop" id="applyPop" aria-hidden="true">
+  <div class="apply-pop-card">
+    <div class="apply-pop-icon"></div>
+    <div class="apply-pop-title"></div>
+    <div class="apply-pop-sub"></div>
   </div>
 </div>
 
@@ -764,7 +817,7 @@ const CONFIG = {
   leadTime: {
     enabled: true,
     holidayApiUrl: 'https://holidays-jp.github.io/api/v1/date.json',
-    skipIfCarrierSet: true,   // ゆうパック等、運送会社が確定した行は福通LTチェック対象外
+    skipIfCarrierSet: false,  // ゆうパック等も納期チェック対象に含める（間に合わなければ指定納期セルを黄色表示。福通CSV出力は別途excludeCarriersで除外済み）
   },
 
   // ──────────────────────────────────────────────
@@ -1216,6 +1269,13 @@ document.getElementById('btnReset').addEventListener('click', resetAll);
 document.getElementById('shipDate').addEventListener('click', function() {
   try { this.showPicker(); } catch(_) {}
 });
+// カレンダーで日付を選んだら（手入力確定でも）即反映。明日出荷ボタンと同じ挙動。
+// ※ プログラムからの .value 代入では change は発火しないので二重実行にならない。
+document.getElementById('shipDate').addEventListener('change', async function() {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+  if (!this.value) return;
+  await applyShipDateAndRender(this.value);
+});
 document.getElementById('btnApplyMapping').addEventListener('click', applyMappingAndPreview);
 
 // 出荷日を行に適用＋納期チェック＋再描画（出荷日設定ボタン／翌営業日ボタン共通）
@@ -1226,10 +1286,33 @@ async function applyShipDateAndRender(v) {
   renderSummaryBar(processedFiles.flatMap(pf => pf.rows), lastStats || {});
   renderPreviewTable(processedFiles);
   updatePrintHeader();
+  const shipLabel = fmtSlash(parseYmd(v));
+  // 即時反映を見落とさないよう、中央にカードをポップ＋テーブルを一瞬点滅させる
+  flashApplyFeedback(shipLabel, changed);
   // 納期チェック結果は自動で消さない（クリックで閉じる）
   showToast(changed
-    ? `出荷日 ${fmtSlash(parseYmd(v))} で納期チェック: ${changed}件の納期を変更（黄色）`
-    : `出荷日 ${fmtSlash(parseYmd(v))}: 全行、指定納期に間に合います`, changed ? '' : 'success', true);
+    ? `出荷日 ${shipLabel} で納期チェック: ${changed}件の納期を変更（黄色）`
+    : `出荷日 ${shipLabel}: 全行、指定納期に間に合います`, changed ? '' : 'success', true);
+}
+
+// 出荷日の反映を視覚的に知らせる（カレンダー選択・明日出荷ボタンの両方から呼ばれる）
+function flashApplyFeedback(shipLabel, changed) {
+  const pop = document.getElementById('applyPop');
+  const card = pop.querySelector('.apply-pop-card');
+  card.classList.toggle('changed', changed > 0);
+  pop.querySelector('.apply-pop-icon').textContent  = changed > 0 ? '⚠️' : '✅';
+  pop.querySelector('.apply-pop-title').textContent = `出荷日 ${shipLabel} を反映`;
+  pop.querySelector('.apply-pop-sub').textContent   = changed > 0
+    ? `指定納期を ${changed}件 変更（黄色セル）`
+    : '全行、指定納期に間に合います';
+  // アニメーションを毎回頭から再生させる（連続反映でも動きが出るように）
+  card.style.animation = 'none'; void card.offsetWidth; card.style.animation = '';
+  pop.classList.add('on');
+  clearTimeout(pop._hideTimer);
+  pop._hideTimer = setTimeout(() => pop.classList.remove('on'), 1000);
+
+  const tw = document.getElementById('tableWrapper');
+  tw.classList.remove('flash'); void tw.offsetWidth; tw.classList.add('flash');
 }
 
 // 出荷日設定ボタン（Excel版の「出荷日設定」ボタンと同じ役割）
@@ -2423,7 +2506,7 @@ function applyShipDateToRows(shipDateIso) {
     for (const r of pf.rows) {
       r.shipDate = shipLabel;
       if (!CONFIG.leadTime.enabled) continue;
-      if (CONFIG.leadTime.skipIfCarrierSet && r.carrier) continue;  // ゆうパック等は対象外
+      if (CONFIG.leadTime.skipIfCarrierSet && r.carrier) continue;  // skipIfCarrierSet=true のときだけ運送会社確定行をスキップ（現在はfalse＝ゆうパックも対象）
       const baseStr = r.deliveryChanged ? r.deliveryDateOrig : r.deliveryDate;
       const due = parseYmd(baseStr);
       const lt = findLeadTime(r.prefecture, r.address);
