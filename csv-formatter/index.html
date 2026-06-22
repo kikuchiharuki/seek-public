@@ -260,11 +260,12 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
      ただし .keep-color（ゆうパック赤字など意図的な色文字）は除外 */
   .data-table td:not(.keep-color), .data-table th,
   .data-table .row-num, .data-table td.row-num, .data-table th.row-num { color: #000 !important; }
-  /* 日付3列（依頼日・指定納期・出荷日）を同じ幅に揃える */
+  /* 日付3列（依頼日・指定納期・出荷日）を同じ幅に揃える
+     （幅は最も長い見出し「指定納期」が右余白付きで収まる値にする） */
   .data-table th[data-k="requestDate"], .data-table td[data-k="requestDate"],
   .data-table th[data-k="deliveryDate"], .data-table td[data-k="deliveryDate"],
   .data-table th[data-k="shipDate"], .data-table td[data-k="shipDate"] {
-    width: 50px !important; min-width: 50px !important; max-width: 50px !important; white-space: nowrap;
+    width: 60px !important; min-width: 60px !important; max-width: 60px !important; white-space: nowrap;
   }
 }
 
@@ -1143,9 +1144,24 @@ function restoreYearAfterPrint() {
   });
 }
 
-// 全角英数字・記号を半角に変換（印刷時の商品列用）
+// 全角カタカナ → 半角カナ 変換表（濁点・半濁点は半角2文字に分解）
+const KATA_TO_HANKAKU = {
+  'ガ':'ｶﾞ','ギ':'ｷﾞ','グ':'ｸﾞ','ゲ':'ｹﾞ','ゴ':'ｺﾞ','ザ':'ｻﾞ','ジ':'ｼﾞ','ズ':'ｽﾞ','ゼ':'ｾﾞ','ゾ':'ｿﾞ',
+  'ダ':'ﾀﾞ','ヂ':'ﾁﾞ','ヅ':'ﾂﾞ','デ':'ﾃﾞ','ド':'ﾄﾞ','バ':'ﾊﾞ','ビ':'ﾋﾞ','ブ':'ﾌﾞ','ベ':'ﾍﾞ','ボ':'ﾎﾞ',
+  'パ':'ﾊﾟ','ピ':'ﾋﾟ','プ':'ﾌﾟ','ペ':'ﾍﾟ','ポ':'ﾎﾟ','ヴ':'ｳﾞ','ヷ':'ﾜﾞ','ヺ':'ｦﾞ',
+  'ア':'ｱ','イ':'ｲ','ウ':'ｳ','エ':'ｴ','オ':'ｵ','カ':'ｶ','キ':'ｷ','ク':'ｸ','ケ':'ｹ','コ':'ｺ',
+  'サ':'ｻ','シ':'ｼ','ス':'ｽ','セ':'ｾ','ソ':'ｿ','タ':'ﾀ','チ':'ﾁ','ツ':'ﾂ','テ':'ﾃ','ト':'ﾄ',
+  'ナ':'ﾅ','ニ':'ﾆ','ヌ':'ﾇ','ネ':'ﾈ','ノ':'ﾉ','ハ':'ﾊ','ヒ':'ﾋ','フ':'ﾌ','ヘ':'ﾍ','ホ':'ﾎ',
+  'マ':'ﾏ','ミ':'ﾐ','ム':'ﾑ','メ':'ﾒ','モ':'ﾓ','ヤ':'ﾔ','ユ':'ﾕ','ヨ':'ﾖ',
+  'ラ':'ﾗ','リ':'ﾘ','ル':'ﾙ','レ':'ﾚ','ロ':'ﾛ','ワ':'ﾜ','ヲ':'ｦ','ン':'ﾝ',
+  'ァ':'ｧ','ィ':'ｨ','ゥ':'ｩ','ェ':'ｪ','ォ':'ｫ','ッ':'ｯ','ャ':'ｬ','ュ':'ｭ','ョ':'ｮ',
+  'ー':'ｰ','、':'､','。':'｡','・':'･','「':'｢','」':'｣'
+};
+// 全角英数字・記号・カタカナを半角に変換（印刷時の商品列用）
 function toHankaku(s) {
-  return s
+  let out = '';
+  for (const ch of s) { out += (KATA_TO_HANKAKU[ch] || ch); }
+  return out
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
     .replace(/＆/g, '&').replace(/／/g, '/').replace(/（/g, '(').replace(/）/g, ')')
     .replace(/＋/g, '+').replace(/－/g, '-').replace(/　/g, ' ');
