@@ -1883,7 +1883,24 @@ function totalRowCount() {
   return files.reduce((s, f) => s + f.rows.length, 0);
 }
 
+// ファイルの固定表示順。日付サフィックス（0618など）が変わっても効くよう先頭一致で判定。
+// リストにないファイルは末尾へ回し、ファイル名順で並べる。元データ・変換結果の両方で共通利用。
+const FILE_ORDER = ['ニオイしま栓！営業所', 'ニオイしま栓！', 'ジェット＆ディフューザー'];
+function filePriority(name) {
+  const i = FILE_ORDER.findIndex(p => (name || '').startsWith(p));
+  return i === -1 ? FILE_ORDER.length : i;
+}
+function compareByFileOrder(a, b) {
+  const da = filePriority(a.name), db = filePriority(b.name);
+  if (da !== db) return da - db;
+  return (a.name || '').localeCompare(b.name || '', 'ja');
+}
+
 function onFilesLoaded() {
+  // 読み込んだ時点で固定優先順に並べ替え（元データ表示・列マッピング・変換結果すべてに反映）
+  files.sort(compareByFileOrder);
+  activeMappingFile = Math.min(activeMappingFile, files.length - 1);
+
   const total = totalRowCount();
   const fileMsg = files.length > 1 ? `${files.length}ファイル ` : '';
   showToast(`${fileMsg}${total} 件のデータを読み込みました`, 'success');
@@ -2377,19 +2394,8 @@ async function applyMappingAndPreview() {
   }
   updateAddFileBtn();  // 変換後はファイル追加ボタンを隠す（追加は変換前のみ対応）
 
-  // ファイルの表示順を固定（日付サフィックスが変わっても効くよう先頭一致で判定）。
-  // リストにないファイルは末尾へ回し、商品名→ファイル名順で並べる。
-  const FILE_ORDER = ['ニオイしま栓！営業所', 'ニオイしま栓！', 'ジェット＆ディフューザー'];
-  const filePriority = (name) => {
-    const i = FILE_ORDER.findIndex(p => (name || '').startsWith(p));
-    return i === -1 ? FILE_ORDER.length : i;
-  };
-  processedFiles.sort((a, b) => {
-    const da = filePriority(a.name), db = filePriority(b.name);
-    if (da !== db) return da - db;
-    const pa = (a.rows[0]?.product || ''), pb = (b.rows[0]?.product || '');
-    return pa.localeCompare(pb, 'ja') || a.name.localeCompare(b.name, 'ja');
-  });
+  // 変換結果も同じ固定優先順に並べる（filesは読込時に整列済みだが念のため統一）
+  processedFiles.sort(compareByFileOrder);
 
   // 出荷日が入力済みなら納期チェックも実行（未入力ならスキップ）
   const shipDateIso = document.getElementById('shipDate').value;
