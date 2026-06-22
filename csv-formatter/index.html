@@ -1102,7 +1102,38 @@ const tableWrapper = document.getElementById('tableWrapper');
 // ============================================================
 // File handling
 // ============================================================
-dropZone.addEventListener('click', () => fileInput.click());
+const fileInputAdd = document.getElementById('fileInputAdd');
+
+// ファイル選択ダイアログを「ダウンロードフォルダ」から開く。
+// Chrome/Edge は File System Access API の startIn:'downloads' でDLフォルダを起点にできる。
+// 非対応ブラウザ（Firefox/Safari）や iframe 内などでは従来の <input> にフォールバック。
+async function openFilePicker(append) {
+  if (window.showOpenFilePicker) {
+    try {
+      const handles = await window.showOpenFilePicker({
+        multiple: true,
+        startIn: 'downloads',   // ← ダウンロードフォルダを起点に開く
+        types: [{
+          description: 'CSV / Excel',
+          accept: {
+            'text/csv': ['.csv'],
+            'application/vnd.ms-excel': ['.xls'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+          },
+        }],
+      });
+      const fileObjs = await Promise.all(handles.map(h => h.getFile()));
+      if (fileObjs.length) handleFiles(fileObjs, append);
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;  // ユーザーがキャンセルした
+      (append ? fileInputAdd : fileInput).click();    // 非対応・拒否時は従来ダイアログ
+    }
+    return;
+  }
+  (append ? fileInputAdd : fileInput).click();
+}
+
+dropZone.addEventListener('click', () => openFilePicker(false));
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop', e => {
@@ -1114,8 +1145,7 @@ fileInput.addEventListener('change', e => {
   if (e.target.files.length) handleFiles(e.target.files);
 });
 // ＋ファイル追加: 既存の読み込み済みデータに追記する（変換前のみ。変換後はボタン非表示）
-const fileInputAdd = document.getElementById('fileInputAdd');
-document.getElementById('btnAddFile').addEventListener('click', () => fileInputAdd.click());
+document.getElementById('btnAddFile').addEventListener('click', () => openFilePicker(true));
 fileInputAdd.addEventListener('change', e => {
   if (e.target.files.length) handleFiles(e.target.files, true);
   e.target.value = '';  // 同じファイルを続けて選べるようリセット
