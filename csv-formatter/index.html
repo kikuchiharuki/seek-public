@@ -260,11 +260,8 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
     height: 29px !important; border: none !important; background: #fff !important;
     padding: 0 !important;
   }
-  /* #・日付・都道府県列: 文字80%に縮小 */
+  /* #・都道府県列: 文字80%に縮小（日付3列の"値"は標準サイズ11ptに戻す＝列幅50pxは維持） */
   .data-table th.row-num, .data-table td.row-num,
-  .data-table th[data-k="requestDate"], .data-table td[data-k="requestDate"],
-  .data-table th[data-k="deliveryDate"], .data-table td[data-k="deliveryDate"],
-  .data-table th[data-k="shipDate"], .data-table td[data-k="shipDate"],
   .data-table th[data-k="prefecture"], .data-table td[data-k="prefecture"] {
     font-size: 80%;
   }
@@ -300,11 +297,11 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap;
 }
 .data-table th {
-  background: #34495e; color: #fff; padding: 8px 6px; text-align: left;
+  background: #34495e; color: #fff; padding: 5px 6px; text-align: left;
   position: sticky; top: 0; z-index: 1; vertical-align: bottom;
 }
-/* 縦線あり（Excelの枠線と同じくらいの色） */
-.data-table td { padding: 6px 6px; border: 1px solid #d4d4d4; }
+/* 縦線あり（Excelの枠線と同じくらいの色）。行高はpaddingで調整（文字サイズ13pxは据え置き） */
+.data-table td { padding: 4px 6px; border: 1px solid #d4d4d4; }
 .data-table th { border: 1px solid #4a5d70; }
 .data-table tr:hover td { background: #f5f8ff; }
 .data-table .row-num { color: #999; text-align: center; width: 40px; }
