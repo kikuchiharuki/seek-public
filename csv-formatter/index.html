@@ -191,7 +191,15 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .btn-orange:hover { background: #d35400; }
-.btn-fixed { width: 140px; text-align: center; box-sizing: border-box; padding-left: 0; padding-right: 0; }
+.btn-fixed { text-align: center; box-sizing: border-box; }
+/* 変換結果ヘッダーのボタン群はテキストが潰れない範囲でコンパクトに揃える */
+.preview-actions button { padding: 9px 14px; font-size: 13px; white-space: nowrap; }
+/* 「翌営業日で設定」系ボタン: 出荷日を設定(青)と区別できるよう緑系 */
+.btn-green {
+  background: #27ae60; color: #fff; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-green:hover { background: #219150; }
 
 .mapping-status { font-size: 13px; color: #666; margin-left: auto; }
 
@@ -505,7 +513,8 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         <label class="ship-date-label">出荷日
           <input type="date" id="shipDate">
         </label>
-        <button class="btn-primary" id="btnApplyShipDate">📅 出荷日を設定</button>
+        <button class="btn-primary" id="btnApplyShipDate">出荷日を設定</button>
+        <button class="btn-green" id="btnNextBizShip">明日出荷で設定</button>
         <button class="btn-secondary btn-fixed" id="btnExcel">📥 Excel保存</button>
         <button class="btn-secondary btn-fixed" id="btnMailText">✉ 承りメール文</button>
         <button class="btn-orange btn-fixed" id="btnInvoiceCsv">🚚 福山通運CSV</button>
@@ -962,14 +971,29 @@ const holidaysReady = (async () => {
     if (!Object.keys(HOLIDAYS).some(k => k.startsWith(y + '-'))) genHol(y);
   }
   // ※ 出荷日は自動入力しない（当日出荷の場合もあるため、ユーザーが明示的に設定する）
+  updateNextBizButton();  // 祝日読込後に翌営業日ボタンのラベルを確定
 })();
 
-// 翌営業日（明日から数えて最初の平日・非祝日）
-function nextBizIso() {
+// 翌営業日（今日から数えて最初の平日・非祝日）。
+// skipped=true は明日が土日祝で飛ばした場合＝「休み明け」。今日はPCの現在日付(new Date())基準。
+function nextBizDay() {
   const d = new Date();
+  d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + 1);
-  while (isNonBiz(d)) d.setDate(d.getDate() + 1);
-  return fmtIso(d);
+  let skipped = false;
+  while (isNonBiz(d)) { d.setDate(d.getDate() + 1); skipped = true; }
+  return { iso: fmtIso(d), skipped, date: d };
+}
+
+// 「翌営業日で設定」ボタンのラベルを動的に切り替える。
+// 明日が営業日→「明日出荷で設定」、土日祝で先送り→「休み明けに出荷」
+function updateNextBizButton() {
+  const btn = document.getElementById('btnNextBizShip');
+  if (!btn) return;
+  const { iso, skipped, date } = nextBizDay();
+  btn.textContent = skipped ? '休み明けに出荷' : '明日出荷で設定';
+  btn.title = `出荷日を ${fmtSlash(date)} に設定して納期チェック`;
+  btn.dataset.iso = iso;
 }
 
 // ============================================================
@@ -1157,11 +1181,8 @@ document.getElementById('shipDate').addEventListener('click', function() {
 });
 document.getElementById('btnApplyMapping').addEventListener('click', applyMappingAndPreview);
 
-// 出荷日設定ボタン（Excel版の「出荷日設定」ボタンと同じ役割）
-document.getElementById('btnApplyShipDate').addEventListener('click', async () => {
-  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
-  const v = document.getElementById('shipDate').value;
-  if (!v) { showToast('出荷日を選択してください', 'error'); return; }
+// 出荷日を行に適用＋納期チェック＋再描画（出荷日設定ボタン／翌営業日ボタン共通）
+async function applyShipDateAndRender(v) {
   await holidaysReady;
   const changed = applyShipDateToRows(v);
   if (lastStats) lastStats.deliveryChanged = changed;
@@ -1172,6 +1193,24 @@ document.getElementById('btnApplyShipDate').addEventListener('click', async () =
   showToast(changed
     ? `出荷日 ${fmtSlash(parseYmd(v))} で納期チェック: ${changed}件の納期を変更（黄色）`
     : `出荷日 ${fmtSlash(parseYmd(v))}: 全行、指定納期に間に合います`, changed ? '' : 'success', true);
+}
+
+// 出荷日設定ボタン（Excel版の「出荷日設定」ボタンと同じ役割）
+document.getElementById('btnApplyShipDate').addEventListener('click', async () => {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+  const v = document.getElementById('shipDate').value;
+  if (!v) { showToast('出荷日を選択してください', 'error'); return; }
+  await applyShipDateAndRender(v);
+});
+
+// 翌営業日ボタン（明日出荷で設定 / 休み明けに出荷）: 翌営業日を出荷日欄に入れて適用
+document.getElementById('btnNextBizShip').addEventListener('click', async () => {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+  await holidaysReady;
+  updateNextBizButton();  // 祝日読込後の最新で再計算（ラベル・dataset.iso）
+  const iso = nextBizDay().iso;
+  document.getElementById('shipDate').value = iso;
+  await applyShipDateAndRender(iso);
 });
 
 // 「📅 出荷日を設定」が未実行（出荷日セルが空白の行がある）かどうか。
@@ -1180,7 +1219,7 @@ function shipDateMissing() {
   const rows = processedFiles.flatMap(pf => pf.rows);
   return !rows.length || rows.some(r => !(r.shipDate || '').trim());
 }
-const SHIP_DATE_MSG = '出荷日セルが空白の行があります。「📅 出荷日を設定」ボタンを押してください';
+const SHIP_DATE_MSG = '出荷日セルが空白の行があります。「出荷日を設定」ボタンを押してください';
 
 // 印刷ボタン（A4横。出荷日+商品集計が表の上に印刷される）
 document.getElementById('btnPrint').addEventListener('click', () => {
@@ -2405,6 +2444,7 @@ async function applyMappingAndPreview() {
 
   // 祝日データの読み込みを待つ（通常は一瞬）
   await holidaysReady;
+  updateNextBizButton();  // プレビュー表示時に翌営業日ボタンのラベルを最新化
 
   const totalStats = { merged: 0, yupack: 0, storeAdded: 0, lineBreaks: 0, deliveryChanged: 0, zipFilled: 0 };
   processedFiles = [];
