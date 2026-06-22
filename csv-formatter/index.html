@@ -245,14 +245,24 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   .data-table th { line-height: 14px; height: 29px; }
   .data-table td, .data-table th { padding-left: 4px; padding-right: 4px; }
   .data-table tr { break-inside: avoid; }
-  /* #・数量・日付・都道府県列: 文字80%に縮小 */
+  /* #・日付・都道府県列: 文字80%に縮小 */
   .data-table th.row-num, .data-table td.row-num,
-  .data-table th[data-k="quantity"], .data-table td[data-k="quantity"],
   .data-table th[data-k="requestDate"], .data-table td[data-k="requestDate"],
   .data-table th[data-k="deliveryDate"], .data-table td[data-k="deliveryDate"],
   .data-table th[data-k="shipDate"], .data-table td[data-k="shipDate"],
   .data-table th[data-k="prefecture"], .data-table td[data-k="prefecture"] {
     font-size: 80%;
+  }
+  /* 数量列: 既存80%から15%UP → 92%（11pt基準で約10.1pt） */
+  .data-table th[data-k="quantity"], .data-table td[data-k="quantity"] { font-size: 92%; }
+  /* 印刷時は全セル黒文字（#列など薄く印刷される問題の対策。特に白黒印刷向け） */
+  .data-table td, .data-table th,
+  .data-table .row-num, .data-table td.row-num, .data-table th.row-num { color: #000 !important; }
+  /* 日付3列（依頼日・指定納期・出荷日）を同じ幅に揃える */
+  .data-table th[data-k="requestDate"], .data-table td[data-k="requestDate"],
+  .data-table th[data-k="deliveryDate"], .data-table td[data-k="deliveryDate"],
+  .data-table th[data-k="shipDate"], .data-table td[data-k="shipDate"] {
+    width: 50px !important; min-width: 50px !important; max-width: 50px !important; white-space: nowrap;
   }
 }
 
@@ -1127,12 +1137,48 @@ function restoreYearAfterPrint() {
   });
 }
 
+// 全角英数字・記号を半角に変換（印刷時の商品列用）
+function toHankaku(s) {
+  return s
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/＆/g, '&').replace(/／/g, '/').replace(/（/g, '(').replace(/）/g, ')')
+    .replace(/＋/g, '+').replace(/－/g, '-').replace(/　/g, ' ');
+}
+// 印刷時のみ、商品列のテキストを半角化。印刷後は元に戻す
+function productToHankakuForPrint() {
+  tableWrapper.querySelectorAll('td[data-k="product"]').forEach(td => {
+    const text = td.textContent || '';
+    const conv = toHankaku(text);
+    if (conv !== text) { td.dataset.fullProduct = text; td.textContent = conv; }
+  });
+}
+function restoreProductAfterPrint() {
+  tableWrapper.querySelectorAll('td[data-full-product]').forEach(td => {
+    td.textContent = td.dataset.fullProduct;
+    delete td.dataset.fullProduct;
+  });
+}
+// 印刷時のみ、配送依頼日の見出しを「依頼日」に短縮。印刷後は元に戻す
+function renameHeadersForPrint() {
+  tableWrapper.querySelectorAll('th[data-k="requestDate"]').forEach(th => {
+    if (th.dataset.fullLabel === undefined) { th.dataset.fullLabel = th.textContent; th.textContent = '依頼日'; }
+  });
+}
+function restoreHeadersAfterPrint() {
+  tableWrapper.querySelectorAll('th[data-full-label]').forEach(th => {
+    th.textContent = th.dataset.fullLabel;
+    delete th.dataset.fullLabel;
+  });
+}
+
 // 印刷時: テーブルの実幅からzoom倍率を計算して全列をA4横1ページ幅に収める
 // （Ctrl+P直接印刷でも効くよう beforeprint/afterprint で着脱する）
 window.addEventListener('beforeprint', () => {
   const table = tableWrapper.querySelector('table');
   if (!table) return;
   stripYearForPrint();  // 西暦を省いてから幅を測る
+  productToHankakuForPrint();  // 商品列を半角化
+  renameHeadersForPrint();     // 配送依頼日 → 依頼日
   // 右スクロール状態でも左端から印刷されるようスクロールをリセット
   tableWrapper.scrollLeft = 0;
   table.style.zoom = 1;
@@ -1144,6 +1190,8 @@ window.addEventListener('afterprint', () => {
   const table = tableWrapper.querySelector('table');
   if (table) table.style.zoom = '';
   restoreYearAfterPrint();
+  restoreProductAfterPrint();
+  restoreHeadersAfterPrint();
 });
 
 // Excel保存ボタン
