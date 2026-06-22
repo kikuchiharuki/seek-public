@@ -246,6 +246,12 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   .data-table th { line-height: 14px; height: 29px; }
   .data-table td, .data-table th { padding-left: 4px; padding-right: 4px; }
   .data-table tr { break-inside: avoid; }
+  /* ファイル間の完全な空白行（印刷のみ表示・枠線/背景なし・高さ29px=データ1行分） */
+  .data-table tr.print-blank-row { display: table-row !important; }
+  .data-table tr.print-blank-row td {
+    height: 29px !important; border: none !important; background: #fff !important;
+    padding: 0 !important;
+  }
   /* #・日付・都道府県列: 文字80%に縮小 */
   .data-table th.row-num, .data-table td.row-num,
   .data-table th[data-k="requestDate"], .data-table td[data-k="requestDate"],
@@ -305,6 +311,11 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   padding: 10px 12px; border-top: 2px solid #cbd5e0; color: #2c3e50;
 }
 .data-table tr.file-sep-row:hover td { background: #eef2f7; }
+/* 印刷時にファイル間へ入れる完全な空白行（画面では非表示） */
+.data-table tr.print-blank-row { display: none; }
+.data-table tr.print-blank-row td {
+  height: 29px; background: #fff !important; border: none !important; padding: 0 !important;
+}
 /* 複数ファイル時にtbody内へ繰り返し出す列名行（stickyにしない） */
 .data-table tr.col-head-row th { position: static; }
 /* 行削除ボタン列（枠線・背景なし。印刷には出さない） */
@@ -2301,8 +2312,16 @@ async function applyMappingAndPreview() {
     processedFiles.push({ name: f.name, rows });
   }
 
-  // 同じ商品のファイルが隣り合うように並び替え（先頭行の商品名→ファイル名順）
+  // ファイルの表示順を固定（日付サフィックスが変わっても効くよう先頭一致で判定）。
+  // リストにないファイルは末尾へ回し、商品名→ファイル名順で並べる。
+  const FILE_ORDER = ['ニオイしま栓！営業所', 'ニオイしま栓！', 'ジェット＆ディフューザー'];
+  const filePriority = (name) => {
+    const i = FILE_ORDER.findIndex(p => (name || '').startsWith(p));
+    return i === -1 ? FILE_ORDER.length : i;
+  };
   processedFiles.sort((a, b) => {
+    const da = filePriority(a.name), db = filePriority(b.name);
+    if (da !== db) return da - db;
     const pa = (a.rows[0]?.product || ''), pb = (b.rows[0]?.product || '');
     return pa.localeCompare(pb, 'ja') || a.name.localeCompare(b.name, 'ja');
   });
@@ -2499,6 +2518,8 @@ function renderPreviewTable(fileResults) {
     const fr = fileResults[fi];
     // ファイル名行（VBA版: ファイル名　データn件　個数合計n件）→ その下に列名行
     if (multi) {
+      // 印刷時のみ、ファイルの区切りに完全な空白行を1行入れる（2件目以降の前）
+      if (fi > 0) html += `<tr class="print-blank-row"><td colspan="${totalCols}"></td></tr>`;
       const totalQty = fr.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
       html += `<tr class="file-sep-row"><td colspan="${totalCols}">📄 ${escapeHtml(fr.name)}　データ${fr.rows.length}件　個数合計${totalQty}件</td></tr>`;
       html += headRowHtml();
