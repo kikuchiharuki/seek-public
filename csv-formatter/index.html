@@ -1264,7 +1264,7 @@ window.addEventListener('afterprint', () => {
 
 // Excel保存ボタン
 // ファイル名: [YYYYMMDD出荷分商品名+商品名.xlsx]（日付は出荷日）
-document.getElementById('btnExcel').addEventListener('click', () => {
+document.getElementById('btnExcel').addEventListener('click', async () => {
   if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
   const shipIso = document.getElementById('shipDate').value;
   if (!shipIso) { showToast('出荷日を設定してください（ファイル名に使います）', 'error'); return; }
@@ -1393,6 +1393,31 @@ document.getElementById('btnExcel').addEventListener('click', () => {
   ws['!cols'] = [{ wch: 4 }, ...ALL_COLUMNS.map(c => ({ wch: colWidths[c.key] || 12 }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '出荷データ');
+
+  // 保存先を「デスクトップ」起点にする。
+  // Chrome/Edge は File System Access API の startIn:'desktop' でデスクトップを起点に保存ダイアログを開ける。
+  // 非対応ブラウザ（Firefox/Safari）や拒否時は従来どおりブラウザの既定DLフォルダへ保存。
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        startIn: 'desktop',   // ← デスクトップを起点に開く
+        types: [{
+          description: 'Excel',
+          accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] },
+        }],
+      });
+      const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const writable = await handle.createWritable();
+      await writable.write(buf);
+      await writable.close();
+      showToast(`保存: ${fileName}`, 'success');
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;  // ユーザーがキャンセルした
+      // 非対応・拒否時は従来ダイアログへフォールバック
+    }
+  }
   XLSX.writeFile(wb, fileName);
   showToast(`保存: ${fileName}`, 'success');
 });
