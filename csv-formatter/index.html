@@ -260,13 +260,14 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
     height: 29px !important; border: none !important; background: #fff !important;
     padding: 0 !important;
   }
-  /* #・都道府県列: 文字80%に縮小（日付3列の"値"は標準サイズ11ptに戻す＝列幅50pxは維持） */
-  .data-table th.row-num, .data-table td.row-num,
+  /* 都道府県列: 文字80%に縮小（日付3列の"値"は標準サイズ11ptに戻す＝列幅50pxは維持） */
   .data-table th[data-k="prefecture"], .data-table td[data-k="prefecture"] {
     font-size: 80%;
   }
-  /* 数量列: 既存80%から15%UP → 92%（11pt基準で約10.1pt） */
-  .data-table th[data-k="quantity"], .data-table td[data-k="quantity"] { font-size: 92%; }
+  /* #列: 80%→92%に拡大（11pt基準で約10.1pt） */
+  .data-table th.row-num, .data-table td.row-num { font-size: 92%; }
+  /* 数量列: 92%→100%に拡大（標準サイズ11pt） */
+  .data-table th[data-k="quantity"], .data-table td[data-k="quantity"] { font-size: 100%; }
   /* 印刷時は全セル黒文字（#列など薄く印刷される問題の対策。特に白黒印刷向け）
      ただし .keep-color（ゆうパック赤字など意図的な色文字）は除外 */
   .data-table td:not(.keep-color), .data-table th,
@@ -301,7 +302,9 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   position: sticky; top: 0; z-index: 1; vertical-align: bottom;
 }
 /* 縦線あり（Excelの枠線と同じくらいの色）。行高はpaddingで調整（文字サイズ13pxは据え置き） */
-.data-table td { padding: 4px 6px; border: 1px solid #d4d4d4; }
+.data-table td { padding: 6px 6px; border: 1px solid #d4d4d4; }
+/* 会社名に改行がある行は上下padding・行間を詰めて、通常行よりコンパクトにする */
+.data-table tr.multiline td { padding-top: 2px; padding-bottom: 2px; line-height: 1.15; }
 .data-table th { border: 1px solid #4a5d70; }
 .data-table tr:hover td { background: #f5f8ff; }
 .data-table .row-num { color: #999; text-align: center; width: 40px; }
@@ -2613,8 +2616,10 @@ function renderDataRow(row, i, fi) {
   const C = CONFIG.colors;
   const isYupack = (row.carrier || '').trim() === 'ゆうパック';
   const rowStyle = isYupack ? `background:${C.yupackRow};` : '';
+  // 会社名に改行を含む行はコンパクト表示（.multiline）にする
+  const isMultiline = (row.companyName || '').includes('\n');
 
-  let html = `<tr><td class="row-num" style="${rowStyle}">${i + 1}</td>`;
+  let html = `<tr class="${isMultiline ? 'multiline' : ''}"><td class="row-num" style="${rowStyle}">${i + 1}</td>`;
 
   ALL_COLUMNS.forEach(col => {
     const val = row[col.key] || '';
