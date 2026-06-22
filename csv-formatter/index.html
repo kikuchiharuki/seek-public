@@ -211,7 +211,8 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 /* ───────── 印刷レイアウト（A4横） ───────── */
 @media print {
-  @page { size: A4 landscape; margin: 5mm; }
+  /* 左余白は5mm(デフォルト)に16mmを足して21mm（バインダーのクリップ対策） */
+  @page { size: A4 landscape; margin: 5mm 5mm 5mm 21mm; }
   *:not(html):not(body) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { -webkit-print-color-adjust: economy !important; print-color-adjust: economy !important;
     background: #fff !important; background-color: #fff !important; }
@@ -1182,7 +1183,7 @@ window.addEventListener('beforeprint', () => {
   // 右スクロール状態でも左端から印刷されるようスクロールをリセット
   tableWrapper.scrollLeft = 0;
   table.style.zoom = 1;
-  const printableWidthPx = (297 - 16) * 96 / 25.4;  // A4横297mm - 余白8mm×2 → px換算
+  const printableWidthPx = (297 - 21 - 5) * 96 / 25.4;  // A4横297mm - 左余白21mm - 右余白5mm → px換算
   const scale = Math.min(1, printableWidthPx / table.scrollWidth);
   table.style.zoom = scale;
 });
