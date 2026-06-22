@@ -50,6 +50,14 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   white-space: nowrap;
 }
 .btn-reset:hover { background: #e74c3c; color: #fff; }
+/* ファイル追加ボタン（変換前のみ表示） */
+.btn-add {
+  background: none; border: 1px solid #3498db; color: #3498db;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  white-space: nowrap;
+}
+.btn-add:hover { background: #3498db; color: #fff; }
+.raw-section.collapsed .btn-add { padding: 4px 12px; font-size: 12px; }
 
 /* 元データセクション */
 .raw-section {
@@ -466,7 +474,9 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         <span class="mapping-badge" id="mappingBadge"></span>
         <button class="btn-link" id="btnToggleMapping">列マッピングを確認・編集 ▸</button>
         <button class="btn-convert" id="btnApplyMapping">⚡ 変換する</button>
-        <button class="btn-reset" id="btnReset">ファイルを変更</button>
+        <button class="btn-add" id="btnAddFile">＋ ファイル追加</button>
+        <button class="btn-reset" id="btnReset">最初からやり直す</button>
+        <input type="file" id="fileInputAdd" accept=".csv,.xlsx,.xls" multiple style="display:none">
       </div>
     </div>
     <!-- 列マッピング（普段は非表示。自動認識できない列があるときだけ自動で開く） -->
@@ -1103,6 +1113,13 @@ dropZone.addEventListener('drop', e => {
 fileInput.addEventListener('change', e => {
   if (e.target.files.length) handleFiles(e.target.files);
 });
+// ＋ファイル追加: 既存の読み込み済みデータに追記する（変換前のみ。変換後はボタン非表示）
+const fileInputAdd = document.getElementById('fileInputAdd');
+document.getElementById('btnAddFile').addEventListener('click', () => fileInputAdd.click());
+fileInputAdd.addEventListener('change', e => {
+  if (e.target.files.length) handleFiles(e.target.files, true);
+  e.target.value = '';  // 同じファイルを続けて選べるようリセット
+});
 document.getElementById('btnReset').addEventListener('click', resetAll);
 // ボックス全体クリックでカレンダーを開く（アイコン以外の部分でも確実に開く）
 document.getElementById('shipDate').addEventListener('click', function() {
@@ -1725,10 +1742,14 @@ function setRawCollapsed(collapsed) {
 }
 
 // 複数ファイルをまとめて読み込む（最大 CONFIG.maxFiles ファイル）
-async function handleFiles(fileList) {
+async function handleFiles(fileList, append = false) {
   const arr = Array.from(fileList);
-  if (arr.length > CONFIG.maxFiles) {
-    showToast(`一度に読み込めるのは ${CONFIG.maxFiles} ファイルまでです（選択: ${arr.length}件）`, 'error');
+  const existing = append ? files.length : 0;
+  if (existing + arr.length > CONFIG.maxFiles) {
+    const detail = append
+      ? `（読み込み済み${existing}件 ＋ 追加${arr.length}件）`
+      : `（選択: ${arr.length}件）`;
+    showToast(`ファイルは合計 ${CONFIG.maxFiles} ファイルまでです${detail}`, 'error');
     return;
   }
 
@@ -1757,8 +1778,12 @@ async function handleFiles(fileList) {
   }
 
   if (loaded.length === 0) return;
-  files = loaded;
-  activeMappingFile = 0;
+  if (append) {
+    files = files.concat(loaded);  // 既存データを保持したまま追記
+  } else {
+    files = loaded;
+    activeMappingFile = 0;
+  }
   onFilesLoaded();
 }
 
@@ -1854,12 +1879,21 @@ function onFilesLoaded() {
       : `(${files[0].name} / ${sizeLabel} / ${total}行)`;
   renderRawTables();
 
-  // マッピングは裏でファイルごとに自動実行。認識できない必須列があるときだけ開く
+  // マッピングは裏でファイルごとに自動実行。認識できない必須列があるときだけ開く。
+  // ファイル追加時は既存ファイルのマッピング（手修正含む）を壊さないよう未設定分だけ実行。
   files.forEach(f => {
-    f.mapping = autoDetectMapping(f.headers);
-    addExtraMappings(f);
+    if (!f.mapping || Object.keys(f.mapping).length === 0) {
+      f.mapping = autoDetectMapping(f.headers);
+      addExtraMappings(f);
+    }
   });
   buildMappingUI();
+  updateAddFileBtn();
+}
+
+// ＋ファイル追加ボタンの表示制御。変換済み（processedFilesあり）なら隠す＝追加非対応。
+function updateAddFileBtn() {
+  document.getElementById('btnAddFile').style.display = processedFiles.length ? 'none' : '';
 }
 
 // 元データのテーブル表示（複数ファイルは縦に並べ、ファイル名見出しを付ける）
@@ -2311,6 +2345,7 @@ async function applyMappingAndPreview() {
     if (fileSource) rows.forEach(r => { r._fileSource = fileSource; });
     processedFiles.push({ name: f.name, rows });
   }
+  updateAddFileBtn();  // 変換後はファイル追加ボタンを隠す（追加は変換前のみ対応）
 
   // ファイルの表示順を固定（日付サフィックスが変わっても効くよう先頭一致で判定）。
   // リストにないファイルは末尾へ回し、商品名→ファイル名順で並べる。
