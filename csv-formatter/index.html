@@ -256,8 +256,9 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   }
   /* 数量列: 既存80%から15%UP → 92%（11pt基準で約10.1pt） */
   .data-table th[data-k="quantity"], .data-table td[data-k="quantity"] { font-size: 92%; }
-  /* 印刷時は全セル黒文字（#列など薄く印刷される問題の対策。特に白黒印刷向け） */
-  .data-table td, .data-table th,
+  /* 印刷時は全セル黒文字（#列など薄く印刷される問題の対策。特に白黒印刷向け）
+     ただし .keep-color（ゆうパック赤字など意図的な色文字）は除外 */
+  .data-table td:not(.keep-color), .data-table th,
   .data-table .row-num, .data-table td.row-num, .data-table th.row-num { color: #000 !important; }
   /* 日付3列（依頼日・指定納期・出荷日）を同じ幅に揃える */
   .data-table th[data-k="requestDate"], .data-table td[data-k="requestDate"],
@@ -289,6 +290,10 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .data-table th { border: 1px solid #4a5d70; }
 .data-table tr:hover td { background: #f5f8ff; }
 .data-table .row-num { color: #999; text-align: center; width: 40px; }
+/* 日付3列（配送依頼日・指定納期・出荷日）の列名は中央揃え（画面・印刷とも） */
+.data-table th[data-k="requestDate"],
+.data-table th[data-k="deliveryDate"],
+.data-table th[data-k="shipDate"] { text-align: center; }
 
 /* 複数ファイル時のファイル区切り行（VBA版のファイル名行を再現） */
 .data-table tr.file-sep-row td {
@@ -2521,6 +2526,7 @@ function renderDataRow(row, i, fi) {
   ALL_COLUMNS.forEach(col => {
     const val = row[col.key] || '';
     let style = rowStyle;
+    let cls = '';
 
     // 空白チェック対象列が空白 → 赤
     if (CONFIG.emptyCheckColumns.includes(col.key) && val.trim() === '') {
@@ -2550,9 +2556,10 @@ function renderDataRow(row, i, fi) {
       title = ` title="元の指定納期: ${escapeHtml(row.deliveryDateOrig || '')}（リードタイム的に間に合わないため変更）"`;
     }
 
-    // ゆうパックの運送会社セル → 赤太字
+    // ゆうパックの運送会社セル → 赤太字（印刷時も黒文字化せず赤を維持）
     if (col.key === 'carrier' && isYupack) {
       style += `color:${C.yupackText};font-weight:bold;`;
+      cls = 'keep-color';
     }
 
     // 会社名の改行を <br> で表示
@@ -2561,7 +2568,7 @@ function renderDataRow(row, i, fi) {
       : escapeHtml(val);
 
     // セルは直接編集可能（focusoutで行データに書き戻す）
-    html += `<td style="${style}"${title} contenteditable="true" data-f="${fi}" data-r="${i}" data-k="${col.key}">${display}</td>`;
+    html += `<td class="${cls}" style="${style}"${title} contenteditable="true" data-f="${fi}" data-r="${i}" data-k="${col.key}">${display}</td>`;
   });
   // 行削除ボタン（保留・在庫切れなどでこの出荷から外したいとき用。印刷には出ない）
   html += `<td class="del-col"><button class="row-del" data-f="${fi}" data-r="${i}" title="この行を削除">🗑</button></td></tr>`;
