@@ -109,9 +109,9 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 }
 /* カレンダー入力と「出荷日を設定」ボタンは隙間なく連結して1つの部品に見せる */
 .ship-date-set { display: flex; align-items: stretch; }
-/* 出荷日の日付ボックス: 隣の「出荷日を設定」ボタンと同じ青背景・同じ高さ(41px)に揃える */
+/* 出荷日の日付ボックス: 隣の「出荷日を設定」ボタンと同じ青背景・同じ高さ(44px)に揃える */
 .ship-date-set #shipDate {
-  height: 41px; box-sizing: border-box;
+  height: 44px; box-sizing: border-box;
   padding: 0 10px; border: none; border-radius: 6px 0 0 6px; font-size: 14px;
   font-family: inherit; font-weight: 600;
   background: #3498db; color: #fff; cursor: pointer;
@@ -202,7 +202,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .btn-orange:hover { background: #d35400; }
 .btn-fixed { text-align: center; box-sizing: border-box; }
 /* 変換結果ヘッダーのボタン群はテキストが潰れない範囲でコンパクトに揃える */
-.preview-actions button { padding: 9px 14px; font-size: 13px; white-space: nowrap; font-weight: 600; }
+.preview-actions button { padding: 6px 14px; min-height: 44px; box-sizing: border-box; font-size: 13px; white-space: nowrap; font-weight: 600; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; }
 /* 「翌営業日で設定」系ボタン: 出荷日を設定(青)と区別できるよう緑系 */
 .btn-green {
   background: #27ae60; color: #fff; border: none; border-radius: 6px;
@@ -604,7 +604,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         </div>
         <button class="btn-secondary btn-fixed" id="btnExcel">📥 Excel保存</button>
         <button class="btn-secondary btn-fixed" id="btnMailText">✉ 承りメール文</button>
-        <button class="btn-orange btn-fixed" id="btnInvoiceCsv">🚚 福山通運CSV</button>
+        <button class="btn-orange btn-fixed" id="btnInvoiceCsv">🚚 福山通運ｴﾝﾄﾘｰ用<br>形式へ変換</button>
         <button class="btn-secondary btn-fixed" id="btnPrint">🖨 印刷</button>
       </div>
     </div>
