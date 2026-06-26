@@ -40,7 +40,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .drop-zone-icon { font-size: 48px; margin-bottom: 12px; }
 .drop-zone-text { font-size: 16px; color: #666; }
 .drop-zone-text strong { color: #3498db; }
-.drop-zone-sub { font-size: 13px; color: #999; margin-top: 8px; }
+.drop-zone-sub { font-size: 13px; color: #555; margin-top: 8px; }
 .drop-zone input[type="file"] { display: none; }
 
 /* ファイルを変更ボタン（元データ欄の右端） */
@@ -83,7 +83,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 }
 .raw-header h2 { font-size: 16px; cursor: pointer; user-select: none; }
 .raw-header h2:hover { color: #3498db; }
-.count-badge { font-size: 13px; color: #666; font-weight: normal; }
+.count-badge { font-size: 13px; color: #444; font-weight: normal; }
 .raw-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .mapping-badge { font-size: 12px; }
 .mapping-badge.ok { color: #27ae60; }
@@ -135,7 +135,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   padding: 16px; margin-bottom: 12px; background: #fcfcfc;
 }
 .mapping-section.visible { display: block; }
-.mapping-section .mapping-desc { font-size: 13px; color: #666; margin-bottom: 16px; }
+.mapping-section .mapping-desc { font-size: 13px; color: #444; margin-bottom: 16px; }
 
 /* マッピングのファイル切り替えタブ（複数ファイル時のみ表示） */
 .file-tabs { display: none; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -167,18 +167,18 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   font-size: 11px; color: #e74c3c; font-weight: normal; margin-left: 4px;
 }
 .mapping-item .optional-badge {
-  font-size: 11px; color: #999; font-weight: normal; margin-left: 4px;
+  font-size: 11px; color: #555; font-weight: normal; margin-left: 4px;
 }
 .mapping-item select {
   flex: 1; min-width: 180px; padding: 8px; border: 1px solid #ddd; border-radius: 6px;
   font-size: 13px; background: #fff;
 }
 .mapping-item .sample-data {
-  font-size: 11px; color: #888; overflow: hidden;
+  font-size: 11px; color: #555; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; flex-basis: 100%;
 }
 .mapping-item .mapping-hint {
-  font-size: 11px; color: #888; flex-basis: 100%; margin-top: -4px;
+  font-size: 11px; color: #555; flex-basis: 100%; margin-top: -4px;
 }
 
 .mapping-actions {
@@ -210,7 +210,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 }
 .btn-green:hover { background: #219150; }
 
-.mapping-status { font-size: 13px; color: #666; margin-left: auto; }
+.mapping-status { font-size: 13px; color: #444; margin-left: auto; }
 
 /* 変換結果のヘッダーは少し小さめ */
 .preview-section .data-table th { font-size: 12px; }
@@ -220,7 +220,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   display: flex; align-items: center; gap: 8px 16px; margin-bottom: 12px; flex-wrap: wrap;
 }
 .preview-section .preview-header h2 { margin-bottom: 0; }
-.edit-hint { font-size: 11px; color: #999; font-weight: normal; margin-left: 8px; }
+.edit-hint { font-size: 11px; color: #555; font-weight: normal; margin-left: 8px; }
 .preview-actions {
   margin-left: auto; display: flex; align-items: center; gap: 10px;
 }
@@ -397,7 +397,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   animation: apply-check-pop 0.4s ease;
 }
 .apply-pop-title { font-size: 17px; font-weight: 700; color: #2c3e50; }
-.apply-pop-sub   { font-size: 13px; color: #666; margin-top: 5px; }
+.apply-pop-sub   { font-size: 13px; color: #444; margin-top: 5px; }
 @keyframes apply-check-pop {
   0%   { transform: scale(0.4); opacity: 0; }
   60%  { transform: scale(1.15); }
@@ -499,7 +499,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .cfg-tag.green { background: #e6f9ed; color: #1a7f37; }
 .cfg-tag.orange { background: #fff3e0; color: #e65100; }
 .cfg-tag.red { background: #ffeaea; color: #d32f2f; }
-.cfg-note { font-size: 12px; color: #888; margin-top: -10px; margin-bottom: 14px; }
+.cfg-note { font-size: 12px; color: #555; margin-top: -10px; margin-bottom: 14px; }
 
 /* ── メール文モーダル ── */
 .mail-overlay {
@@ -591,7 +591,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   <!-- 変換結果 -->
   <div class="preview-section" id="previewSection">
     <div class="preview-header">
-      <h2>変換結果 <span id="previewCount" style="font-size:13px;color:#666;font-weight:normal;"></span>
+      <h2>変換結果 <span id="previewCount" style="font-size:13px;color:#444;font-weight:normal;"></span>
         <span class="edit-hint">※ セルはクリックして直接修正できます</span>
       </h2>
       <div class="preview-actions">
@@ -616,7 +616,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   <!-- 送り状CSVプレビュー（編集してからダウンロードする） -->
   <div class="preview-section" id="invoiceSection">
     <div class="preview-header">
-      <h2>🚚 福山通運用 送り状CSVプレビュー <span id="invoiceCount" style="font-size:13px;color:#666;font-weight:normal;"></span>
+      <h2>🚚 福山通運用 送り状CSVプレビュー <span id="invoiceCount" style="font-size:13px;color:#444;font-weight:normal;"></span>
         <span class="edit-hint">※ セルはクリックして直接修正できます。修正してから下のボタンで保存</span>
       </h2>
       <div class="preview-actions">
@@ -624,8 +624,8 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         <button class="btn-secondary" id="btnInvoiceClose">✖ 閉じる</button>
       </div>
     </div>
-    <div id="invoiceNotes" style="font-size:13px;color:#666;margin-bottom:4px;"></div>
-    <div id="invoiceHint" style="font-size:12px;color:#666;margin-bottom:8px;">
+    <div id="invoiceNotes" style="font-size:13px;color:#444;margin-bottom:4px;"></div>
+    <div id="invoiceHint" style="font-size:12px;color:#444;margin-bottom:8px;">
       ※ 時間指定をする場合のみ: 輸送商品１に「100」、輸送商品２に時間帯コード
       （110=10時～12時 / 112=12時～14時 / 114=14時～16時 / 116=16時～18時 / 118=18時～20時）を入力。
       通常は両方とも空欄のまま
@@ -2769,7 +2769,7 @@ function renderSummaryBar(rows, stats) {
   if (stats.deliveryChanged > 0) notes.push(`<span style="background:${CONFIG.colors.deliveryChanged};padding:0 4px;">納期変更: ${stats.deliveryChanged}件</span>`);
   // 郵便番号取得◯件は表示しない（取得できなかった行は郵便番号セルが赤になる）
   // 注記行（ゆうパック件数など）は印刷時には出さない（.summary-notes を@media printで非表示）
-  if (notes.length) html += `<br><span class="summary-notes" style="color:#666;font-size:13px;">${notes.join(' ／ ')}</span>`;
+  if (notes.length) html += `<br><span class="summary-notes" style="color:#444;font-size:13px;">${notes.join(' ／ ')}</span>`;
   el.innerHTML = html;
 }
 
