@@ -1481,7 +1481,7 @@ document.getElementById('btnExcel').addEventListener('click', async () => {
   for (const pf of processedFiles) {
     if (multi) {
       const totalQty = pf.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
-      aoa.push([`${pf.name}　データ${pf.rows.length}件　個数合計${totalQty}件`]);
+      aoa.push([`${pf.name}　データ${pf.rows.length}件　個数合計${totalQty}個`]);
       meta.push('sep');
       aoa.push(['#', ...ALL_COLUMNS.map(c => c.label)]);
       meta.push('header');
@@ -2859,12 +2859,12 @@ function renderPreviewTable(fileResults) {
 
   for (let fi = 0; fi < fileResults.length; fi++) {
     const fr = fileResults[fi];
-    // ファイル名行（VBA版: ファイル名　データn件　個数合計n件）→ その下に列名行
+    // ファイル名行（VBA版: ファイル名　データn件　個数合計n個）→ その下に列名行
     if (multi) {
       // 印刷時のみ、ファイルの区切りに完全な空白行を1行入れる（2件目以降の前）
       if (fi > 0) html += `<tr class="print-blank-row"><td colspan="${totalCols}"></td></tr>`;
       const totalQty = fr.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
-      html += `<tr class="file-sep-row"><td colspan="${totalCols}">📄 ${escapeHtml(fr.name)}　データ${fr.rows.length}件　個数合計${totalQty}件</td></tr>`;
+      html += `<tr class="file-sep-row"><td colspan="${totalCols}">📄 ${escapeHtml(fr.name)}　データ${fr.rows.length}件　個数合計${totalQty}個</td></tr>`;
       html += headRowHtml();
     }
     for (let i = 0; i < fr.rows.length; i++) {
