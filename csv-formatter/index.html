@@ -883,7 +883,7 @@ const CONFIG = {
   // ──────────────────────────────────────────────
   invoiceCsv: {
     // 出力ファイル名（{M}=月, {D}=日。日付は出荷日）
-    filenamePattern: '{M}月{D}日出荷日分CSVエントリーデータ.csv',
+    filenamePattern: '{M}月{D}日出荷CSVエントリーデータ.csv',
     includeHeader: true,        // 1行目に列名行を出すか（ソフト側の取込設定に合わせる）
     encoding: 'SJIS',           // 送り状ソフトはWindows用のためShift-JIS（UTF8も指定可）
     dateFormat: 'yyyymmdd',     // 配達指定日・出荷日付・登録日付は8桁数字（iS-2でyyyy/mm/ddはエラーになる）
@@ -1295,25 +1295,41 @@ document.getElementById('shipDate').addEventListener('change', async function() 
 document.getElementById('btnApplyMapping').addEventListener('click', applyMappingAndPreview);
 
 // 出荷日を行に適用＋納期チェック＋再描画（出荷日設定ボタン／翌営業日ボタン共通）
+// 流れ（ユーザー要望）: ①もともと表示中の出荷日を消す → ②ぐるぐる（処理中）→ ③反映 → ④完了メッセージ
+// ＝ 反映が「ぐるぐるの後に実際に起きる」ようにして、日付が更新されたことを分かりやすくする
 async function applyShipDateAndRender(v) {
   await holidaysReady;
+  const shipLabel = fmtSlash(parseYmd(v));
+
+  // ① まず元の出荷日を画面から消す（古い日付が消えるのが見える）＋スピナー表示
+  beginApplyFeedback();
+  clearShipDateDisplay();
+  // ② ぐるぐるを実際に見せてから反映する（この間は本当に何もしていない＝処理中の演出）
+  await sleep(550);
+
+  // ③ 反映（実際の納期チェック・再描画はここで走る）
   const changed = applyShipDateToRows(v);
   if (lastStats) lastStats.deliveryChanged = changed;
   renderSummaryBar(processedFiles.flatMap(pf => pf.rows), lastStats || {});
   renderPreviewTable(processedFiles);
   updatePrintHeader();
-  const shipLabel = fmtSlash(parseYmd(v));
-  // 即時反映を見落とさないよう、中央にカードをポップ＋テーブルを一瞬点滅させる
-  flashApplyFeedback(shipLabel, changed);
+
+  // ④ 完了メッセージ＋テーブル点滅で「どこが更新されたか」に目を向けさせる
+  finishApplyFeedback(shipLabel, changed);
   // 納期チェック結果は自動で消さない（クリックで閉じる）
   showToast(changed
     ? `出荷日 ${shipLabel} で納期チェック: ${changed}件の納期を変更（黄色）`
     : `出荷日 ${shipLabel}: 全行、指定納期に間に合います`, changed ? '' : 'success', true);
 }
 
-// 出荷日の反映を視覚的に知らせる（カレンダー選択・明日出荷ボタンの両方から呼ばれる）
-// まず一瞬ぐるぐる回し→「設定しました」に切替＝「処理して完了した」感を出す（ユーザー要望）
-function flashApplyFeedback(shipLabel, changed) {
+// 現在表示中の出荷日を一旦クリアして再描画（「もともとある日付を削除」の見せ場）
+function clearShipDateDisplay() {
+  for (const pf of processedFiles) for (const r of pf.rows) r.shipDate = '';
+  renderPreviewTable(processedFiles);
+}
+
+// ① 処理中（スピナー）表示を出す
+function beginApplyFeedback() {
   const pop   = document.getElementById('applyPop');
   const card  = pop.querySelector('.apply-pop-card');
   const icon  = pop.querySelector('.apply-pop-icon');
@@ -1323,31 +1339,37 @@ function flashApplyFeedback(shipLabel, changed) {
   clearTimeout(pop._doneTimer);
   clearTimeout(pop._hideTimer);
 
-  // ① 処理中（スピナー）
   card.classList.remove('done');
   card.classList.add('loading');
   icon.textContent  = '';
   title.textContent = '出荷日を反映中…';
   sub.textContent   = '';
   pop.classList.add('on');
+}
 
-  // テーブルも一瞬点滅させて、どこが更新されたか目を向けさせる
+// ④ 反映後に完了メッセージへ切替（チェックのポップ＋テーブル点滅）
+function finishApplyFeedback(shipLabel, changed) {
+  const pop   = document.getElementById('applyPop');
+  const card  = pop.querySelector('.apply-pop-card');
+  const icon  = pop.querySelector('.apply-pop-icon');
+  const title = pop.querySelector('.apply-pop-title');
+  const sub   = pop.querySelector('.apply-pop-sub');
+
+  card.classList.remove('loading');
+  card.classList.add('done');
+  // アニメ（チェックのポップ）を毎回頭から再生
+  icon.style.animation = 'none'; void icon.offsetWidth; icon.style.animation = '';
+  icon.textContent  = '✅';
+  title.textContent = `出荷日 ${shipLabel} を設定しました`;
+  sub.textContent   = changed > 0
+    ? `指定納期 ${changed}件 を最短納期に変更（黄色セル）`
+    : '全行、指定納期に間に合います';
+
+  // 反映後のテーブルを一瞬点滅させて、更新箇所に目を向けさせる
   const tw = document.getElementById('tableWrapper');
   tw.classList.remove('flash'); void tw.offsetWidth; tw.classList.add('flash');
 
-  // ② 少し回してから完了表示へ
-  pop._doneTimer = setTimeout(() => {
-    card.classList.remove('loading');
-    card.classList.add('done');
-    // アニメ（チェックのポップ）を毎回頭から再生
-    icon.style.animation = 'none'; void icon.offsetWidth; icon.style.animation = '';
-    icon.textContent  = '✅';
-    title.textContent = `出荷日 ${shipLabel} を設定しました`;
-    sub.textContent   = changed > 0
-      ? `指定納期 ${changed}件 を最短納期に変更（黄色セル）`
-      : '全行、指定納期に間に合います';
-    pop._hideTimer = setTimeout(() => pop.classList.remove('on'), 1200);
-  }, 650);
+  pop._hideTimer = setTimeout(() => pop.classList.remove('on'), 1200);
 }
 
 // 出荷日設定ボタン（Excel版の「出荷日設定」ボタンと同じ役割）
