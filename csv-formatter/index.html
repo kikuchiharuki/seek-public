@@ -305,6 +305,28 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   .data-table th[data-k="shipDate"] { font-size: 64% !important; letter-spacing: -0.3px; }
 }
 
+/* ── 印刷の自前ページ分割（出荷日＋N／M枚目を全ページに） ──
+   beforeprintで行を実測し1ページぶんずつ .print-page に詰める。
+   画面では非表示、印刷時のみ表示し、元の .preview-section は隠す。 */
+#printPaged { display: none; }
+@media print {
+  body.paged-print .preview-section { display: none !important; }
+  body.paged-print #printPaged { display: block !important; }
+  #printPaged .print-page { break-after: page; page-break-after: always; break-inside: avoid; }
+  #printPaged .print-page:last-child { break-after: auto; page-break-after: auto; }
+  /* ページ見出し: 出荷日(青・中央)＋「N／M枚目」を1行で。既存#printHeaderと同じ体裁 */
+  #printPaged .pp-header {
+    font-size: 33px; font-weight: 700; color: rgb(10, 150, 255);
+    text-align: center; margin: 0 0 4px 0;
+  }
+  /* 製品別個数(赤・右)。1枚目のみ出す（buildPrintPagesがpage0だけ付与） */
+  #printPaged .pp-summary {
+    font-size: 27px; font-weight: 700; color: #ff0000;
+    text-align: right; margin: 0 0 6px 0;
+  }
+  /* テーブル本体は既存 .data-table の印刷ルール(枠線/フォント/行高)をそのまま継承 */
+}
+
 /* Preview table */
 .preview-section {
   display: none; background: #fff; border-radius: 8px; padding: 20px;
@@ -1459,7 +1481,124 @@ function restoreHeadersAfterPrint() {
   });
 }
 
-// 印刷時: テーブルの実幅からzoom倍率を計算して全列をA4横1ページ幅に収める
+// ── 印刷の自前ページ分割 ───────────────────────────────
+// 出荷日見出しとページ番号「N／M枚目」を全ページに出すため、行を実測してA4横1ページ
+// ぶんずつ .print-page に詰める。製品(=tbody.product-group)はできるだけ分割しない。
+// 列幅は元テーブルの実測幅をcolgroupで固定し、全ページで桁を揃える。
+// rendered px（物理ページのpx）で計算。1mm = 96/25.4px。
+const PRINT_PAGE = {
+  contentPx: (210 - 5 - 5) * 96 / 25.4,  // A4横の縦=210mm - 上下余白5mm = 200mm
+  headerPx: 48,    // ページ見出し(出荷日+N/M枚目)の高さ見積り
+  summaryPx: 38,   // 1枚目の製品別個数行の高さ見積り
+  safetyPx: 16,    // 余裕（実測と印刷のズレ吸収）
+  fudge: 1.05,     // 行高の安全係数（やや多めに見積って溢れ＝余計な改ページを防ぐ）
+};
+
+function teardownPrintPages() {
+  const el = document.getElementById('printPaged');
+  if (el) el.remove();
+  document.body.classList.remove('paged-print');
+}
+
+// scale: 列をA4横1ページ幅に収めるzoom倍率
+function buildPrintPages(scale) {
+  teardownPrintPages();
+  const src = tableWrapper.querySelector('table.data-table');
+  if (!src) return;
+  src.style.zoom = '';  // 実測は等倍で行う
+
+  // 列幅（行削除列 .del-col は印刷で消えるので除外）
+  const headRow = src.querySelector('thead tr') || src.querySelector('tr.col-head-row') || src.querySelector('tr');
+  const headCells = headRow ? [...headRow.children].filter(c => !c.classList.contains('del-col')) : [];
+  const colW = headCells.map(c => Math.ceil(c.getBoundingClientRect().width));
+
+  const H = tr => Math.max(1, tr.getBoundingClientRect().height) * scale * PRINT_PAGE.fudge;
+
+  // 製品グループ単位に行を収集
+  const groups = [];
+  if (src.querySelector('tbody.product-group')) {
+    // 複数ファイル（=複数製品）: 各 product-group が1製品
+    src.querySelectorAll('tbody.product-group').forEach(tb => {
+      const trs = [...tb.children].filter(tr => !tr.classList.contains('print-blank-row'));
+      const headerRows = trs.filter(tr => tr.classList.contains('file-sep-row') || tr.classList.contains('col-head-row'));
+      const colHead = trs.find(tr => tr.classList.contains('col-head-row')) || null;
+      const dataRows = trs.filter(tr => !tr.classList.contains('file-sep-row') && !tr.classList.contains('col-head-row'));
+      groups.push({ headerRows, colHead, dataRows });
+    });
+  } else {
+    // 単一ファイル: thead の列名行を各ページ先頭に繰り返す
+    const colHead = src.querySelector('thead tr') || null;
+    const dataRows = [...(src.querySelector('tbody')?.children || [])];
+    groups.push({ headerRows: colHead ? [colHead] : [], colHead, dataRows });
+  }
+
+  // ページ詰め（rendered px）。pages[i] = そのページに置く <tr> 参照の配列
+  const budgetFor = i => PRINT_PAGE.contentPx - PRINT_PAGE.headerPx - (i === 0 ? PRINT_PAGE.summaryPx : 0) - PRINT_PAGE.safetyPx;
+  const pages = [[]];
+  let i = 0, cur = 0;
+  const place = tr => { pages[i].push(tr); cur += H(tr); };
+  const newPage = () => { pages.push([]); i++; cur = 0; };
+
+  for (const g of groups) {
+    const startH = g.headerRows.reduce((s, tr) => s + H(tr), 0);
+    const firstDataH = g.dataRows.length ? H(g.dataRows[0]) : 0;
+    // 製品の先頭(見出し+最初の1行)が今のページに入らないなら、製品ごと次ページへ
+    if (cur > 0 && cur + startH + firstDataH > budgetFor(i)) newPage();
+    g.headerRows.forEach(place);
+    for (let d = 0; d < g.dataRows.length; d++) {
+      const dh = H(g.dataRows[d]);
+      if (cur > 0 && cur + dh > budgetFor(i)) {
+        newPage();
+        if (g.colHead) place(g.colHead);  // 継続ページの先頭に列名を再掲
+      }
+      place(g.dataRows[d]);
+    }
+  }
+
+  const M = pages.length;
+  const v = document.getElementById('shipDate').value;
+  const dd = v ? parseYmd(v) : null;
+  const dateStr = dd ? `${dd.getMonth() + 1}/${dd.getDate()} (${'日月火水木金土'[dd.getDay()]}) 出荷` : '出荷日未設定';
+  const summary = buildProductSummary(processedFiles.flatMap(pf => pf.rows));
+  const summaryStr = [...summary.entries()].map(([n, s]) => `${n}×${s.quantity}`).join('　');
+
+  const wrap = document.createElement('div');
+  wrap.id = 'printPaged';
+  pages.forEach((rows, pi) => {
+    const page = document.createElement('div');
+    page.className = 'print-page';
+    const hd = document.createElement('div');
+    hd.className = 'pp-header';
+    hd.textContent = `${dateStr}　${pi + 1}／${M}枚目`;
+    page.appendChild(hd);
+    if (pi === 0 && summaryStr) {
+      const sm = document.createElement('div');
+      sm.className = 'pp-summary';
+      sm.textContent = summaryStr;
+      page.appendChild(sm);
+    }
+    const tbl = document.createElement('table');
+    tbl.className = 'data-table';
+    tbl.style.zoom = scale;
+    tbl.style.tableLayout = 'fixed';
+    const cg = document.createElement('colgroup');
+    colW.forEach(w => { const c = document.createElement('col'); c.style.width = w + 'px'; cg.appendChild(c); });
+    tbl.appendChild(cg);
+    const tb = document.createElement('tbody');
+    rows.forEach(tr => {
+      const clone = tr.cloneNode(true);
+      const del = clone.querySelector('.del-col'); if (del) del.remove();
+      tb.appendChild(clone);
+    });
+    tbl.appendChild(tb);
+    page.appendChild(tbl);
+    wrap.appendChild(page);
+  });
+  document.body.appendChild(wrap);
+  document.body.classList.add('paged-print');
+}
+
+// 印刷時: 全列をA4横1ページ幅に収めるzoom倍率を計算し、自前ページ分割を組み立てる
 // （Ctrl+P直接印刷でも効くよう beforeprint/afterprint で着脱する）
 window.addEventListener('beforeprint', () => {
   const table = tableWrapper.querySelector('table');
@@ -1469,12 +1608,20 @@ window.addEventListener('beforeprint', () => {
   renameHeadersForPrint();     // 配送依頼日 → 依頼日
   // 右スクロール状態でも左端から印刷されるようスクロールをリセット
   tableWrapper.scrollLeft = 0;
-  table.style.zoom = 1;
+  table.style.zoom = '';
   const printableWidthPx = (297 - 21 - 5) * 96 / 25.4;  // A4横297mm - 左余白21mm - 右余白5mm → px換算
   const scale = Math.min(1, printableWidthPx / table.scrollWidth);
-  table.style.zoom = scale;
+  try {
+    buildPrintPages(scale);  // 自前ページ分割（成功すれば body.paged-print で旧表を隠す）
+  } catch (e) {
+    // 失敗時は従来動作（出荷日は1枚目のみ・ブラウザ自動改ページ）にフォールバック
+    teardownPrintPages();
+    table.style.zoom = scale;
+    console.error('印刷ページ分割に失敗、従来印刷にフォールバック', e);
+  }
 });
 window.addEventListener('afterprint', () => {
+  teardownPrintPages();
   const table = tableWrapper.querySelector('table');
   if (table) table.style.zoom = '';
   restoreYearAfterPrint();
