@@ -271,6 +271,10 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   .data-table th { line-height: 14px; height: 29px; }
   .data-table td, .data-table th { padding-left: 4px; padding-right: 4px; }
   .data-table tr { break-inside: avoid; }
+  /* 製品（＝1ファイル）ブロックは途中改ページしない。
+     入りきらなければ製品まるごと次ページへ送り、ページ末で製品が見切れるのを防ぐ。
+     1製品だけで1ページを超える場合のみブラウザが分割する（不可避）。 */
+  .data-table tbody.product-group { break-inside: avoid; }
   /* ファイル間の完全な空白行（印刷のみ表示・枠線/背景なし・高さ29px=データ1行分） */
   .data-table tr.print-blank-row { display: table-row !important; }
   .data-table tr.print-blank-row td {
@@ -2872,9 +2876,12 @@ function renderPreviewTable(fileResults) {
     return h + '<th class="del-col"></th></tr>';
   };
   const multi = fileResults.length > 1;
-  // 複数ファイル時は「ファイル名行 → 列名行 → データ」の順で繰り返す（列名の上にファイル名）
+  // 複数ファイル時は「ファイル名行 → 列名行 → データ」の順で繰り返す（列名の上にファイル名）。
+  // さらに、ファイル(＝1製品)ごとに <tbody class="product-group"> でくくる。
+  // 印刷時はこの tbody に break-inside:avoid が効き、製品ブロックがページ途中で
+  // 見切れず、入りきらなければ製品まるごと次ページへ送られる。
   let html = '<table class="data-table">'
-    + (multi ? '<tbody>' : '<thead>' + headRowHtml() + '</thead><tbody>');
+    + (multi ? '' : '<thead>' + headRowHtml() + '</thead><tbody>');
 
   let rendered = 0;
   const renderLimit = 500;
@@ -2883,6 +2890,7 @@ function renderPreviewTable(fileResults) {
     const fr = fileResults[fi];
     // ファイル名行（VBA版: ファイル名　データn件　個数合計n個）→ その下に列名行
     if (multi) {
+      html += '<tbody class="product-group">';
       // 印刷時のみ、ファイルの区切りに完全な空白行を1行入れる（2件目以降の前）
       if (fi > 0) html += `<tr class="print-blank-row"><td colspan="${totalCols}"></td></tr>`;
       const totalQty = fr.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
@@ -2894,15 +2902,18 @@ function renderPreviewTable(fileResults) {
       html += renderDataRow(fr.rows[i], i, fi);
       rendered++;
     }
+    if (multi) html += '</tbody>';
     if (rendered >= renderLimit) break;
   }
 
+  if (!multi) html += '</tbody>';
+
   if (allCount > renderLimit) {
-    html += `<tr><td colspan="${totalCols}" style="text-align:center;color:#999;padding:12px;">
-      ... 他 ${allCount - renderLimit} 件（表示は${renderLimit}件まで）</td></tr>`;
+    html += `<tbody><tr><td colspan="${totalCols}" style="text-align:center;color:#999;padding:12px;">
+      ... 他 ${allCount - renderLimit} 件（表示は${renderLimit}件まで）</td></tr></tbody>`;
   }
 
-  html += '</tbody></table>';
+  html += '</table>';
   tableWrapper.innerHTML = html;
 }
 
