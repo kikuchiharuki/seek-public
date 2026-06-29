@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>在庫管理（試作）</title>
+<script src="vendor/xlsx.bundle.js"></script>
+<style>
+  :root{ --line:#d0d7d0; --head:#e8f0e8; --accent:#2e7d32; --warn:#c62828; --soft:#f6faf6; }
+  *{ box-sizing:border-box; }
+  body{ font-family:"Hiragino Sans","Yu Gothic",sans-serif; margin:0; color:#1b1b1b; background:#fff; font-size:14px; }
+  header{ background:var(--accent); color:#fff; padding:10px 16px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  header h1{ font-size:16px; margin:0; font-weight:700; }
+  header .status{ font-size:12px; opacity:.9; }
+  .bar{ padding:8px 16px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--soft); }
+  .bar label{ font-size:12px; color:#555; }
+  select,button{ font-size:14px; padding:5px 9px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button{ cursor:pointer; }
+  button.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:hover{ filter:brightness(.97); }
+  nav{ display:flex; gap:4px; padding:8px 16px 0; flex-wrap:wrap; }
+  nav button{ border-bottom:none; border-radius:6px 6px 0 0; background:#eef3ee; }
+  nav button.active{ background:#fff; border-bottom:1px solid #fff; font-weight:700; color:var(--accent); }
+  main{ padding:14px 16px 60px; }
+  table{ border-collapse:collapse; width:100%; }
+  th,td{ border:1px solid var(--line); padding:4px 8px; text-align:right; white-space:nowrap; }
+  th{ background:var(--head); font-weight:700; text-align:center; position:sticky; top:0; }
+  td.l,th.l{ text-align:left; }
+  tr.clickable{ cursor:pointer; }
+  tr.clickable:hover td{ background:#f0f7f0; }
+  .alert{ color:var(--warn); font-weight:700; }
+  .pill{ display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; background:#eef; color:#335; margin-left:4px; }
+  .pill.wh{ background:#fff3e0; color:#995; }
+  .muted{ color:#888; }
+  .sat{ background:#eef6ff; } .sun{ background:#fdeef4; }
+  input.qty{ width:62px; text-align:right; font-size:14px; padding:3px; border:1px solid #cfd; border-radius:4px; }
+  input.note{ width:100%; font-size:13px; padding:3px; border:1px solid #eee; border-radius:4px; }
+  textarea{ width:100%; height:240px; font-family:inherit; font-size:13px; padding:8px; border:1px solid var(--line); border-radius:6px; }
+  .note-cell{ text-align:left; min-width:160px; }
+  .totrow td{ background:#fffde7; font-weight:700; }
+  .hint{ font-size:12px; color:#666; margin:6px 0 12px; }
+  .two{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media(max-width:800px){ .two{ grid-template-columns:1fr; } }
+  h2{ font-size:15px; margin:6px 0 10px; border-left:4px solid var(--accent); padding-left:8px; }
+  /* 記入シート印刷 */
+  .print-wrap{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; align-items:start; }
+  .psheet table{ width:100%; border-collapse:collapse; font-size:11px; }
+  .psheet th,.psheet td{ border:1px solid #999; padding:1px 4px; text-align:right; height:16px; }
+  .psheet th{ background:#dff0df; }
+  .psheet .phead{ background:#cfe8cf; font-size:12px; text-align:left; }
+  .psheet .carry,.psheet .tot td{ background:#fff7cc; font-weight:700; }
+  .psheet td.l,.psheet th.l{ text-align:left; }
+  .psheet .small{ font-size:10px; color:#444; }
+  .psheet tr.sat td{ background:#eef6ff; } .psheet tr.sun td{ background:#fdeef4; }
+  .psheet .alertcell{ color:var(--warn); font-weight:700; }
+  @media print{
+    header,.bar,nav,.noprint{ display:none !important; }
+    main{ padding:0; }
+    .print-wrap{ grid-template-columns:repeat(3,1fr); gap:6px; }
+    .psheet{ page-break-inside:avoid; }
+    .psheet table{ font-size:10px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>在庫管理 <span style="font-weight:400;font-size:12px;">試作 / プロトタイプ</span></h1>
+  <span class="status" id="status">データ未読込</span>
+  <span style="flex:1"></span>
+  <button onclick="loadSample()">サンプルデータで見る</button>
+  <button onclick="pickFile()">在庫データ.xlsx を開く</button>
+  <button onclick="pickLegacy()" title="元の在庫管理表ぴゅあ・エコ.xlsx（66シート）を取り込んで正規化">元Excelを取り込む</button>
+  <button onclick="genPartner()" title="選択月の会社別 製品出入庫表を出力（先方送付用）">先方報告Excel</button>
+  <button class="primary" onclick="save()">保存（.xlsx）</button>
+</header>
+
+<div class="bar">
+  <label>会社</label>
+  <select id="company" onchange="render()"></select>
+  <label>年月</label>
+  <select id="ym" onchange="render()"></select>
+  <span class="muted" id="counts"></span>
+</div>
+
+<nav id="tabs">
+  <button data-tab="stock" class="active" onclick="setTab('stock')">在庫一覧</button>
+  <button data-tab="dayin" onclick="setTab('dayin')">日次入力（全製品）</button>
+  <button data-tab="ship" onclick="setTab('ship')">当月出荷数</button>
+  <button data-tab="ledger" onclick="setTab('ledger')">製品別台帳</button>
+  <button data-tab="print" onclick="setTab('print')">記入シート印刷</button>
+  <button data-tab="master" onclick="setTab('master')">製品マスタ</button>
+</nav>
+
+<main id="view"><p class="hint">「サンプルデータで見る」を押すと、本番Excel（66シート）から取り込んだ実データで動きます。<br>「在庫データ.xlsx を開く」は同フォルダの正規化ファイルを読み込み、編集→保存（同じ.xlsx）まで試せます。</p></main>
+
+<script src="seed-data.js"></script>
+<script>
+const S = { products:[], periods:{}, movements:[], tab:'stock', fileHandle:null, fileName:null, inputDate:null, activity:{}, _uidSeq:0 };
+const COMP_ORDER = ['ピュアライフ','エコレイズ','シーク'];
+const compIdx = c => { const i=COMP_ORDER.indexOf(c); return i<0?99:i; };
+const $ = id => document.getElementById(id);
+const pkey = (c,ym,n) => c+'|'+ym+'|'+n;
+const mkey = (c,n,ym) => c+'|'+n+'|'+ym;
+
+/* ---------- load ---------- */
+function ingest(d){
+  S._uidSeq = 0;
+  S.products = d.products.map(p=>({ active:true, ordered:false, ...p, uid:++S._uidSeq }));
+  S.periods = {};
+  d.periods.forEach(r=> S.periods[pkey(r.company,r.ym,r.name)] = r.opening);
+  S.movements = d.movements.map(m=>({...m}));
+  // よく出る順の指標：直近2ヶ月で出庫が立った件数（製造終了・休眠品を下げる）
+  const ymNum = ym => { const [y,m]=ym.split('-').map(Number); return y*12+m; };
+  let maxN=0; S.movements.forEach(m=> maxN=Math.max(maxN, ymNum(m.ym)));
+  const cutoff = maxN-1;
+  S.activity = {};
+  S.movements.forEach(m=>{ if(m.out>0 && ymNum(m.ym)>=cutoff){ const k=m.company+'|'+m.name; S.activity[k]=(S.activity[k]||0)+1; } });
+  buildSelectors();
+  render();
+}
+function act(p){ return S.activity[p.company+'|'+p.name]||0; }
+
+/* ---------- 自動保存（共有フォルダのファイルにバインド時のみ） ---------- */
+let _saveTimer=null;
+function markDirty(){
+  if(!S.fileHandle){ return; }
+  $('status').textContent='…自動保存中';
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    try{ const wb=buildWorkbook(); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+      const w=await S.fileHandle.createWritable(); await w.write(out); await w.close();
+      $('status').textContent=(S.fileName||'')+' / 自動保存 ✓ '+new Date().toLocaleTimeString('ja-JP');
+    }catch(e){ $('status').textContent='自動保存エラー: '+e.message; }
+  }, 700);
+}
+function alertText(p,a){
+  if(p.alert==null||p.alert==='') return '-';
+  if(a.breach) return p.ordered? `${p.alert}以下・発注済` : `${p.alert}以下 ⚠ご発注`;
+  return `${p.alert}以下`;
+}
+function loadSample(){
+  if(!window.SEED){ alert('seed-data.js が見つかりません'); return; }
+  ingest(structuredClone(window.SEED));
+  S.fileHandle=null; S.fileName='（サンプル）';
+  setStatus();
+}
+async function pickFile(){
+  try{
+    if(window.showOpenFilePicker){
+      const [h] = await window.showOpenFilePicker({types:[{description:'Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});
+      S.fileHandle=h; const f=await h.getFile(); S.fileName=f.name;
+      readXlsx(await f.arrayBuffer());
+    }else{
+      const inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx';
+      inp.onchange=async e=>{ const f=e.target.files[0]; if(!f)return; S.fileName=f.name; S.fileHandle=null; readXlsx(await f.arrayBuffer()); };
+      inp.click();
+    }
+  }catch(err){ if(err.name!=='AbortError') alert('読込エラー: '+err.message); }
+}
+function fmtDate(v){
+  if(v instanceof Date){ return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0'); }
+  return String(v).slice(0,10);
+}
+function readXlsx(buf){
+  const wb = XLSX.read(buf,{type:'array',cellDates:true});
+  const peSheet = wb.Sheets['月初在庫'] || wb.Sheets['期首残'];
+  if(!wb.Sheets['製品マスタ'] || !wb.Sheets['入出庫']){
+    const legacy = wb.SheetNames.some(n=>/^\d{4}年\d{1,2}月(ぴゅあ|エコ)\s*$/.test(n));
+    alert(legacy
+      ? 'これは元の在庫管理表（月シートが並ぶ形式）のようです。\nこのアプリは正規化済み「在庫データ.xlsx」を読みます。\n「元Excelを取り込む」ボタンから取り込んでください。'
+      : 'このファイルには「製品マスタ／期首残／入出庫」シートがありません。\n正規化済みの 在庫データ.xlsx を選んでください。');
+    return;
+  }
+  const pm = XLSX.utils.sheet_to_json(wb.Sheets['製品マスタ']||{});
+  const pe = XLSX.utils.sheet_to_json(peSheet||{});
+  const mv = XLSX.utils.sheet_to_json(wb.Sheets['入出庫']||{});
+  const d = {
+    products: pm.map(r=>({ _id:r['製品ID'], company:r['会社'], torihiki:r['取引先'], name:r['商品名'],
+      mode:r['数え方']||'decimal', unitsPerCase:r['入り数']||null, unitLabel:r['単位']||'ケース',
+      alert:(r['アラート']??null), sort:r['並び順']||0, isWarehouse:r['倉庫品']==='○', note:r['注記']||'',
+      active: r['有効']==null||r['有効']===''?true:(r['有効']==='○'||r['有効']===true), ordered: r['発注済']==='○' })),
+    periods: pe.map(r=>({ company:r['会社'], ym:String(r['年月']), name:r['商品名'], opening:(r['月初在庫']??r['期首残']) })),
+    movements: mv.map(r=>{ const ds=fmtDate(r['日付']); return { company:r['会社'], name:r['商品名'], date:ds,
+      ym:ds.slice(0,7), in:r['入庫']||0, out:r['出庫']||0, note:r['備考']||'' }; })
+  };
+  ingest(d); setStatus();
+}
+function setStatus(){ $('status').textContent = (S.fileName||'') + ' / 製品'+S.products.length+'・入出庫'+S.movements.length+'件'; }
+
+/* ---------- 元Excel（66シート）取り込み → 正規化 ---------- */
+async function pickLegacy(){
+  try{
+    let buf;
+    if(window.showOpenFilePicker){
+      const [h] = await window.showOpenFilePicker({types:[{description:'Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});
+      const f=await h.getFile(); S.fileName='（'+f.name+'から正規化）'; buf=await f.arrayBuffer();
+    }else{
+      buf=await new Promise((res,rej)=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx';
+        inp.onchange=e=>{ const f=e.target.files[0]; if(!f)return rej({name:'AbortError'}); S.fileName='（'+f.name+'から正規化）'; f.arrayBuffer().then(res); }; inp.click(); });
+    }
+    importLegacy(buf);
+  }catch(err){ if(err.name!=='AbortError') alert('取り込みエラー: '+err.message); }
+}
+function importLegacy(buf){
+  const wb = XLSX.read(buf,{type:'array',cellDates:true});
+  const COMP = { 'ぴゅあ':['ピュアライフ','PLHD㈱'], 'エコ':['エコレイズ','エコレイズ㈱'] };
+  const sheetRe = /^(\d{4})年(\d{1,2})月(ぴゅあ|エコ)$/;
+  const products={}, order={}, periods=[], movements=[];
+  const isDate=v=>v instanceof Date;
+  const parseDate=v=>{ if(isDate(v)) return v;
+    if(typeof v==='string'){ const m=v.match(/^\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]); }
+    return null; };
+  let sheetCount=0;
+  wb.SheetNames.forEach(name=>{
+    const mm=sheetRe.exec(name.trim()); if(!mm) return;
+    sheetCount++;
+    const [company,torihiki]=COMP[mm[3]];
+    const ym=mm[1]+'-'+String(+mm[2]).padStart(2,'0');
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null});
+    const at=(r,c)=>(aoa[r]?aoa[r][c]:undefined);
+    // anchors: cell === '取引先' in first 8 rows
+    for(let r=0;r<8 && r<aoa.length;r++){ const row=aoa[r]||[];
+      for(let c=0;c<row.length;c++){ if(row[c]!=='取引先') continue;
+        let nm=at(r+1,c+4); if(nm==null||String(nm).trim()==='') continue;
+        nm=String(nm).replace(/[　\n]/g,' ').replace(/\s+/g,' ').trim();
+        const carry=String(at(r,c+12)||'');
+        const opening=at(r+1,c+12);
+        // alert
+        let alert=null;
+        for(let rr=r+38; rr<=r+45 && alert===null; rr++) for(let co=0; co<=18; co++){
+          const v=at(rr,c+co);
+          if(typeof v==='string' && v.includes('在庫アラート')){
+            for(let c2=co+1;c2<=co+8;c2++){ const nv=at(rr,c+c2); if(typeof nv==='number'){ alert=nv; break; } } }
+        }
+        // note (※)
+        let note=null;
+        for(let rr=r+38; rr<=r+45; rr++) for(let co=0; co<=18; co++){
+          const v=at(rr,c+co); if(typeof v==='string' && v.trim().startsWith('※')) note=v.trim();
+        }
+        const isWh=nm.startsWith('【倉庫】');
+        if(!products[nm]){
+          order[company]=(order[company]||0)+10;
+          products[nm]={ _id:company.slice(0,2)+String(order[company]).padStart(3,'0'),
+            name:nm, company, torihiki,
+            mode: nm==='フレグランスジェット'?'pack':(isWh?'unit':'decimal'),
+            unitsPerCase: nm==='フレグランスジェット'?30:null,
+            unitLabel: (carry.includes('（本）')||carry.includes('(本)'))?'本':(carry.includes('（箱）')||carry.includes('(箱)'))?'箱':'ケース',
+            alert, sort:order[company], isWarehouse:isWh, note:note||'', active:true, ordered:/発注済/.test(note||'') };
+        }
+        const p=products[nm]; if(alert!=null) p.alert=alert; if(note){ p.note=note; if(/発注済/.test(note)) p.ordered=true; }
+        if(typeof opening==='number') periods.push({company,ym,name:nm,opening});
+        // daily rows
+        for(let rr=r+7; rr<=r+44; rr++){
+          const d=parseDate(at(rr,c+0)); if(!d) continue;
+          const qin=at(rr,c+4), qout=at(rr,c+7), nt=at(rr,c+14);
+          const hasIn=typeof qin==='number'&&qin, hasOut=typeof qout==='number'&&qout, hasNt=typeof nt==='string'&&nt.trim();
+          if(hasIn||hasOut||hasNt){
+            const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+            movements.push({company,name:nm,date:ds,ym:ds.slice(0,7),in:hasIn?qin:0,out:hasOut?qout:0,note:hasNt?nt.trim():''});
+          }
+        }
+      }
+    }
+  });
+  if(!sheetCount){ alert('月シート（例「2026年6月ぴゅあ」）が見つかりませんでした。元の在庫管理表を選んでください。'); return; }
+  ingest({ products:Object.values(products), periods, movements });
+  S.fileHandle=null;
+  setStatus();
+  alert(`取り込み完了：${sheetCount}シート → 製品${Object.keys(products).length}・入出庫${movements.length}件。\n内容を確認し「保存（.xlsx）」で 在庫データ.xlsx として書き出せます。`);
+}
+
+/* ---------- selectors ---------- */
+function months(){
+  const set=new Set();
+  Object.keys(S.periods).forEach(k=> set.add(k.split('|')[1]));
+  S.movements.forEach(m=> set.add(m.ym));
+  return [...set].sort();
+}
+function buildSelectors(){
+  const comps=[...new Set(S.products.map(p=>p.company))];
+  $('company').innerHTML = '<option value="all">両方（自社用）</option>' + comps.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const ms=months(); const cur = ms.includes('2026-06')?'2026-06':ms[ms.length-1];
+  $('ym').innerHTML = ms.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m.replace('-','年')}月</option>`).join('');
+}
+
+/* ---------- qty helpers (pack mode) ---------- */
+function toUnits(p,v){ v=+v||0; const c=Math.floor(v+1e-9); const f=Math.round((v-c)*100); return c*(p.unitsPerCase||1)+f; }
+function fromUnits(p,u){ const upc=p.unitsPerCase||1; const c=Math.floor(u/upc); const f=u-c*upc; return c + f/100; }
+function fmtQty(p,v){
+  if(p.mode==='pack'){ const upc=p.unitsPerCase||30; const u=toUnits(p,v); const c=Math.floor(u/upc); const r=u-c*upc; return r? `${c}ケース${r}本` : `${c}ケース`; }
+  const n = Math.round((+v||0)*100)/100;
+  return (Number.isInteger(n)? n : parseFloat(n.toFixed(2))) + (p.unitLabel||'');
+}
+function num(v){ return v==null||v===''?0:(+v||0); }
+
+/* ---------- month aggregation ---------- */
+function daysInMonth(ym){ const [y,m]=ym.split('-').map(Number); return new Date(y,m,0).getDate(); }
+function aggregate(p, ym){
+  const c=p.company, n=p.name;
+  const opening = S.periods[pkey(c,ym,n)] ?? 0;
+  const byDate = {};
+  S.movements.filter(m=>m.company===c&&m.name===n&&m.ym===ym).forEach(m=>{
+    (byDate[m.date] = byDate[m.date]||{in:0,out:0,note:''});
+    byDate[m.date].in += num(m.in); byDate[m.date].out += num(m.out);
+    if(m.note) byDate[m.date].note = m.note;
+  });
+  const pack = p.mode==='pack';
+  let stockU = pack? toUnits(p,opening):0, stock = opening;
+  let inU=0,outU=0,inN=0,outN=0;
+  const rows=[];
+  const dim=daysInMonth(ym);
+  for(let d=1; d<=dim; d++){
+    const date = ym+'-'+String(d).padStart(2,'0');
+    const e = byDate[date]||{in:0,out:0,note:''};
+    if(pack){ stockU += toUnits(p,e.in)-toUnits(p,e.out); stock=fromUnits(p,stockU); inU+=toUnits(p,e.in); outU+=toUnits(p,e.out); }
+    else { stock += e.in-e.out; inN+=e.in; outN+=e.out; }
+    const dow = new Date(date).getDay();
+    rows.push({date, d, in:e.in, out:e.out, note:e.note, stock, dow});
+  }
+  const sumIn  = pack? fromUnits(p,inU) : inN;
+  const sumOut = pack? fromUnits(p,outU): outN;
+  const end = stock;
+  const cases = pack? Math.floor(toUnits(p,end)/(p.unitsPerCase||30)) : end;
+  const breach = (p.alert!=null && p.alert!=='') && cases <= p.alert;
+  return {opening, rows, sumIn, sumOut, end, breach};
+}
+
+/* ---------- render ---------- */
+function sortProds(arr){ return arr.sort((a,b)=> (compIdx(a.company)-compIdx(b.company)) || (act(b)-act(a)) || (a.sort||0)-(b.sort||0)); }
+function curProducts(){
+  const c=$('company').value, ym=$('ym').value;
+  const hasData=p=> S.periods[pkey(p.company,ym,p.name)]!=null || S.movements.some(m=>m.company===p.company&&m.name===p.name&&m.ym===ym);
+  // 有効な製品＋（廃止でもその月にデータがある製品＝履歴は消えない）
+  return sortProds(S.products.filter(p=> (c==='all'||p.company===c) && (p.active!==false || hasData(p))));
+}
+function allProds(){ const c=$('company').value; return sortProds(S.products.filter(p=> c==='all'||p.company===c)); }
+function setTab(t){ S.tab=t; [...$('tabs').children].forEach(b=>b.classList.toggle('active',b.dataset.tab===t)); render(); }
+function render(){
+  if(!S.products.length){ return; }
+  const ym=$('ym').value;
+  $('counts').textContent = '　'+curProducts().length+'品目';
+  if(S.tab==='stock') renderStock(ym);
+  else if(S.tab==='dayin') renderDayInput(ym);
+  else if(S.tab==='ship') renderShip(ym);
+  else if(S.tab==='ledger') renderLedger(ym);
+  else if(S.tab==='print') renderPrintSheet(ym);
+  else renderMaster();
+}
+
+function renderPrintSheet(ym){
+  const prods=curProducts();
+  const mNum=+ym.split('-')[1];
+  let blocks='';
+  prods.forEach(p=>{
+    const a=aggregate(p,ym);
+    let drows='';
+    a.rows.forEach(r=>{
+      const cls=r.dow===0?'sun':(r.dow===6?'sat':'');
+      drows+=`<tr class="${cls}"><td>${mNum}/${r.d}</td><td>${r.in||''}</td><td>${r.out||''}</td><td>${fmtQty(p,r.stock)}</td><td class="l small">${r.note||''}</td></tr>`;
+    });
+    const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${fmtQty(p,a.end)}</td><td></td></tr>`;
+    const meta=`<tr><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
+    blocks+=`<div class="psheet"><table>
+       <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${p.name}${p.isWarehouse?'（倉庫）':''}</th></tr>
+       <tr><td colspan=4 class="l">月初在庫</td><td class="carry">${fmtQty(p,a.opening)}</td></tr>
+       <tr><th>年月日</th><th>入庫</th><th>出庫</th><th>在庫数</th><th class="l">備考</th></tr>
+       ${drows}${foot}${meta}
+      </table></div>`;
+  });
+  $('view').innerHTML=`<div class="bar noprint" style="padding-left:0;background:none;border:none">
+     <button class="primary" onclick="window.print()">🖨 印刷</button>
+     <span class="muted">上の「会社」「年月」で対象を切替。現行レイアウト（製品ブロック・日＝行・前後の在庫が見える）。空欄は手書き用。印刷は3列／ページ。</span>
+   </div>
+   <div class="print-wrap">${blocks}</div>`;
+}
+
+function clampInputDate(ym){
+  if(!S.inputDate || S.inputDate.slice(0,7)!==ym){
+    const t=new Date(), tym=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');
+    S.inputDate = (tym===ym)? ym+'-'+String(t.getDate()).padStart(2,'0') : ym+'-01';
+  }
+}
+function moveDay(delta){
+  const d=new Date(S.inputDate); d.setDate(d.getDate()+delta);
+  const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(ds.slice(0,7)===$('ym').value){ S.inputDate=ds; render(); }
+}
+function renderDayInput(ym){
+  clampInputDate(ym);
+  const date=S.inputDate, W=['日','月','火','水','木','金','土'], dow=new Date(date).getDay();
+  let rows='', lastComp=null;
+  curProducts().forEach(p=>{
+    if(p.company!==lastComp){ lastComp=p.company; rows+=`<tr><td colspan=5 style="background:#eef3ee;font-weight:700" class="l">${p.company}</td></tr>`; }
+    const a=aggregate(p,ym); const r=a.rows.find(x=>x.date===date)||{in:0,out:0,note:'',stock:a.opening};
+    const nm=p.name.replace(/'/g,"\\'"), breach=(p.alert!=null&&p.alert!=='')&&(p.mode==='pack'?Math.floor(toUnits(p,r.stock)/(p.unitsPerCase||30)):r.stock)<=p.alert;
+    rows+=`<tr>
+      <td class="l">${p.name}${p.isWarehouse?'<span class="pill wh">倉庫</span>':''}</td>
+      <td><input class="qty" value="${r.in||''}" onchange="editDay('${p.company}','${nm}','${date}','in',this.value)"></td>
+      <td><input class="qty" value="${r.out||''}" onchange="editDay('${p.company}','${nm}','${date}','out',this.value)"></td>
+      <td class="${breach?'alert':''}">${fmtQty(p,r.stock)}</td>
+      <td class="note-cell"><input class="note" value="${(r.note||'').replace(/"/g,'&quot;')}" onchange="editDay('${p.company}','${nm}','${date}','note',this.value)"></td>
+    </tr>`;
+  });
+  $('view').innerHTML=`<h2>日次入力（${date} ${W[dow]}）— 全製品まとめて</h2>
+   <div class="bar" style="padding-left:0;background:none;border:none">
+     <button onclick="moveDay(-1)">◀ 前日</button>
+     <input type="date" value="${date}" min="${ym}-01" max="${ym}-${String(daysInMonth(ym)).padStart(2,'0')}" onchange="S.inputDate=this.value;render()">
+     <button onclick="moveDay(1)">翌日 ▶</button>
+     <span class="muted">よく出る製品が上／ピュアライフ→エコレイズ順。空欄=0として計算。製品ごとの切替不要で当日分をまとめて入力。</span>
+   </div>
+   <table><thead><tr><th class="l">商品名</th><th>入庫</th><th>出庫</th><th>在庫(当日)</th><th class="l">備考</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderStock(ym){
+  let h=`<h2>${ym.replace('-','年')}月 在庫一覧（ぴゅあ・エコまとめて表示）</h2>
+  <p class="hint">赤字＝在庫アラート以下。会社の分け方は表示の切替だけ（データは1つ）。日次の入力は上の「日次台帳」タブから。</p>
+  <table><thead><tr>
+   <th class="l">会社</th><th class="l">商品名</th><th>月初在庫</th><th>入庫計</th><th>出庫計</th><th>現在庫(月末)</th><th>アラート</th>
+  </tr></thead><tbody>`;
+  curProducts().forEach(p=>{
+    const a=aggregate(p,ym);
+    h+=`<tr>
+      <td class="l">${p.company}${p.isWarehouse?'<span class="pill wh">倉庫</span>':''}</td>
+      <td class="l">${p.name}${p.note?`<span class="pill">${p.note}</span>`:''}</td>
+      <td>${fmtQty(p,a.opening)}</td>
+      <td>${a.sumIn?fmtQty(p,a.sumIn):'-'}</td>
+      <td>${a.sumOut?fmtQty(p,a.sumOut):'-'}</td>
+      <td class="${a.breach?'alert':''}">${fmtQty(p,a.end)}</td>
+      <td class="${a.breach&&!p.ordered?'alert':''}">${alertText(p,a)}</td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  $('view').innerHTML=h;
+}
+
+function renderShip(ym){
+  // 自社経理向け：会社フィルタに関係なく両社を合算（請求はピュアライフ1本化）。倉庫品は除外。出荷0も表示。
+  const all=S.products.filter(p=>!p.isWarehouse)
+    .sort((a,b)=>(compIdx(a.company)-compIdx(b.company))||(act(b)-act(a))||(a.sort||0)-(b.sort||0));
+  const ymdisp=ym.replace('-','年')+'月';
+  const [yy,mm]=ym.split('-');
+  // コピー用テキスト＝タブ区切りのテーブル形式（メール/Excelに貼ると列になる）
+  let txt=`${yy}/${+mm}月末 出荷数報告（ピュアライフ・エコレイズ合算／請求：ピュアライフ）\nすべてケース単位\n`;
+  let rows='';
+  const comps=[...new Set(all.map(p=>p.company))].sort((a,b)=>compIdx(a)-compIdx(b));
+  comps.forEach(co=>{
+    const items=all.filter(p=>p.company===co); if(!items.length) return;
+    txt+=`\n【${co}製品】\n`;
+    rows+=`<tr><td colspan=2 style="background:#eef3ee;font-weight:700" class="l">【${co}製品】</td></tr>`;
+    items.forEach(p=>{ const a=aggregate(p,ym); const q=fmtQty(p,a.sumOut);
+      txt+=`${p.name}\t${q}\n`;
+      rows+=`<tr><td class="l">${p.name}</td><td>${q}</td></tr>`; });
+  });
+  const lines=txt.split('\n').length+1;
+  let h=`<h2>当月出荷数（自社経理向け・${ymdisp}）</h2>
+  <p class="hint">ピュアライフ・エコレイズを<b>合算</b>（請求はピュアライフ1本化）。<b>出荷0も表示</b>。倉庫品は除外。月は上のプルダウンで切替（前月も見られます）。<br>
+  ※これは<b>在庫の出庫ベース</b>。手数料の数え方（2ケース1梱包・セット按分・スティック件数等）はCSV突合で別途補正。</p>
+  <div class="two">
+   <div><table><thead><tr><th class="l">商品名</th><th>出荷数</th></tr></thead><tbody>${rows}</tbody></table></div>
+   <div>
+     <button class="primary" onclick="copyText()">▼ この内容をコピー</button>
+     <textarea id="mail" readonly style="height:auto" rows="${lines}">${txt}</textarea>
+   </div>
+  </div>`;
+  $('view').innerHTML=h;
+}
+function copyText(){ const t=$('mail'); t.select(); navigator.clipboard?.writeText(t.value); alert('コピーしました'); }
+
+let LEDGER={company:null,name:null};
+function gotoLedger(c,n){ LEDGER={company:c,name:n}; setTab('ledger'); }
+function renderLedger(ym){
+  const prods=allProds();
+  if(!LEDGER.name || !prods.find(p=>p.company===LEDGER.company&&p.name===LEDGER.name)){ LEDGER={company:prods[0].company,name:prods[0].name}; }
+  const p=S.products.find(x=>x.company===LEDGER.company&&x.name===LEDGER.name);
+  const a=aggregate(p,ym);
+  const opts=prods.map(x=>`<option value="${x.company}|${x.name}"${x.company===p.company&&x.name===p.name?' selected':''}>[${x.company}] ${x.name}</option>`).join('');
+  let h=`<h2>日次台帳</h2>
+   <div class="bar" style="padding-left:0;background:none;border:none">
+     <label>製品</label>
+     <select onchange="(function(v){LEDGER={company:v.split('|')[0],name:v.split('|')[1]};render();})(this.value)">${opts}</select>
+     <span class="muted">月初在庫（前月繰越）= <b>${fmtQty(p,a.opening)}</b> ／ 単位:${p.unitLabel} ／ ${p.mode==='pack'?'入り数'+p.unitsPerCase+'本/ケース':'通常'}</span>
+   </div>
+   <p class="hint">入庫・出庫を入力すると在庫が自動計算（過去日でも未来日でもOK）。編集後「保存」で .xlsx に書き戻し。${p.mode==='pack'?'<b>※この製品はケース＋本で表示。入力はケース数（例 1.15＝1ケース15本）。</b>':''}</p>
+   <table><thead><tr><th>日付</th><th>曜</th><th>入庫</th><th>出庫</th><th>在庫</th><th class="l">備考</th></tr></thead><tbody>`;
+  const W=['日','月','火','水','木','金','土'];
+  a.rows.forEach(r=>{
+    const cls = r.dow===0?'sun':(r.dow===6?'sat':'');
+    h+=`<tr class="${cls}">
+      <td>${r.d}</td><td>${W[r.dow]}</td>
+      <td><input class="qty" value="${r.in||''}" onchange="editDay('${p.company}','${p.name.replace(/'/g,"\\'")}','${r.date}','in',this.value)"></td>
+      <td><input class="qty" value="${r.out||''}" onchange="editDay('${p.company}','${p.name.replace(/'/g,"\\'")}','${r.date}','out',this.value)"></td>
+      <td>${fmtQty(p,r.stock)}</td>
+      <td class="note-cell"><input class="note" value="${(r.note||'').replace(/"/g,'&quot;')}" onchange="editDay('${p.company}','${p.name.replace(/'/g,"\\'")}','${r.date}','note',this.value)"></td>
+    </tr>`;
+  });
+  h+=`</tbody><tfoot><tr class="totrow"><td colspan=2>合計 / 次月繰越</td>
+     <td>${a.sumIn?fmtQty(p,a.sumIn):0}</td><td>${a.sumOut?fmtQty(p,a.sumOut):0}</td>
+     <td class="${a.breach?'alert':''}">${fmtQty(p,a.end)}</td><td></td></tr></tfoot></table>`;
+  $('view').innerHTML=h;
+}
+function editDay(c,n,date,field,val){
+  const ym=date.slice(0,7);
+  let m=S.movements.find(x=>x.company===c&&x.name===n&&x.date===date);
+  if(!m){ m={company:c,name:n,date,ym,in:0,out:0,note:''}; S.movements.push(m); }
+  if(field==='note') m.note=val; else m[field]= val===''?0:(+val||0);
+  markDirty();
+  render();
+}
+
+const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;');
+function editMaster(uid,field,val){
+  const p=S.products.find(x=>x.uid===uid); if(!p) return;
+  if(field==='alert'||field==='unitsPerCase') p[field]= val===''?null:(+val||0);
+  else p[field]=val;
+  markDirty();
+  if(['active','company','mode','name','ordered'].includes(field)) render(); // 並び替え・在庫一覧の催促表示などに反映
+}
+function addProduct(){
+  const co=$('company').value==='all'?'ピュアライフ':$('company').value;
+  S.products.push({ uid:++S._uidSeq, _id:'NEW'+S._uidSeq, name:'（新規製品）', company:co,
+    torihiki: co==='ピュアライフ'?'PLHD㈱':'エコレイズ㈱', mode:'decimal', unitsPerCase:null,
+    unitLabel:'ケース', alert:null, sort:999, isWarehouse:false, note:'', active:true, ordered:false });
+  markDirty(); renderMaster();
+}
+function renderMaster(){
+  let h=`<h2>製品マスタ（編集できます）</h2>
+  <p class="hint">商品名・アラート・注記をその場で編集。<b>発注済</b>にチェックすると在庫一覧の「ご発注」催促が止まります（先方への二重催促を防止）。<br>
+  <b>有効</b>を外す＝廃止（在庫一覧・日次入力から消えますが、過去の記録は残ります＝名前は消えません）。${S.fileHandle?'編集は自動保存されます。':'保存は上の「保存（.xlsx）」で。'}</p>
+  <button class="primary" onclick="addProduct()">＋ 製品を追加</button>
+  <table style="margin-top:8px"><thead><tr>
+   <th class="l">会社</th><th class="l">商品名</th><th>数え方</th><th>入り数</th><th>アラート</th><th>発注済</th><th class="l">注記</th><th>有効</th>
+  </tr></thead><tbody>`;
+  allProds().forEach(p=>{
+    const u=p.uid, dim=p.active===false?' style="opacity:.5"':'';
+    h+=`<tr${dim}>
+      <td class="l"><select onchange="editMaster(${u},'company',this.value)">
+        <option${p.company==='ピュアライフ'?' selected':''}>ピュアライフ</option>
+        <option${p.company==='エコレイズ'?' selected':''}>エコレイズ</option></select>${p.isWarehouse?'<span class="pill wh">倉庫</span>':''}</td>
+      <td class="l"><input class="note" style="min-width:220px" value="${esc(p.name)}" onchange="editMaster(${u},'name',this.value)"></td>
+      <td><select onchange="editMaster(${u},'mode',this.value)">
+        <option value="decimal"${p.mode==='decimal'?' selected':''}>通常</option>
+        <option value="pack"${p.mode==='pack'?' selected':''}>ケース+本</option>
+        <option value="unit"${p.mode==='unit'?' selected':''}>本/箱</option></select></td>
+      <td><input class="qty" style="width:48px" value="${p.unitsPerCase==null?'':p.unitsPerCase}" onchange="editMaster(${u},'unitsPerCase',this.value)"></td>
+      <td><input class="qty" style="width:54px" value="${p.alert==null?'':p.alert}" onchange="editMaster(${u},'alert',this.value)"></td>
+      <td><input type="checkbox" ${p.ordered?'checked':''} onchange="editMaster(${u},'ordered',this.checked)"></td>
+      <td class="l"><input class="note" value="${esc(p.note)}" onchange="editMaster(${u},'note',this.value)"></td>
+      <td><input type="checkbox" ${p.active!==false?'checked':''} onchange="editMaster(${u},'active',this.checked)"></td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  $('view').innerHTML=h;
+}
+
+/* ---------- 先方報告：会社別 製品出入庫表 ---------- */
+const OFFICIAL = { 'ピュアライフ':'ピュアライフホールディングス㈱', 'エコレイズ':'エコレイズ㈱' };
+function buildPartnerSheet(co, ym){
+  const [yy,mm]=ym.split('-');
+  const prods=S.products.filter(p=>p.company===co && !p.isWarehouse)
+    .sort((a,b)=>(act(b)-act(a))||(a.sort||0)-(b.sort||0));
+  if(!prods.length) return null;
+  const aoa=[], styles={};
+  const HEAD={fill:{fgColor:{rgb:"CFE8CF"}},font:{bold:true}};
+  const COL={fill:{fgColor:{rgb:"DFF0DF"}},font:{bold:true},alignment:{horizontal:"center"}};
+  const CARRY={fill:{fgColor:{rgb:"FFF7CC"}},font:{bold:true}};
+  const SAT={fill:{fgColor:{rgb:"EEF6FF"}}}, SUN={fill:{fgColor:{rgb:"FDEEF4"}}};
+  const put=(r,c,st)=>{ styles[r+','+c]=st; };
+  aoa.push([`${yy}年${+mm}月 製品出入庫表`,'','','',co]); aoa.push([]);
+  prods.forEach(p=>{
+    const a=aggregate(p,ym);
+    const bare=v=>p.mode==='pack'?fmtQty(p,v):(Math.round((+v||0)*100)/100);
+    let r=aoa.length; aoa.push(['取引先','商品名','月初在庫']); [0,1,2].forEach(c=>put(r,c,HEAD));
+    r=aoa.length; aoa.push([p.torihiki,p.name,bare(a.opening)]); put(r,2,CARRY);
+    r=aoa.length; aoa.push(['年月日','入庫','出庫','在庫数','備考']); [0,1,2,3,4].forEach(c=>put(r,c,COL));
+    a.rows.forEach(row=>{ const rr=aoa.length;
+      aoa.push([`${+mm}/${row.d}`, row.in||null, row.out||null, bare(row.stock), row.note||'']);
+      if(row.dow===6) [0,1,2,3,4].forEach(c=>put(rr,c,SAT));
+      if(row.dow===0) [0,1,2,3,4].forEach(c=>put(rr,c,SUN));
+    });
+    r=aoa.length; aoa.push(['合計', a.sumIn||0, a.sumOut||0, bare(a.end), '']); [0,1,2,3].forEach(c=>put(r,c,CARRY));
+    const tail=`${(p.alert!=null&&p.alert!=='')?'在庫アラート '+p.alert+' 以下':''}${p.note?'　'+p.note:''}`;
+    if(tail) aoa.push([tail]);
+    aoa.push([]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  Object.entries(styles).forEach(([k,st])=>{ const [rr,cc]=k.split(',').map(Number); const ad=XLSX.utils.encode_cell({r:rr,c:cc}); if(ws[ad]) ws[ad].s=st; });
+  ws['!cols']=[{wch:8},{wch:30},{wch:11},{wch:12},{wch:18}];
+  return ws;
+}
+function genPartner(){
+  if(!S.products.length){ alert('先にデータを読み込んでください'); return; }
+  const ym=$('ym').value, [yy,mm]=ym.split('-');
+  let made=[];
+  COMP_ORDER.forEach(co=>{
+    const ws=buildPartnerSheet(co,ym); if(!ws) return;
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `${yy}年${+mm}月`);
+    XLSX.writeFile(wb, `${yy}-${mm}${OFFICIAL[co]||co}様製品出入庫表.xlsx`);
+    made.push(OFFICIAL[co]||co);
+  });
+  if(made.length) alert(`先方報告Excelを出力しました：\n${made.join(' / ')}\n（会社ごとに別ファイル。倉庫品は除外）`);
+}
+
+/* ---------- save ---------- */
+function buildWorkbook(){
+  const pm = S.products.map(p=>({'製品ID':p._id,'会社':p.company,'取引先':p.torihiki,'商品名':p.name,
+    '数え方':p.mode,'入り数':p.unitsPerCase,'単位':p.unitLabel,'アラート':p.alert,'並び順':p.sort,
+    '倉庫品':p.isWarehouse?'○':'','発注済':p.ordered?'○':'','注記':p.note||'','有効':p.active===false?'':'○'}));
+  const pe = Object.entries(S.periods).map(([k,v])=>{ const [company,ym,name]=k.split('|'); return {'会社':company,'年月':ym,'商品名':name,'月初在庫':v}; });
+  const mv = S.movements.filter(m=>m.in||m.out||m.note).sort((a,b)=>(a.company+a.name+a.date).localeCompare(b.company+b.name+b.date))
+    .map(m=>({'会社':m.company,'商品名':m.name,'日付':m.date,'入庫':m.in||null,'出庫':m.out||null,'備考':m.note||''}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pm), '製品マスタ');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pe), '月初在庫');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mv), '入出庫');
+  return wb;
+}
+async function save(){
+  if(!S.products.length){ alert('先にデータを読み込んでください'); return; }
+  const wb=buildWorkbook();
+  if(S.fileHandle){
+    try{
+      const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+      const w=await S.fileHandle.createWritable(); await w.write(out); await w.close();
+      alert('保存しました（同じ .xlsx に上書き）'); return;
+    }catch(e){ /* fall through to download */ }
+  }
+  XLSX.writeFile(wb, '在庫データ.xlsx');
+}
+</script>
+</body>
+</html>
