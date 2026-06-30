@@ -1123,7 +1123,8 @@ function updateNextBizButton() {
   const btn = document.getElementById('btnNextBizShip');
   if (!btn) return;
   const { iso, skipped, date } = nextBizDay();
-  btn.textContent = skipped ? '休み明けに出荷' : '明日出荷で設定';
+  const md = `${date.getMonth() + 1}/${date.getDate()}(${'日月火水木金土'[date.getDay()]})`;
+  btn.textContent = skipped ? `休み明け(${md})に出荷` : `明日(${md})出荷で設定`;
   btn.title = `出荷日を ${fmtSlash(date)} に設定して納期チェック`;
   btn.dataset.iso = iso;
 }
