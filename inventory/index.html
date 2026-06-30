@@ -53,9 +53,10 @@
   .print-wrap{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; align-items:start; }
   .psheet table{ width:100%; border-collapse:collapse; font-size:11px; border:2px solid #333; table-layout:fixed; }
   /* 日付・入庫・出庫は同じ固定幅、在庫数は中、備考は残り（最も広い） */
-  .psheet col.c-d,.psheet col.c-i,.psheet col.c-o{ width:12%; }
-  .psheet col.c-s{ width:30%; }
-  .psheet col.c-n{ width:34%; }
+  .psheet col.c-d{ width:12%; }
+  .psheet col.c-i,.psheet col.c-o{ width:13.2%; } /* 入庫・出庫は10%増(12→13.2) */
+  .psheet col.c-s{ width:24%; }                   /* 在庫数は80%(30→24) */
+  .psheet col.c-n{ width:37.6%; }                 /* 余り幅は備考へ(34→37.6) */
   .psheet th,.psheet td{ border:1px solid #777; padding:1px 4px; text-align:right; height:16px; }
   .psheet th{ background:#bfe0bf; }
   .psheet .phead{ background:none; font-size:15px; font-weight:700; text-align:center; vertical-align:middle; height:40px; }
@@ -89,7 +90,9 @@
     .print-wrap.cols4 .psheet table{ font-size:9px; }
     .print-wrap.cols4 .psheet th,.print-wrap.cols4 .psheet td{ padding:1px 2px; height:16px; }
     .print-wrap.cols4 .psheet .phead{ font-size:13px; height:40px; }
-    .print-ym{ position:fixed; top:6mm; right:10mm; margin:0; font-size:13px; } /* 上余白(20mm)内に浮かせる。本文を押し下げない＝テーブルは20mmから開始 */
+    /* 年月は画面用の見出し(.print-ym)では出さず、@pageの@top-rightマージンボックスで全ページ右上の余白に描く。
+       Chrome実測: fixedはtop:0=本文上端(20mm)が下限で、負値/transformは下に回り込むため不可。マージンボックスならflowに影響せずテーブルは20mm固定のまま全ページ右上に出る。年月文字はrenderPrintが動的<style>で注入。 */
+    .print-ym{ display:none; }
   }
 </style>
 </head>
@@ -429,6 +432,8 @@ function todayStr(){
   if(S.today) return S.today;
   const t=new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
 }
+/* 印刷の在庫数表示: 列幅節約のため全角「ケース」を半角「ｹｰｽ」に置換（印刷シート専用） */
+function pq(p,v){ return fmtQty(p,v).replace(/ケース/g,'ｹｰｽ'); }
 function renderPrintSheet(ym,cols){
   cols=cols||3;
   const c=$('company').value;
@@ -442,16 +447,16 @@ function renderPrintSheet(ym,cols){
     let drows='';
     a.rows.forEach(r=>{
       const cls=r.dow===0?'sun':(r.dow===6?'sat':'');
-      const stockCell = r.date>today ? '' : fmtQty(p,r.stock); // 未来日は在庫を出さない（手書き用）
+      const stockCell = r.date>today ? '' : pq(p,r.stock); // 未来日は在庫を出さない（手書き用）
       drows+=`<tr class="${cls}"><td>${mNum}/${r.d}</td><td>${r.in||''}</td><td>${r.out||''}</td><td>${stockCell}</td><td class="l small">${r.note||''}</td></tr>`;
     });
-    const endCell = lastStr>today ? '' : fmtQty(p,a.end); // 月末が未来なら次月繰越も空欄
+    const endCell = lastStr>today ? '' : pq(p,a.end); // 月末が未来なら次月繰越も空欄
     const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${endCell}</td><td></td></tr>`;
     const meta=`<tr class="metarow"><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
     blocks+=`<div class="psheet"><table>
        <colgroup><col class="c-d"><col class="c-i"><col class="c-o"><col class="c-s"><col class="c-n"></colgroup>
        <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${pdispName(p)}</th></tr>
-       <tr><td colspan=3 class="l">前月繰越在庫数</td><td class="carry">${fmtQty(p,a.opening)}</td><td></td></tr>
+       <tr><td colspan=3 class="l">前月繰越在庫数</td><td class="carry">${pq(p,a.opening)}</td><td></td></tr>
        <tr class="colhead"><th>日付</th><th>入庫</th><th>出庫</th><th>在庫数</th><th class="l">備考</th></tr>
        ${drows}${foot}${meta}
       </table></div>`;
@@ -460,6 +465,7 @@ function renderPrintSheet(ym,cols){
      <button class="primary" onclick="window.print()">🖨 印刷</button>
      <span class="muted">上の「会社」「年月」で対象を切替。現行レイアウト（製品ブロック・日＝行・前後の在庫が見える）。空欄は手書き用。<b>印刷は${cols}列／ページ</b>。上にバインダー余白20mm。</span>
    </div>
+   <style>@page{ @top-right{ content:"${yy}年${mNum}月"; font-size:13px; font-weight:bold; color:#333; vertical-align:bottom; padding-bottom:4mm; } }</style>
    <div class="print-ym">${yy}年${mNum}月</div>
    <div class="print-wrap cols${cols}" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">${blocks}</div>`;
 }
