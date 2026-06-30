@@ -347,18 +347,26 @@ function render(){
   else renderMaster();
 }
 
+function todayStr(){
+  if(S.today) return S.today;
+  const t=new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+}
 function renderPrintSheet(ym){
   const prods=curProducts();
   const mNum=+ym.split('-')[1];
+  const today=todayStr();
+  const lastStr=`${ym}-${String(daysInMonth(ym)).padStart(2,'0')}`;
   let blocks='';
   prods.forEach(p=>{
     const a=aggregate(p,ym);
     let drows='';
     a.rows.forEach(r=>{
       const cls=r.dow===0?'sun':(r.dow===6?'sat':'');
-      drows+=`<tr class="${cls}"><td>${mNum}/${r.d}</td><td>${r.in||''}</td><td>${r.out||''}</td><td>${fmtQty(p,r.stock)}</td><td class="l small">${r.note||''}</td></tr>`;
+      const stockCell = r.date>today ? '' : fmtQty(p,r.stock); // 未来日は在庫を出さない（手書き用）
+      drows+=`<tr class="${cls}"><td>${mNum}/${r.d}</td><td>${r.in||''}</td><td>${r.out||''}</td><td>${stockCell}</td><td class="l small">${r.note||''}</td></tr>`;
     });
-    const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${fmtQty(p,a.end)}</td><td></td></tr>`;
+    const endCell = lastStr>today ? '' : fmtQty(p,a.end); // 月末が未来なら次月繰越も空欄
+    const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${endCell}</td><td></td></tr>`;
     const meta=`<tr><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
     blocks+=`<div class="psheet"><table>
        <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${p.name}${p.isWarehouse?'（倉庫）':''}</th></tr>
