@@ -50,6 +50,15 @@
   .psheet .phead{ background:#cfe8cf; font-size:12px; text-align:left; }
   .psheet .ym{ float:right; font-weight:700; }
   @page{ margin:8mm; }
+  /* 処理中オーバーレイ（ぐるぐる＋％） */
+  .proc-overlay{ position:fixed; inset:0; z-index:3000; background:rgba(20,35,25,.55); display:none; align-items:center; justify-content:center; }
+  .proc-overlay.on{ display:flex; }
+  .proc-box{ background:#fff; border-radius:12px; padding:26px 36px; box-shadow:0 12px 40px rgba(0,0,0,.3); text-align:center; min-width:260px; }
+  .proc-spinner{ width:46px; height:46px; margin:2px auto 14px; border:5px solid #e3e8ee; border-top-color:var(--accent); border-radius:50%; animation:proc-spin .8s linear infinite; }
+  @keyframes proc-spin{ to{ transform:rotate(360deg); } }
+  .proc-title{ font-size:14px; font-weight:700; color:#2c3e50; }
+  .proc-pct{ font-size:30px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; margin-top:6px; min-height:30px; }
+  .proc-sub{ font-size:12px; color:#888; margin-top:2px; }
   .psheet .carry,.psheet .tot td{ background:#fff7cc; font-weight:700; }
   .psheet td.l,.psheet th.l{ text-align:left; }
   .psheet .small{ font-size:10px; color:#444; }
@@ -95,6 +104,15 @@
 
 <main id="view"><p class="hint">「サンプルデータで見る」を押すと、本番Excel（66シート）から取り込んだ実データで動きます。<br>「在庫データ.xlsx を開く」は同フォルダの正規化ファイルを読み込み、編集→保存（同じ.xlsx）まで試せます。</p></main>
 
+<div class="proc-overlay" id="procOverlay" aria-hidden="true">
+  <div class="proc-box">
+    <div class="proc-spinner"></div>
+    <div class="proc-title" id="procTitle">処理中です…</div>
+    <div class="proc-pct" id="procPct"></div>
+    <div class="proc-sub" id="procSub"></div>
+  </div>
+</div>
+
 <script src="seed-data.js"></script>
 <script>
 const S = { products:[], periods:{}, movements:[], tab:'stock', fileHandle:null, fileName:null, inputDate:null, activity:{}, _uidSeq:0 };
@@ -103,6 +121,16 @@ const compIdx = c => { const i=COMP_ORDER.indexOf(c); return i<0?99:i; };
 const $ = id => document.getElementById(id);
 const pkey = (c,ym,n) => c+'|'+ym+'|'+n;
 const mkey = (c,n,ym) => c+'|'+n+'|'+ym;
+
+/* 処理中オーバーレイ（ぐるぐる＋進捗%）— csv-formatter方式 */
+const procUI = {
+  show(title,sub){ $('procTitle').textContent=title||'処理中です…'; this.pct(null); this.sub(sub||'');
+    const o=$('procOverlay'); o.classList.add('on'); o.setAttribute('aria-hidden','false'); },
+  pct(p){ $('procPct').textContent = (p==null?'':p+'%'); },
+  sub(t){ $('procSub').textContent=t||''; },
+  hide(){ const o=$('procOverlay'); o.classList.remove('on'); o.setAttribute('aria-hidden','true'); },
+};
+const yieldUI = ()=>new Promise(r=>setTimeout(r, 0)); // 背景タブでも確実に進むようrAFでなくsetTimeout
 
 /* ---------- load ---------- */
 function ingest(d){
@@ -151,10 +179,10 @@ async function pickFile(){
     if(window.showOpenFilePicker){
       const [h] = await window.showOpenFilePicker({types:[{description:'Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});
       S.fileHandle=h; const f=await h.getFile(); S.fileName=f.name;
-      readXlsx(await f.arrayBuffer());
+      await readXlsx(await f.arrayBuffer());
     }else{
       const inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx';
-      inp.onchange=async e=>{ const f=e.target.files[0]; if(!f)return; S.fileName=f.name; S.fileHandle=null; readXlsx(await f.arrayBuffer()); };
+      inp.onchange=async e=>{ const f=e.target.files[0]; if(!f)return; S.fileName=f.name; S.fileHandle=null; await readXlsx(await f.arrayBuffer()); };
       inp.click();
     }
   }catch(err){ if(err.name!=='AbortError') alert('読込エラー: '+err.message); }
@@ -163,11 +191,14 @@ function fmtDate(v){
   if(v instanceof Date){ return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0'); }
   return String(v).slice(0,10);
 }
-function readXlsx(buf){
+async function readXlsx(buf){
+  procUI.show('在庫データを読み込み中…','ファイルを解析しています…'); await yieldUI();
+  try{
   const wb = XLSX.read(buf,{type:'array',cellDates:true});
   const peSheet = wb.Sheets['月初在庫'] || wb.Sheets['期首残'];
   if(!wb.Sheets['製品マスタ'] || !wb.Sheets['入出庫']){
     const legacy = wb.SheetNames.some(n=>/^\d{4}年\d{1,2}月(ぴゅあ|エコ)\s*$/.test(n));
+    procUI.hide();
     alert(legacy
       ? 'これは元の在庫管理表（月シートが並ぶ形式）のようです。\nこのアプリは正規化済み「在庫データ.xlsx」を読みます。\n「元Excelを取り込む」ボタンから取り込んでください。'
       : 'このファイルには「製品マスタ／期首残／入出庫」シートがありません。\n正規化済みの 在庫データ.xlsx を選んでください。');
@@ -186,6 +217,8 @@ function readXlsx(buf){
       ym:ds.slice(0,7), in:r['入庫']||0, out:r['出庫']||0, note:r['備考']||'' }; })
   };
   ingest(d); setStatus();
+  procUI.hide();
+  }catch(e){ procUI.hide(); alert('読込エラー: '+e.message); }
 }
 function setStatus(){ $('status').textContent = (S.fileName||'') + ' / 製品'+S.products.length+'・入出庫'+S.movements.length+'件'; }
 
@@ -200,10 +233,13 @@ async function pickLegacy(){
       buf=await new Promise((res,rej)=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx';
         inp.onchange=e=>{ const f=e.target.files[0]; if(!f)return rej({name:'AbortError'}); S.fileName='（'+f.name+'から正規化）'; f.arrayBuffer().then(res); }; inp.click(); });
     }
-    importLegacy(buf);
+    await importLegacy(buf);
   }catch(err){ if(err.name!=='AbortError') alert('取り込みエラー: '+err.message); }
 }
-function importLegacy(buf){
+async function importLegacy(buf){
+  procUI.show('元Excelを読み込み中…','ファイルを解析しています…');
+  await yieldUI();
+  try{
   const wb = XLSX.read(buf,{type:'array',cellDates:true});
   const COMP = { 'ぴゅあ':['ピュアライフ','PLHD㈱'], 'エコ':['エコレイズ','エコレイズ㈱'] };
   const sheetRe = /^(\d{4})年(\d{1,2})月(ぴゅあ|エコ)$/;
@@ -213,8 +249,11 @@ function importLegacy(buf){
     if(typeof v==='string'){ const m=v.match(/^\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]); }
     return null; };
   let sheetCount=0;
-  wb.SheetNames.forEach(name=>{
-    const mm=sheetRe.exec(name.trim()); if(!mm) return;
+  const names=wb.SheetNames, total=names.length;
+  for(let si=0; si<total; si++){
+    const name=names[si];
+    const mm=sheetRe.exec(name.trim());
+    if(mm){
     sheetCount++;
     const [company,torihiki]=COMP[mm[3]];
     const ym=mm[1]+'-'+String(+mm[2]).padStart(2,'0');
@@ -263,12 +302,18 @@ function importLegacy(buf){
         }
       }
     }
-  });
-  if(!sheetCount){ alert('月シート（例「2026年6月ぴゅあ」）が見つかりませんでした。元の在庫管理表を選んでください。'); return; }
+    } // end if(mm)
+    procUI.pct(Math.round((si+1)/total*100));
+    procUI.sub(`シート ${si+1}/${total}`);
+    if(si%8===0) await yieldUI();
+  } // end for si
+  if(!sheetCount){ procUI.hide(); alert('月シート（例「2026年6月ぴゅあ」）が見つかりませんでした。元の在庫管理表を選んでください。'); return; }
   ingest({ products:Object.values(products), periods, movements });
   S.fileHandle=null;
   setStatus();
+  procUI.hide();
   alert(`取り込み完了：${sheetCount}シート → 製品${Object.keys(products).length}・入出庫${movements.length}件。\n内容を確認し「保存（.xlsx）」で 在庫データ.xlsx として書き出せます。`);
+  }catch(e){ procUI.hide(); alert('取り込みエラー: '+e.message); }
 }
 
 /* ---------- selectors ---------- */
@@ -598,18 +643,25 @@ function buildPartnerSheet(co, ym){
   ws['!cols']=[{wch:8},{wch:30},{wch:11},{wch:12},{wch:18}];
   return ws;
 }
-function genPartner(){
+async function genPartner(){
   if(!S.products.length){ alert('先にデータを読み込んでください'); return; }
   const ym=$('ym').value, [yy,mm]=ym.split('-');
-  let made=[];
-  COMP_ORDER.forEach(co=>{
-    const ws=buildPartnerSheet(co,ym); if(!ws) return;
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `${yy}年${+mm}月`);
-    XLSX.writeFile(wb, `${yy}-${mm}${OFFICIAL[co]||co}様製品出入庫表.xlsx`);
-    made.push(OFFICIAL[co]||co);
-  });
-  if(made.length) alert(`先方報告Excelを出力しました：\n${made.join(' / ')}\n（会社ごとに別ファイル。倉庫品は除外）`);
+  const comps=[...new Set(S.products.map(p=>p.company))].sort((a,b)=>compIdx(a)-compIdx(b));
+  procUI.show('先方報告Excelを作成中…'); await yieldUI();
+  try{
+    let made=[];
+    for(let i=0;i<comps.length;i++){
+      const co=comps[i];
+      procUI.pct(Math.round((i+1)/comps.length*100)); procUI.sub(`${OFFICIAL[co]||co}`); await yieldUI();
+      const ws=buildPartnerSheet(co,ym); if(!ws) continue;
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `${yy}年${+mm}月`);
+      XLSX.writeFile(wb, `${yy}-${mm}${OFFICIAL[co]||co}様製品出入庫表.xlsx`);
+      made.push(OFFICIAL[co]||co);
+    }
+    procUI.hide();
+    if(made.length) alert(`先方報告Excelを出力しました：\n${made.join(' / ')}\n（会社ごとに別ファイル。倉庫品は除外）`);
+  }catch(e){ procUI.hide(); alert('先方Excel生成エラー: '+e.message); }
 }
 
 /* ---------- save ---------- */
