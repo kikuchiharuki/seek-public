@@ -48,7 +48,7 @@
   .psheet th,.psheet td{ border:1px solid #999; padding:1px 4px; text-align:right; height:16px; }
   .psheet th{ background:#dff0df; }
   .psheet .phead{ background:#cfe8cf; font-size:12px; text-align:left; }
-  .psheet .ym{ float:right; font-weight:700; }
+  .print-ym{ text-align:right; font-weight:700; font-size:14px; margin:0 4px 6px 0; color:#333; }
   /* ★印刷の上余白＝バインダー用。1つ目の値(20mm)が上。増減はここ。 右/下/左=8mm */
   @page{ margin:20mm 8mm 8mm 8mm; }
   /* 処理中オーバーレイ（ぐるぐる＋％） */
@@ -71,8 +71,10 @@
     .print-wrap{ gap:6px; }
     .psheet{ page-break-inside:avoid; }
     .psheet table{ font-size:10px; }
+    .psheet th,.psheet td{ height:auto; padding:0 3px; line-height:1.18; } /* 印刷は行を詰めて余白増の分を回収 */
     .print-wrap.cols4 .psheet table{ font-size:9px; }
     .print-wrap.cols4 .psheet th,.print-wrap.cols4 .psheet td{ padding:0 2px; }
+    .print-ym{ position:fixed; top:8mm; right:10mm; margin:0; font-size:13px; } /* 各ページ右上に固定（上余白内） */
   }
 </style>
 </head>
@@ -423,7 +425,7 @@ function renderPrintSheet(ym,cols){
     const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${endCell}</td><td></td></tr>`;
     const meta=`<tr><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
     blocks+=`<div class="psheet"><table>
-       <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${p.name}${p.isWarehouse?'（倉庫）':''}<span class="ym">${yy}年${mNum}月</span></th></tr>
+       <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${p.name}${p.isWarehouse?'（倉庫）':''}</th></tr>
        <tr><td colspan=4 class="l">月初在庫</td><td class="carry">${fmtQty(p,a.opening)}</td></tr>
        <tr><th>年月日</th><th>入庫</th><th>出庫</th><th>在庫数</th><th class="l">備考</th></tr>
        ${drows}${foot}${meta}
@@ -433,6 +435,7 @@ function renderPrintSheet(ym,cols){
      <button class="primary" onclick="window.print()">🖨 印刷</button>
      <span class="muted">上の「会社」「年月」で対象を切替。現行レイアウト（製品ブロック・日＝行・前後の在庫が見える）。空欄は手書き用。<b>印刷は${cols}列／ページ</b>。上にバインダー余白20mm。</span>
    </div>
+   <div class="print-ym">${yy}年${mNum}月</div>
    <div class="print-wrap cols${cols}" style="grid-template-columns:repeat(${cols},1fr)">${blocks}</div>`;
 }
 
