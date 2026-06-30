@@ -13,7 +13,9 @@
   header h1{ font-size:16px; margin:0; font-weight:700; }
   header .status{ font-size:12px; opacity:.9; }
   .bar{ padding:8px 16px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--soft); }
-  .bar label{ font-size:12px; color:#555; }
+  .bar label{ font-size:18px; color:#555; }
+  /* 会社・年月セレクタは大きめ（現行の約1.5倍） */
+  .bar select{ font-size:21px; padding:8px 14px; }
   select,button{ font-size:14px; padding:5px 9px; border:1px solid var(--line); border-radius:6px; background:#fff; }
   button{ cursor:pointer; }
   button.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
@@ -395,6 +397,8 @@ function aggregate(p, ym){
 
 /* ---------- render ---------- */
 function sortProds(arr){ return arr.sort((a,b)=> (compIdx(a.company)-compIdx(b.company)) || (act(b)-act(a)) || (a.sort||0)-(b.sort||0)); }
+/* 印刷表示用の製品名整形（暫定。元Excel整理までの仮対応）: 全角【】→半角[]、名前に「倉庫」を含む場合は（倉庫）を重複付与しない */
+function pdispName(p){ const nm=(p.name||'').replace(/【/g,'[').replace(/】/g,']'); return nm + (p.isWarehouse && !/倉庫/.test(nm) ? '（倉庫）' : ''); }
 function curProducts(){
   const c=$('company').value, ym=$('ym').value;
   const hasData=p=> S.periods[pkey(p.company,ym,p.name)]!=null || S.movements.some(m=>m.company===p.company&&m.name===p.name&&m.ym===ym);
@@ -440,7 +444,7 @@ function renderPrintSheet(ym,cols){
     const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${endCell}</td><td></td></tr>`;
     const meta=`<tr><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
     blocks+=`<div class="psheet"><table>
-       <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${p.name}${p.isWarehouse?'（倉庫）':''}</th></tr>
+       <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${pdispName(p)}</th></tr>
        <tr><td colspan=3 class="l">前月繰越在庫数</td><td class="carry">${fmtQty(p,a.opening)}</td><td></td></tr>
        <tr class="colhead"><th>日付</th><th>入庫</th><th>出庫</th><th>在庫数</th><th class="l">備考</th></tr>
        ${drows}${foot}${meta}
