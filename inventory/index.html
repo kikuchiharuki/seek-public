@@ -44,10 +44,12 @@
   h2{ font-size:15px; margin:6px 0 10px; border-left:4px solid var(--accent); padding-left:8px; }
   /* 記入シート印刷 */
   .print-wrap{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; align-items:start; }
-  .psheet table{ width:100%; border-collapse:collapse; font-size:11px; }
+  .psheet table{ width:100%; border-collapse:collapse; font-size:11px; border:2px solid #333; }
   .psheet th,.psheet td{ border:1px solid #999; padding:1px 4px; text-align:right; height:16px; }
   .psheet th{ background:#dff0df; }
   .psheet .phead{ background:#cfe8cf; font-size:12px; text-align:left; }
+  .psheet .ym{ float:right; font-weight:700; }
+  @page{ margin:8mm; }
   .psheet .carry,.psheet .tot td{ background:#fff7cc; font-weight:700; }
   .psheet td.l,.psheet th.l{ text-align:left; }
   .psheet .small{ font-size:10px; color:#444; }
@@ -352,8 +354,9 @@ function todayStr(){
   const t=new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
 }
 function renderPrintSheet(ym){
-  const prods=curProducts();
-  const mNum=+ym.split('-')[1];
+  const c=$('company').value;
+  const prods=sortProds(S.products.filter(p=> (c==='all'||p.company===c) && p.active!==false)); // 有効な製品のみ印刷
+  const mNum=+ym.split('-')[1], yy=ym.split('-')[0];
   const today=todayStr();
   const lastStr=`${ym}-${String(daysInMonth(ym)).padStart(2,'0')}`;
   let blocks='';
@@ -369,7 +372,7 @@ function renderPrintSheet(ym){
     const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${endCell}</td><td></td></tr>`;
     const meta=`<tr><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
     blocks+=`<div class="psheet"><table>
-       <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${p.name}${p.isWarehouse?'（倉庫）':''}</th></tr>
+       <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${p.name}${p.isWarehouse?'（倉庫）':''}<span class="ym">${yy}年${mNum}月</span></th></tr>
        <tr><td colspan=4 class="l">月初在庫</td><td class="carry">${fmtQty(p,a.opening)}</td></tr>
        <tr><th>年月日</th><th>入庫</th><th>出庫</th><th>在庫数</th><th class="l">備考</th></tr>
        ${drows}${foot}${meta}
