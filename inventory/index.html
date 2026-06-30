@@ -49,7 +49,8 @@
   .psheet th{ background:#dff0df; }
   .psheet .phead{ background:#cfe8cf; font-size:12px; text-align:left; }
   .psheet .ym{ float:right; font-weight:700; }
-  @page{ margin:8mm; }
+  /* ★印刷の上余白＝バインダー用。1つ目の値(20mm)が上。増減はここ。 右/下/左=8mm */
+  @page{ margin:20mm 8mm 8mm 8mm; }
   /* 処理中オーバーレイ（ぐるぐる＋％） */
   .proc-overlay{ position:fixed; inset:0; z-index:3000; background:rgba(20,35,25,.55); display:none; align-items:center; justify-content:center; }
   .proc-overlay.on{ display:flex; }
@@ -67,9 +68,11 @@
   @media print{
     header,.bar,nav,.noprint{ display:none !important; }
     main{ padding:0; }
-    .print-wrap{ grid-template-columns:repeat(3,1fr); gap:6px; }
+    .print-wrap{ gap:6px; }
     .psheet{ page-break-inside:avoid; }
     .psheet table{ font-size:10px; }
+    .print-wrap.cols4 .psheet table{ font-size:9px; }
+    .print-wrap.cols4 .psheet th,.print-wrap.cols4 .psheet td{ padding:0 2px; }
   }
 </style>
 </head>
@@ -98,7 +101,8 @@
   <button data-tab="dayin" onclick="setTab('dayin')">日次入力（全製品）</button>
   <button data-tab="ship" onclick="setTab('ship')">当月出荷数</button>
   <button data-tab="ledger" onclick="setTab('ledger')">製品別台帳</button>
-  <button data-tab="print" onclick="setTab('print')">記入シート印刷</button>
+  <button data-tab="print" onclick="setTab('print')">記入シート印刷(3列)</button>
+  <button data-tab="print4" onclick="setTab('print4')">記入シート印刷(4列)</button>
   <button data-tab="master" onclick="setTab('master')">製品マスタ</button>
 </nav>
 
@@ -390,7 +394,8 @@ function render(){
   else if(S.tab==='dayin') renderDayInput(ym);
   else if(S.tab==='ship') renderShip(ym);
   else if(S.tab==='ledger') renderLedger(ym);
-  else if(S.tab==='print') renderPrintSheet(ym);
+  else if(S.tab==='print') renderPrintSheet(ym,3);
+  else if(S.tab==='print4') renderPrintSheet(ym,4);
   else renderMaster();
 }
 
@@ -398,7 +403,8 @@ function todayStr(){
   if(S.today) return S.today;
   const t=new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
 }
-function renderPrintSheet(ym){
+function renderPrintSheet(ym,cols){
+  cols=cols||3;
   const c=$('company').value;
   const prods=sortProds(S.products.filter(p=> (c==='all'||p.company===c) && p.active!==false)); // 有効な製品のみ印刷
   const mNum=+ym.split('-')[1], yy=ym.split('-')[0];
@@ -425,9 +431,9 @@ function renderPrintSheet(ym){
   });
   $('view').innerHTML=`<div class="bar noprint" style="padding-left:0;background:none;border:none">
      <button class="primary" onclick="window.print()">🖨 印刷</button>
-     <span class="muted">上の「会社」「年月」で対象を切替。現行レイアウト（製品ブロック・日＝行・前後の在庫が見える）。空欄は手書き用。印刷は3列／ページ。</span>
+     <span class="muted">上の「会社」「年月」で対象を切替。現行レイアウト（製品ブロック・日＝行・前後の在庫が見える）。空欄は手書き用。<b>印刷は${cols}列／ページ</b>。上にバインダー余白20mm。</span>
    </div>
-   <div class="print-wrap">${blocks}</div>`;
+   <div class="print-wrap cols${cols}" style="grid-template-columns:repeat(${cols},1fr)">${blocks}</div>`;
 }
 
 function clampInputDate(ym){
