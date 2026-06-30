@@ -73,6 +73,7 @@
   .psheet .carry,.psheet .tot td{ background:#ffe98a; font-weight:700; }
   .psheet td.l,.psheet th.l{ text-align:left; }
   .psheet .small{ font-size:10px; color:#444; }
+  .psheet .metarow td{ height:18px; line-height:14px; } /* 注記の有無で高さが変わらないよう固定 */
   .psheet tr.sat td{ background:#c9d6e8; } .psheet tr.sun td{ background:#f0cdd8; }
   .psheet .alertcell{ color:var(--warn); font-weight:700; }
   @media print{
@@ -442,7 +443,7 @@ function renderPrintSheet(ym,cols){
     });
     const endCell = lastStr>today ? '' : fmtQty(p,a.end); // 月末が未来なら次月繰越も空欄
     const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${endCell}</td><td></td></tr>`;
-    const meta=`<tr><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
+    const meta=`<tr class="metarow"><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
     blocks+=`<div class="psheet"><table>
        <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${pdispName(p)}</th></tr>
        <tr><td colspan=3 class="l">前月繰越在庫数</td><td class="carry">${fmtQty(p,a.opening)}</td><td></td></tr>
