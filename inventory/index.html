@@ -51,7 +51,11 @@
   h2{ font-size:15px; margin:6px 0 10px; border-left:4px solid var(--accent); padding-left:8px; }
   /* 記入シート印刷 */
   .print-wrap{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; align-items:start; }
-  .psheet table{ width:100%; border-collapse:collapse; font-size:11px; border:2px solid #333; }
+  .psheet table{ width:100%; border-collapse:collapse; font-size:11px; border:2px solid #333; table-layout:fixed; }
+  /* 日付・入庫・出庫は同じ固定幅、在庫数は中、備考は残り（最も広い） */
+  .psheet col.c-d,.psheet col.c-i,.psheet col.c-o{ width:12%; }
+  .psheet col.c-s{ width:30%; }
+  .psheet col.c-n{ width:34%; }
   .psheet th,.psheet td{ border:1px solid #777; padding:1px 4px; text-align:right; height:16px; }
   .psheet th{ background:#bfe0bf; }
   .psheet .phead{ background:none; font-size:15px; font-weight:700; text-align:center; vertical-align:middle; height:40px; }
@@ -85,7 +89,7 @@
     .print-wrap.cols4 .psheet table{ font-size:9px; }
     .print-wrap.cols4 .psheet th,.print-wrap.cols4 .psheet td{ padding:1px 2px; height:16px; }
     .print-wrap.cols4 .psheet .phead{ font-size:13px; height:40px; }
-    .print-ym{ position:static; text-align:right; margin:0 4mm 4px 0; font-size:13px; } /* 先頭・テーブル上に配置（重なり回避） */
+    .print-ym{ position:fixed; top:6mm; right:10mm; margin:0; font-size:13px; } /* 上余白(20mm)内に浮かせる。本文を押し下げない＝テーブルは20mmから開始 */
   }
 </style>
 </head>
@@ -445,6 +449,7 @@ function renderPrintSheet(ym,cols){
     const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${endCell}</td><td></td></tr>`;
     const meta=`<tr class="metarow"><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
     blocks+=`<div class="psheet"><table>
+       <colgroup><col class="c-d"><col class="c-i"><col class="c-o"><col class="c-s"><col class="c-n"></colgroup>
        <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${pdispName(p)}</th></tr>
        <tr><td colspan=3 class="l">前月繰越在庫数</td><td class="carry">${fmtQty(p,a.opening)}</td><td></td></tr>
        <tr class="colhead"><th>日付</th><th>入庫</th><th>出庫</th><th>在庫数</th><th class="l">備考</th></tr>
