@@ -125,6 +125,7 @@
   <button data-tab="ship" onclick="setTab('ship')">当月出荷数</button>
   <button data-tab="ledger" onclick="setTab('ledger')">製品別台帳</button>
   <button data-tab="print" onclick="setTab('print')">記入シート印刷(3列)</button>
+  <button data-tab="print3n" onclick="setTab('print3n')">記入シート印刷(通常順3列)</button>
   <button data-tab="print4" onclick="setTab('print4')">記入シート印刷(4列)</button>
   <button data-tab="master" onclick="setTab('master')">製品マスタ</button>
 </nav>
@@ -405,6 +406,8 @@ function aggregate(p, ym){
 
 /* ---------- render ---------- */
 function sortProds(arr){ return arr.sort((a,b)=> (compIdx(a.company)-compIdx(b.company)) || (act(b)-act(a)) || (a.sort||0)-(b.sort||0)); }
+/* 通常順：出荷数(活動量)を使わず会社→マスタ並び順のみ */
+function sortProdsPlain(arr){ return arr.sort((a,b)=> (compIdx(a.company)-compIdx(b.company)) || (a.sort||0)-(b.sort||0)); }
 /* 印刷表示用の製品名整形（暫定。元Excel整理までの仮対応）: 全角【】→半角[]、名前に「倉庫」を含む場合は（倉庫）を重複付与しない */
 function pdispName(p){ const nm=(p.name||'').replace(/【/g,'[').replace(/】/g,']'); return nm + (p.isWarehouse && !/倉庫/.test(nm) ? '（倉庫）' : ''); }
 function curProducts(){
@@ -424,6 +427,7 @@ function render(){
   else if(S.tab==='ship') renderShip(ym);
   else if(S.tab==='ledger') renderLedger(ym);
   else if(S.tab==='print') renderPrintSheet(ym,3);
+  else if(S.tab==='print3n') renderPrintSheet(ym,3,true);
   else if(S.tab==='print4') renderPrintSheet(ym,4);
   else renderMaster();
 }
@@ -434,10 +438,11 @@ function todayStr(){
 }
 /* 印刷の在庫数表示: 列幅節約のため全角「ケース」を半角「ｹｰｽ」に置換（印刷シート専用） */
 function pq(p,v){ return fmtQty(p,v).replace(/ケース/g,'ｹｰｽ'); }
-function renderPrintSheet(ym,cols){
+function renderPrintSheet(ym,cols,plain){
   cols=cols||3;
   const c=$('company').value;
-  const prods=sortProds(S.products.filter(p=> (c==='all'||p.company===c) && p.active!==false)); // 有効な製品のみ印刷
+  const sorter=plain?sortProdsPlain:sortProds;
+  const prods=sorter(S.products.filter(p=> (c==='all'||p.company===c) && p.active!==false)); // 有効な製品のみ印刷
   const mNum=+ym.split('-')[1], yy=ym.split('-')[0];
   const today=todayStr();
   const lastStr=`${ym}-${String(daysInMonth(ym)).padStart(2,'0')}`;
@@ -463,7 +468,7 @@ function renderPrintSheet(ym,cols){
   });
   $('view').innerHTML=`<div class="bar noprint" style="padding-left:0;background:none;border:none">
      <button class="primary" onclick="window.print()">🖨 印刷</button>
-     <span class="muted">上の「会社」「年月」で対象を切替。現行レイアウト（製品ブロック・日＝行・前後の在庫が見える）。空欄は手書き用。<b>印刷は${cols}列／ページ</b>。上にバインダー余白20mm。</span>
+     <span class="muted">上の「会社」「年月」で対象を切替。現行レイアウト（製品ブロック・日＝行・前後の在庫が見える）。空欄は手書き用。<b>並び順：${plain?'通常順（マスタ順）':'会社ごと出荷数順'}</b>。<b>印刷は${cols}列／ページ</b>。上にバインダー余白20mm。</span>
    </div>
    <style>@page{ @top-right{ content:"${yy}年${mNum}月"; font-size:13px; font-weight:bold; color:#333; vertical-align:bottom; padding-bottom:4mm; } }</style>
    <div class="print-ym">${yy}年${mNum}月</div>
