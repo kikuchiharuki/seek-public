@@ -51,7 +51,7 @@
   h2{ font-size:15px; margin:6px 0 10px; border-left:4px solid var(--accent); padding-left:8px; }
   /* 記入シート印刷 */
   .print-wrap{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; align-items:start; }
-  .psheet table{ width:100%; border-collapse:collapse; font-size:11px; border:2px solid #333; table-layout:fixed; }
+  .psheet table{ width:100%; border-collapse:collapse; font-size:11px; border:1px solid #777; table-layout:fixed; }
   /* 日付・入庫・出庫は同じ固定幅、在庫数は中、備考は残り（最も広い） */
   .psheet col.c-d{ width:12%; }
   .psheet col.c-i,.psheet col.c-o{ width:13.2%; } /* 入庫・出庫は10%増(12→13.2) */
@@ -59,7 +59,7 @@
   .psheet col.c-n{ width:37.6%; }                 /* 余り幅は備考へ(34→37.6) */
   .psheet th,.psheet td{ border:1px solid #777; padding:1px 4px; text-align:right; height:16px; }
   .psheet th{ background:#bfe0bf; }
-  .psheet .phead{ background:none; font-size:15px; font-weight:700; text-align:center; vertical-align:middle; height:40px; }
+  .psheet .phead{ background:none; font-size:15px; font-weight:400; text-align:center; vertical-align:middle; height:40px; }
   .psheet .colhead th{ font-weight:400; }
   .print-ym{ text-align:right; font-weight:700; font-size:14px; margin:0 4px 6px 0; color:#333; }
   /* ★印刷の上余白＝バインダー用。1つ目の値(20mm)が上。増減はここ。 右/下/左=8mm */
