@@ -612,9 +612,10 @@ const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;');
 function editMaster(uid,field,val){
   const p=S.products.find(x=>x.uid===uid); if(!p) return;
   if(field==='alert'||field==='unitsPerCase') p[field]= val===''?null:(+val||0);
+  else if(field==='sort') p[field]= val===''?0:(+val||0);
   else p[field]=val;
   markDirty();
-  if(['active','company','mode','name','ordered'].includes(field)) render(); // 並び替え・在庫一覧の催促表示などに反映
+  if(['active','company','mode','name','ordered','sort'].includes(field)) render(); // 並び替え・在庫一覧の催促表示などに反映
 }
 function addProduct(){
   const co=$('company').value==='all'?'ピュアライフ':$('company').value;
@@ -626,10 +627,11 @@ function addProduct(){
 function renderMaster(){
   let h=`<h2>製品マスタ（編集できます）</h2>
   <p class="hint">商品名・アラート・注記をその場で編集。<b>発注済</b>にチェックすると在庫一覧の「ご発注」催促が止まります（先方への二重催促を防止）。<br>
-  <b>有効</b>を外す＝廃止（在庫一覧・日次入力から消えますが、過去の記録は残ります＝名前は消えません）。${S.fileHandle?'編集は自動保存されます。':'保存は上の「保存（.xlsx）」で。'}</p>
+  <b>有効</b>を外す＝廃止（在庫一覧・日次入力から消えますが、過去の記録は残ります＝名前は消えません）。<br>
+  <b>並び順</b>＝「記入シート印刷(通常順3列)」の並び（会社ごとに数字の小さい順／同じ数字は現状の順のまま）。${S.fileHandle?'編集は自動保存されます。':'保存は上の「保存（.xlsx）」で。'}</p>
   <button class="primary" onclick="addProduct()">＋ 製品を追加</button>
   <table style="margin-top:8px"><thead><tr>
-   <th class="l">会社</th><th class="l">商品名</th><th>数え方</th><th>入り数</th><th>アラート</th><th>発注済</th><th class="l">注記</th><th>有効</th>
+   <th class="l">会社</th><th class="l">商品名</th><th>並び順</th><th>数え方</th><th>入り数</th><th>アラート</th><th>発注済</th><th class="l">注記</th><th>有効</th>
   </tr></thead><tbody>`;
   allProds().forEach(p=>{
     const u=p.uid, dim=p.active===false?' style="opacity:.5"':'';
@@ -638,6 +640,7 @@ function renderMaster(){
         <option${p.company==='ピュアライフ'?' selected':''}>ピュアライフ</option>
         <option${p.company==='エコレイズ'?' selected':''}>エコレイズ</option></select>${p.isWarehouse?'<span class="pill wh">倉庫</span>':''}</td>
       <td class="l"><input class="note" style="min-width:220px" value="${esc(p.name)}" onchange="editMaster(${u},'name',this.value)"></td>
+      <td><input class="qty" style="width:48px" value="${p.sort==null?'':p.sort}" onchange="editMaster(${u},'sort',this.value)"></td>
       <td><select onchange="editMaster(${u},'mode',this.value)">
         <option value="decimal"${p.mode==='decimal'?' selected':''}>通常</option>
         <option value="pack"${p.mode==='pack'?' selected':''}>ケース+本</option>
