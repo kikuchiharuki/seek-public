@@ -445,7 +445,6 @@ function renderPrintSheet(ym,cols,plain){
   const prods=sorter(S.products.filter(p=> (c==='all'||p.company===c) && p.active!==false)); // 有効な製品のみ印刷
   const mNum=+ym.split('-')[1], yy=ym.split('-')[0];
   const today=todayStr();
-  const lastStr=`${ym}-${String(daysInMonth(ym)).padStart(2,'0')}`;
   let blocks='';
   prods.forEach(p=>{
     const a=aggregate(p,ym);
@@ -455,14 +454,14 @@ function renderPrintSheet(ym,cols,plain){
       const stockCell = r.date>today ? '' : pq(p,r.stock); // 未来日は在庫を出さない（手書き用）
       drows+=`<tr class="${cls}"><td>${mNum}/${r.d}</td><td>${r.in||''}</td><td>${r.out||''}</td><td>${stockCell}</td><td class="l small">${r.note||''}</td></tr>`;
     });
-    const endCell = lastStr>today ? '' : pq(p,a.end); // 月末が未来なら次月繰越も空欄
-    const foot=`<tr class="tot"><td>合計</td><td>${a.sumIn||0}</td><td>${a.sumOut||0}</td><td class="carry">${endCell}</td><td></td></tr>`;
+    // 記入シートなので合計は手書き用に空欄（数値は在庫データ側で閲覧できる）
+    const foot=`<tr class="tot"><td>合計</td><td></td><td></td><td class="carry"></td><td></td></tr>`;
     const meta=`<tr class="metarow"><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
     blocks+=`<div class="psheet"><table>
        <colgroup><col class="c-d"><col class="c-i"><col class="c-o"><col class="c-s"><col class="c-n"></colgroup>
        <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${pdispName(p)}</th></tr>
-       <tr><td colspan=3 class="l">前月繰越在庫数</td><td class="carry">${pq(p,a.opening)}</td><td></td></tr>
        <tr class="colhead"><th>日付</th><th>入庫</th><th>出庫</th><th>在庫数</th><th class="l">備考</th></tr>
+       <tr><td colspan=3 class="l">前月繰越在庫数</td><td class="carry">${pq(p,a.opening)}</td><td></td></tr>
        ${drows}${foot}${meta}
       </table></div>`;
   });
