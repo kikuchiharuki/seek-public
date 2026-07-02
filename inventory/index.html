@@ -247,7 +247,7 @@ async function readXlsx(buf){
       active: r['有効']==null||r['有効']===''?true:(r['有効']==='○'||r['有効']===true), ordered: r['発注済']==='○' })),
     periods: pe.map(r=>({ company:r['会社'], ym:String(r['年月']), name:r['商品名'], opening:(r['月初在庫']??r['期首残']) })),
     movements: mv.map(r=>{ const ds=fmtDate(r['日付']); return { company:r['会社'], name:r['商品名'], date:ds,
-      ym:ds.slice(0,7), in:r['入庫']||0, out:r['出庫']||0, note:r['備考']||'' }; })
+      ym:ds.slice(0,7), in:r['入庫']??null, out:r['出庫']??null, note:r['備考']||'' }; }) // 0は明示的な0として保持、空セル=null
   };
   ingest(d); setStatus();
   procUI.hide();
@@ -330,7 +330,7 @@ async function importLegacy(buf){
           const hasIn=typeof qin==='number'&&qin, hasOut=typeof qout==='number'&&qout, hasNt=typeof nt==='string'&&nt.trim();
           if(hasIn||hasOut||hasNt){
             const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-            movements.push({company,name:nm,date:ds,ym:ds.slice(0,7),in:hasIn?qin:0,out:hasOut?qout:0,note:hasNt?nt.trim():''});
+            movements.push({company,name:nm,date:ds,ym:ds.slice(0,7),in:hasIn?qin:null,out:hasOut?qout:null,note:hasNt?nt.trim():''});
           }
         }
       }
@@ -378,9 +378,11 @@ function aggregate(p, ym){
   const c=p.company, n=p.name;
   const opening = S.periods[pkey(c,ym,n)] ?? 0;
   const byDate = {};
+  // in/out は null=未入力・0=明示的に0(記入済) を区別して保持する
   S.movements.filter(m=>m.company===c&&m.name===n&&m.ym===ym).forEach(m=>{
-    (byDate[m.date] = byDate[m.date]||{in:0,out:0,note:''});
-    byDate[m.date].in += num(m.in); byDate[m.date].out += num(m.out);
+    (byDate[m.date] = byDate[m.date]||{in:null,out:null,note:''});
+    if(m.in!=null) byDate[m.date].in = num(byDate[m.date].in) + num(m.in);
+    if(m.out!=null) byDate[m.date].out = num(byDate[m.date].out) + num(m.out);
     if(m.note) byDate[m.date].note = m.note;
   });
   const pack = p.mode==='pack';
@@ -390,9 +392,9 @@ function aggregate(p, ym){
   const dim=daysInMonth(ym);
   for(let d=1; d<=dim; d++){
     const date = ym+'-'+String(d).padStart(2,'0');
-    const e = byDate[date]||{in:0,out:0,note:''};
+    const e = byDate[date]||{in:null,out:null,note:''};
     if(pack){ stockU += toUnits(p,e.in)-toUnits(p,e.out); stock=fromUnits(p,stockU); inU+=toUnits(p,e.in); outU+=toUnits(p,e.out); }
-    else { stock += e.in-e.out; inN+=e.in; outN+=e.out; }
+    else { stock += num(e.in)-num(e.out); inN+=num(e.in); outN+=num(e.out); }
     const dow = new Date(date).getDay();
     rows.push({date, d, in:e.in, out:e.out, note:e.note, stock, dow});
   }
@@ -451,8 +453,9 @@ function renderPrintSheet(ym,cols,plain){
     let drows='';
     a.rows.forEach(r=>{
       const cls=r.dow===0?'sun':(r.dow===6?'sat':'');
-      const stockCell = r.date>today ? '' : pq(p,r.stock); // 未来日は在庫を出さない（手書き用）
-      drows+=`<tr class="${cls}"><td>${mNum}/${r.d}</td><td>${r.in||''}</td><td>${r.out||''}</td><td>${stockCell}</td><td class="l small">${r.note||''}</td></tr>`;
+      // 未来日は在庫を出さない（手書き用）。ただし入出庫の予定入力がある行だけ（　）付きで予測在庫を出す
+      const stockCell = r.date>today ? ((r.in!=null||r.out!=null)?`（${pq(p,r.stock)}）`:'') : pq(p,r.stock);
+      drows+=`<tr class="${cls}"><td>${mNum}/${r.d}</td><td>${r.in??''}</td><td>${r.out??''}</td><td>${stockCell}</td><td class="l small">${r.note||''}</td></tr>`;
     });
     // 記入シートなので合計は手書き用に空欄（数値は在庫データ側で閲覧できる）
     const foot=`<tr class="tot"><td>合計</td><td></td><td></td><td class="carry"></td><td></td></tr>`;
@@ -495,8 +498,8 @@ function renderDayInput(ym){
     const nm=p.name.replace(/'/g,"\\'"), breach=(p.alert!=null&&p.alert!=='')&&(p.mode==='pack'?Math.floor(toUnits(p,r.stock)/(p.unitsPerCase||30)):r.stock)<=p.alert;
     rows+=`<tr>
       <td class="l">${p.name}${p.isWarehouse?'<span class="pill wh">倉庫</span>':''}</td>
-      <td><input class="qty" value="${r.in||''}" onchange="editDay('${p.company}','${nm}','${date}','in',this.value)"></td>
-      <td><input class="qty" value="${r.out||''}" onchange="editDay('${p.company}','${nm}','${date}','out',this.value)"></td>
+      <td><input class="qty" value="${r.in??''}" onchange="editDay('${p.company}','${nm}','${date}','in',this.value)"></td>
+      <td><input class="qty" value="${r.out??''}" onchange="editDay('${p.company}','${nm}','${date}','out',this.value)"></td>
       <td class="${breach?'alert':''}">${fmtQty(p,r.stock)}</td>
       <td class="note-cell"><input class="note" value="${(r.note||'').replace(/"/g,'&quot;')}" onchange="editDay('${p.company}','${nm}','${date}','note',this.value)"></td>
     </tr>`;
@@ -506,7 +509,7 @@ function renderDayInput(ym){
      <button onclick="moveDay(-1)">◀ 前日</button>
      <input type="date" value="${date}" min="${ym}-01" max="${ym}-${String(daysInMonth(ym)).padStart(2,'0')}" onchange="S.inputDate=this.value;render()">
      <button onclick="moveDay(1)">翌日 ▶</button>
-     <span class="muted">よく出る製品が上／ピュアライフ→エコレイズ順。空欄=0として計算。製品ごとの切替不要で当日分をまとめて入力。</span>
+     <span class="muted">よく出る製品が上／ピュアライフ→エコレイズ順。空欄=0として計算。<b>0を入力すると0と表示</b>＝記入済みの印（ミス防止）。製品ごとの切替不要で当日分をまとめて入力。</span>
    </div>
    <table><thead><tr><th class="l">商品名</th><th>入庫</th><th>出庫</th><th>在庫(当日)</th><th class="l">備考</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -587,8 +590,8 @@ function renderLedger(ym){
     const cls = r.dow===0?'sun':(r.dow===6?'sat':'');
     h+=`<tr class="${cls}">
       <td>${r.d}</td><td>${W[r.dow]}</td>
-      <td><input class="qty" value="${r.in||''}" onchange="editDay('${p.company}','${p.name.replace(/'/g,"\\'")}','${r.date}','in',this.value)"></td>
-      <td><input class="qty" value="${r.out||''}" onchange="editDay('${p.company}','${p.name.replace(/'/g,"\\'")}','${r.date}','out',this.value)"></td>
+      <td><input class="qty" value="${r.in??''}" onchange="editDay('${p.company}','${p.name.replace(/'/g,"\\'")}','${r.date}','in',this.value)"></td>
+      <td><input class="qty" value="${r.out??''}" onchange="editDay('${p.company}','${p.name.replace(/'/g,"\\'")}','${r.date}','out',this.value)"></td>
       <td>${fmtQty(p,r.stock)}</td>
       <td class="note-cell"><input class="note" value="${(r.note||'').replace(/"/g,'&quot;')}" onchange="editDay('${p.company}','${p.name.replace(/'/g,"\\'")}','${r.date}','note',this.value)"></td>
     </tr>`;
@@ -601,8 +604,8 @@ function renderLedger(ym){
 function editDay(c,n,date,field,val){
   const ym=date.slice(0,7);
   let m=S.movements.find(x=>x.company===c&&x.name===n&&x.date===date);
-  if(!m){ m={company:c,name:n,date,ym,in:0,out:0,note:''}; S.movements.push(m); }
-  if(field==='note') m.note=val; else m[field]= val===''?0:(+val||0);
+  if(!m){ m={company:c,name:n,date,ym,in:null,out:null,note:''}; S.movements.push(m); }
+  if(field==='note') m.note=val; else m[field]= val===''?null:(+val||0); // 空欄=null(未入力)、0=明示的な0(記入済)
   markDirty();
   render();
 }
@@ -717,8 +720,8 @@ function buildWorkbook(){
     '数え方':p.mode,'入り数':p.unitsPerCase,'単位':p.unitLabel,'アラート':p.alert,'並び順':p.sort,
     '倉庫品':p.isWarehouse?'○':'','発注済':p.ordered?'○':'','注記':p.note||'','有効':p.active===false?'':'○'}));
   const pe = Object.entries(S.periods).map(([k,v])=>{ const [company,ym,name]=k.split('|'); return {'会社':company,'年月':ym,'商品名':name,'月初在庫':v}; });
-  const mv = S.movements.filter(m=>m.in||m.out||m.note).sort((a,b)=>(a.company+a.name+a.date).localeCompare(b.company+b.name+b.date))
-    .map(m=>({'会社':m.company,'商品名':m.name,'日付':m.date,'入庫':m.in||null,'出庫':m.out||null,'備考':m.note||''}));
+  const mv = S.movements.filter(m=>m.in!=null||m.out!=null||m.note).sort((a,b)=>(a.company+a.name+a.date).localeCompare(b.company+b.name+b.date))
+    .map(m=>({'会社':m.company,'商品名':m.name,'日付':m.date,'入庫':m.in??null,'出庫':m.out??null,'備考':m.note||''}));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pm), '製品マスタ');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pe), '月初在庫');
