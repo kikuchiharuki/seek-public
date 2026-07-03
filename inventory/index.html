@@ -84,8 +84,10 @@
   /* 記入シート入力（画面用）: 印刷シートと同じ見た目に入力セルを重ねる */
   .sheetin .psheet input{ width:100%; border:none; background:transparent; text-align:right; font:inherit; padding:0; box-sizing:border-box; }
   .sheetin .psheet input.nt{ text-align:left; }
-  .sheetin .psheet input:focus{ background:#ffe98a; outline:2px solid var(--accent); outline-offset:-2px; }
-  .sheetin .psheet.cur .phead{ background:#dff0df; }
+  .sheetin .psheet td:has(input:focus){ background:#ffd83d; }
+  .sheetin .psheet input:focus{ background:#ffd83d; outline:none; padding-right:5px; caret-color:#000; }
+  .sheetin .psheet input.nt:focus{ padding-right:0; padding-left:2px; }
+  .sheetin .psheet.cur .phead{ background:var(--accent); color:#fff; }
   @media print{
     header,.bar,nav,.noprint{ display:none !important; }
     main{ padding:0; }
@@ -201,7 +203,7 @@ function markDirty(){
       const w=await S.fileHandle.createWritable(); await w.write(out); await w.close();
       $('status').textContent=(S.fileName||'')+' / 自動保存 ✓ '+new Date().toLocaleTimeString('ja-JP');
     }catch(e){ $('status').textContent='自動保存エラー: '+e.message; }
-  }, 700);
+  }, 1500);
 }
 function alertText(p,a){
   if(p.alert==null||p.alert==='') return '-';
@@ -219,6 +221,9 @@ async function pickFile(){
     if(window.showOpenFilePicker){
       const [h] = await window.showOpenFilePicker({types:[{description:'Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});
       S.fileHandle=h; const f=await h.getFile(); S.fileName=f.name;
+      // 書き込み権限をここで一度だけ要求（ファイル選択直後のユーザー操作扱いのうちに）
+      // →以後の自動保存で毎回「保存を許可しますか」と聞かれなくなる
+      try{ if(h.requestPermission) await h.requestPermission({mode:'readwrite'}); }catch(_){}
       await readXlsx(await f.arrayBuffer());
     }else{
       const inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx';
@@ -564,13 +569,14 @@ function renderStock(ym){
   let h=`<h2>${ym.replace('-','年')}月 在庫一覧（ぴゅあ・エコまとめて表示）</h2>
   <p class="hint">赤字＝在庫アラート以下。会社の分け方は表示の切替だけ（データは1つ）。日次の入力は上の「日次台帳」タブから。</p>
   <table><thead><tr>
-   <th class="l">会社</th><th class="l">商品名</th><th>月初在庫</th><th>入庫計</th><th>出庫計</th><th>現在庫(月末)</th><th>アラート</th>
+   <th class="l">会社</th><th class="l">商品名</th><th class="l">注記</th><th>月初在庫</th><th>入庫計</th><th>出庫計</th><th>現在庫(月末)</th><th>アラート</th>
   </tr></thead><tbody>`;
   curProducts().forEach(p=>{
     const a=aggregate(p,ym);
     h+=`<tr>
       <td class="l">${p.company}${p.isWarehouse?'<span class="pill wh">倉庫</span>':''}</td>
-      <td class="l">${p.name}${p.note?`<span class="pill">${p.note}</span>`:''}</td>
+      <td class="l">${p.name}</td>
+      <td class="l" style="font-size:12px;color:#445">${esc(p.note||'')}</td>
       <td>${fmtOpen(p,a,fmtQty(p,a.opening))}</td>
       <td>${a.sumIn?fmtQty(p,a.sumIn):'-'}</td>
       <td>${a.sumOut?fmtQty(p,a.sumOut):'-'}</td>
