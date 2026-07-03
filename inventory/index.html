@@ -122,7 +122,8 @@
   <label>会社</label>
   <select id="company" onchange="render()"></select>
   <label>年月</label>
-  <select id="ym" onchange="render()"></select>
+  <select id="ymY" onchange="render()"></select>
+  <select id="ymM" onchange="render()"></select>
   <button id="closeBtn" onclick="closeMonth()" title="月末在庫を翌月の前月繰越（月初在庫）として確定します">この月を締める</button>
   <span id="closeBadge" class="muted"></span>
   <span class="muted" id="counts"></span>
@@ -192,19 +193,12 @@ function ingest(d){
 }
 function act(p){ return S.activity[p.company+'|'+p.name]||0; }
 
-/* ---------- 自動保存（共有フォルダのファイルにバインド時のみ） ---------- */
-let _saveTimer=null;
+/* ---------- 変更マーカー（自動保存は廃止：保存ボタンで書き出す） ---------- */
 function markDirty(){
-  if(!S.fileHandle){ return; }
-  $('status').textContent='…自動保存中';
-  clearTimeout(_saveTimer);
-  _saveTimer=setTimeout(async()=>{
-    try{ const wb=buildWorkbook(); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-      const w=await S.fileHandle.createWritable(); await w.write(out); await w.close();
-      $('status').textContent=(S.fileName||'')+' / 自動保存 ✓ '+new Date().toLocaleTimeString('ja-JP');
-    }catch(e){ $('status').textContent='自動保存エラー: '+e.message; }
-  }, 1500);
+  S.dirty=true;
+  $('status').textContent=(S.fileName||'')+' / ●未保存の変更あり（右上の「保存」で書き出し）';
 }
+window.addEventListener('beforeunload', e=>{ if(S.dirty){ e.preventDefault(); e.returnValue=''; } });
 function alertText(p,a){
   if(p.alert==null||p.alert==='') return '-';
   if(a.breach) return p.ordered? `${p.alert}以下・発注済` : `${p.alert}以下 ⚠ご発注`;
@@ -222,7 +216,7 @@ async function pickFile(){
       const [h] = await window.showOpenFilePicker({types:[{description:'Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});
       S.fileHandle=h; const f=await h.getFile(); S.fileName=f.name;
       // 書き込み権限をここで一度だけ要求（ファイル選択直後のユーザー操作扱いのうちに）
-      // →以後の自動保存で毎回「保存を許可しますか」と聞かれなくなる
+      // →保存時に毎回「保存を許可しますか」と聞かれなくなる
       try{ if(h.requestPermission) await h.requestPermission({mode:'readwrite'}); }catch(_){}
       await readXlsx(await f.arrayBuffer());
     }else{
@@ -372,8 +366,13 @@ function buildSelectors(){
   const comps=[...new Set(S.products.map(p=>p.company))];
   $('company').innerHTML = '<option value="all">両方（自社用）</option>' + comps.map(c=>`<option value="${c}">${c}</option>`).join('');
   const ms=months(); const cur = ms.includes('2026-06')?'2026-06':ms[ms.length-1];
-  $('ym').innerHTML = ms.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m.replace('-','年')}月</option>`).join('');
+  const years=[...new Set(ms.map(m=>m.slice(0,4)))];
+  $('ymY').innerHTML = years.map(y=>`<option value="${y}"${y===cur.slice(0,4)?' selected':''}>${y}年</option>`).join('');
+  $('ymM').innerHTML = Array.from({length:12},(_,i)=>{const mm=String(i+1).padStart(2,'0');
+    return `<option value="${mm}"${mm===cur.slice(5)?' selected':''}>${i+1}月</option>`;}).join('');
 }
+function curYm(){ return $('ymY').value+'-'+$('ymM').value; }
+function setYm(ym){ $('ymY').value=ym.slice(0,4); $('ymM').value=ym.slice(5); }
 
 /* ---------- qty helpers (pack mode) ---------- */
 function toUnits(p,v){ v=+v||0; const c=Math.floor(v+1e-9); const f=Math.round((v-c)*100); return c*(p.unitsPerCase||1)+f; }
@@ -440,7 +439,7 @@ function fmtOpen(p,a,txt){ return a.openingFixed? txt : '（'+txt+'）'; }
 /* ---------- 月締め ---------- */
 function closeMonth(){
   if(!S.products.length){ alert('先にデータを読み込んでください'); return; }
-  const ym=$('ym').value, ny=nextYm(ym);
+  const ym=curYm(), ny=nextYm(ym);
   const j=s=>s.replace('-','年')+'月';
   const re=isClosed(ym);
   if(!confirm(
@@ -451,7 +450,7 @@ function closeMonth(){
     '※棚卸を終えて、差異の調整を入力してから締めてください。')) return;
   S.products.forEach(p=>{ const a=aggregate(p,ym); S.periods[pkey(p.company,ny,p.name)]=a.end; });
   S.closed[ym]=new Date().toISOString().slice(0,10);
-  const sel=$('ym').value; buildSelectors(); $('ym').value=sel; // 翌月が選択肢に増える
+  const sel=curYm(); buildSelectors(); setYm(sel); // 翌月が選択肢に増える
   markDirty(); render();
   procUI.done(j(ym)+'を締めました', '月末在庫を'+j(ny)+'の前月繰越として確定しました');
 }
@@ -463,7 +462,7 @@ function sortProdsPlain(arr){ return arr.sort((a,b)=> (compIdx(a.company)-compId
 /* 印刷表示用の製品名整形（暫定。元Excel整理までの仮対応）: 全角【】→半角[]、名前に「倉庫」を含む場合は（倉庫）を重複付与しない */
 function pdispName(p){ const nm=(p.name||'').replace(/【/g,'[').replace(/】/g,']'); return nm + (p.isWarehouse && !/倉庫/.test(nm) ? '（倉庫）' : ''); }
 function curProducts(){
-  const c=$('company').value, ym=$('ym').value;
+  const c=$('company').value, ym=curYm();
   const hasData=p=> S.periods[pkey(p.company,ym,p.name)]!=null || S.movements.some(m=>m.company===p.company&&m.name===p.name&&m.ym===ym);
   // 有効な製品＋（廃止でもその月にデータがある製品＝履歴は消えない）
   return sortProds(S.products.filter(p=> (c==='all'||p.company===c) && (p.active!==false || hasData(p))));
@@ -472,7 +471,7 @@ function allProds(){ const c=$('company').value; return sortProds(S.products.fil
 function setTab(t){ S.tab=t; [...$('tabs').children].forEach(b=>b.classList.toggle('active',b.dataset.tab===t)); render(); }
 function render(){
   if(!S.products.length){ return; }
-  const ym=$('ym').value;
+  const ym=curYm();
   $('counts').textContent = '　'+curProducts().length+'品目';
   $('closeBadge').textContent = isClosed(ym)? '締め済み ✓ ('+S.closed[ym]+')' : '';
   $('closeBtn').textContent = isClosed(ym)? 'この月を締め直す' : 'この月を締める';
@@ -537,7 +536,7 @@ function clampInputDate(ym){
 function moveDay(delta){
   const d=new Date(S.inputDate); d.setDate(d.getDate()+delta);
   const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  if(ds.slice(0,7)===$('ym').value){ S.inputDate=ds; render(); }
+  if(ds.slice(0,7)===curYm()){ S.inputDate=ds; render(); }
 }
 function renderDayInput(ym){
   clampInputDate(ym);
@@ -755,7 +754,7 @@ function renderMaster(){
   let h=`<h2>製品マスタ（編集できます）</h2>
   <p class="hint">商品名・アラート・注記をその場で編集。<b>発注済</b>にチェックすると在庫一覧の「ご発注」催促が止まります（先方への二重催促を防止）。<br>
   <b>有効</b>を外す＝廃止（在庫一覧・日次入力から消えますが、過去の記録は残ります＝名前は消えません）。<br>
-  <b>シート並び順</b>＝記入シート（印刷・入力）の並び優先度（会社ごとに数字の小さい順／同じ数字は現状の順のまま）。${S.fileHandle?'編集は自動保存されます。':'保存は上の「保存（.xlsx）」で。'}</p>
+  <b>シート並び順</b>＝記入シート（印刷・入力）の並び優先度（会社ごとに数字の小さい順／同じ数字は現状の順のまま）。編集後は右上の「保存（.xlsx）」で書き出してください。</p>
   <button class="primary" onclick="addProduct()">＋ 製品を追加</button>
   <table style="margin-top:8px"><thead><tr>
    <th class="l">会社</th><th class="l">商品名</th><th>シート並び順</th><th>数え方</th><th>入り数</th><th>アラート</th><th>発注済</th><th class="l">注記</th><th>有効</th>
@@ -856,8 +855,9 @@ function buildPartnerSheet(co, ym){
 }
 async function genPartner(){
   if(!S.products.length){ alert('先にデータを読み込んでください'); return; }
-  const ym=$('ym').value, [yy,mm]=ym.split('-');
+  const ym=curYm(), [yy,mm]=ym.split('-');
   const comps=Object.keys(OFFICIAL); // 先方送付はピュアライフ/エコレイズのみ
+  if(!confirm(`${yy}年${+mm}月の先方報告Excelを作成します。\n会社ごとに${comps.length}ファイルがダウンロードされます。よろしいですか？`)) return;
   procUI.show('先方報告Excelを作成中…'); await yieldUI();
   try{
     let made=[];
@@ -898,10 +898,11 @@ async function save(){
     try{
       const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
       const w=await S.fileHandle.createWritable(); await w.write(out); await w.close();
-      alert('保存しました（同じ .xlsx に上書き）'); return;
+      S.dirty=false; setStatus(); alert('保存しました（同じ .xlsx に上書き）'); return;
     }catch(e){ /* fall through to download */ }
   }
   XLSX.writeFile(wb, '在庫データ.xlsx');
+  S.dirty=false; setStatus();
 }
 </script>
 </body>
