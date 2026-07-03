@@ -81,6 +81,11 @@
   .psheet .metarow td{ height:18px; line-height:14px; } /* 注記の有無で高さが変わらないよう固定 */
   .psheet tr.sat td{ background:#c9d6e8; } .psheet tr.sun td{ background:#f0cdd8; }
   .psheet .alertcell{ color:var(--warn); font-weight:700; }
+  /* 記入シート入力（画面用）: 印刷シートと同じ見た目に入力セルを重ねる */
+  .sheetin .psheet input{ width:100%; border:none; background:transparent; text-align:right; font:inherit; padding:0; box-sizing:border-box; }
+  .sheetin .psheet input.nt{ text-align:left; }
+  .sheetin .psheet input:focus{ background:#ffe98a; outline:2px solid var(--accent); outline-offset:-2px; }
+  .sheetin .psheet.cur .phead{ background:#dff0df; }
   @media print{
     header,.bar,nav,.noprint{ display:none !important; }
     main{ padding:0; }
@@ -121,6 +126,7 @@
 
 <nav id="tabs">
   <button data-tab="stock" class="active" onclick="setTab('stock')">在庫一覧</button>
+  <button data-tab="sheetin" onclick="setTab('sheetin')">記入シート入力</button>
   <button data-tab="dayin" onclick="setTab('dayin')">日次入力（全製品）</button>
   <button data-tab="ship" onclick="setTab('ship')">当月出荷数</button>
   <button data-tab="ledger" onclick="setTab('ledger')">製品別台帳</button>
@@ -425,6 +431,7 @@ function render(){
   const ym=$('ym').value;
   $('counts').textContent = '　'+curProducts().length+'品目';
   if(S.tab==='stock') renderStock(ym);
+  else if(S.tab==='sheetin') renderSheetInput(ym);
   else if(S.tab==='dayin') renderDayInput(ym);
   else if(S.tab==='ship') renderShip(ym);
   else if(S.tab==='ledger') renderLedger(ym);
@@ -601,6 +608,78 @@ function renderLedger(ym){
      <td class="${a.breach?'alert':''}">${fmtQty(p,a.end)}</td><td></td></tr></tfoot></table>`;
   $('view').innerHTML=h;
 }
+/* ---------- 記入シート入力（紙と同じ見た目で入力・Tab/Enterで次製品の同日セルへ） ---------- */
+function renderSheetInput(ym){
+  const c=$('company').value;
+  const prods=sortProdsPlain(S.products.filter(p=> (c==='all'||p.company===c) && p.active!==false));
+  const mNum=+ym.split('-')[1];
+  let blocks='';
+  prods.forEach((p,bi)=>{
+    const a=aggregate(p,ym);
+    let drows='';
+    a.rows.forEach(r=>{
+      const cls=r.dow===0?'sun':(r.dow===6?'sat':'');
+      const att=f=>`data-bi="${bi}" data-uid="${p.uid}" data-date="${r.date}" data-f="${f}"`;
+      drows+=`<tr class="${cls}"><td>${mNum}/${r.d}</td>
+        <td><input ${att('in')} value="${r.in??''}"></td>
+        <td><input ${att('out')} value="${r.out??''}"></td>
+        <td class="stk">${fmtQty(p,r.stock)}</td>
+        <td class="l"><input class="nt" ${att('note')} value="${esc(r.note)}"></td></tr>`;
+    });
+    const foot=`<tr class="tot"><td>合計</td><td class="sum-in">${a.sumIn||0}</td><td class="sum-out">${a.sumOut||0}</td><td class="carry sum-end">${fmtQty(p,a.end)}</td><td></td></tr>`;
+    const meta=`<tr class="metarow"><td colspan=5 class="l small">${(p.alert!=null&&p.alert!=='')?`<span class="${a.breach?'alertcell':''}">在庫アラート：${p.alert} 以下</span>`:''}${p.note?'　'+p.note:''}</td></tr>`;
+    blocks+=`<div class="psheet" data-uid="${p.uid}"><table>
+       <colgroup><col class="c-d"><col class="c-i"><col class="c-o"><col class="c-s"><col class="c-n"></colgroup>
+       <tr><th colspan=5 class="phead">${p.torihiki||p.company}　/　${pdispName(p)}</th></tr>
+       <tr class="colhead"><th>日付</th><th>入庫</th><th>出庫</th><th>在庫数</th><th class="l">備考</th></tr>
+       <tr><td colspan=3 class="l">前月繰越在庫数</td><td class="carry">${fmtQty(p,a.opening)}</td><td></td></tr>
+       ${drows}${foot}${meta}
+      </table></div>`;
+  });
+  $('view').innerHTML=`<div class="bar" style="padding-left:0;background:none;border:none">
+     <span class="muted">手元の記入シートと同じ並び（通常順）・有効な製品のみ。<b>Tab / Enter で次の製品の同じ日の同じ列へ</b>（Shift で戻る）。0を入力すると0と表示＝記入済みの印。空欄=未入力。</span>
+   </div>
+   <div class="print-wrap sheetin" style="grid-template-columns:repeat(3,minmax(0,1fr))">${blocks}</div>`;
+}
+/* 記入シート入力のイベントは文書レベルで1回だけ委譲登録（再描画で重複しない） */
+document.addEventListener('keydown', sheetNav);
+document.addEventListener('focusin', sheetFocus);
+document.addEventListener('change', e=>{ if(S.tab!=='sheetin') return;
+  const t=e.target; if(t.dataset&&t.dataset.uid&&t.dataset.f) editDaySheet(+t.dataset.uid, t.dataset.date, t.dataset.f, t.value); });
+function sheetNav(e){
+  if(S.tab!=='sheetin') return;
+  if(e.key!=='Enter'&&e.key!=='Tab') return;
+  const t=e.target; if(!t.dataset||!t.dataset.f) return;
+  e.preventDefault();
+  const bi=+t.dataset.bi+(e.shiftKey?-1:1);
+  const nxt=document.querySelector(`.sheetin input[data-f="${t.dataset.f}"][data-date="${t.dataset.date}"][data-bi="${bi}"]`);
+  if(nxt){ nxt.focus(); nxt.scrollIntoView({block:'center'}); }
+}
+function sheetFocus(e){
+  if(S.tab!=='sheetin') return;
+  const inp=e.target; if(!inp.matches||!inp.matches('.sheetin input')) return;
+  document.querySelectorAll('.psheet.cur').forEach(x=>x.classList.remove('cur'));
+  const b=inp.closest('.psheet'); if(b) b.classList.add('cur');
+  if(inp.select) inp.select();
+}
+function editDaySheet(uid,date,f,val){
+  const p=S.products.find(x=>x.uid===uid); if(!p) return;
+  const ym=date.slice(0,7);
+  let m=S.movements.find(x=>x.company===p.company&&x.name===p.name&&x.date===date);
+  if(!m){ m={company:p.company,name:p.name,date,ym,in:null,out:null,note:''}; S.movements.push(m); }
+  if(f==='note') m.note=val; else m[f]= val===''?null:(+val||0); // 空欄=null(未入力)、0=明示的な0(記入済)
+  markDirty();
+  // 全再描画するとフォーカスが飛ぶので、当該ブロックの在庫セルだけ更新
+  const el=document.querySelector(`.sheetin .psheet[data-uid="${uid}"]`); if(!el) return;
+  const a=aggregate(p,ym);
+  const stks=el.querySelectorAll('td.stk');
+  a.rows.forEach((r,i)=>{ if(stks[i]) stks[i].textContent=fmtQty(p,r.stock); });
+  const q=(s)=>el.querySelector(s);
+  if(q('.sum-in')) q('.sum-in').textContent=a.sumIn||0;
+  if(q('.sum-out')) q('.sum-out').textContent=a.sumOut||0;
+  if(q('.sum-end')) q('.sum-end').textContent=fmtQty(p,a.end);
+}
+
 function editDay(c,n,date,field,val){
   const ym=date.slice(0,7);
   let m=S.movements.find(x=>x.company===c&&x.name===n&&x.date===date);
