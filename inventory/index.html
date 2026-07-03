@@ -132,9 +132,7 @@
   <button data-tab="dayin" onclick="setTab('dayin')">日次入力（全製品）</button>
   <button data-tab="ship" onclick="setTab('ship')">当月出荷数</button>
   <button data-tab="ledger" onclick="setTab('ledger')">製品別台帳</button>
-  <button data-tab="print" onclick="setTab('print')">記入シート印刷(3列)</button>
-  <button data-tab="print3n" onclick="setTab('print3n')">記入シート印刷(通常順3列)</button>
-  <button data-tab="print4" onclick="setTab('print4')">記入シート印刷(4列)</button>
+  <button data-tab="print3n" onclick="setTab('print3n')">記入シート印刷</button>
   <button data-tab="master" onclick="setTab('master')">製品マスタ</button>
 </nav>
 
@@ -478,9 +476,7 @@ function render(){
   else if(S.tab==='dayin') renderDayInput(ym);
   else if(S.tab==='ship') renderShip(ym);
   else if(S.tab==='ledger') renderLedger(ym);
-  else if(S.tab==='print') renderPrintSheet(ym,3);
   else if(S.tab==='print3n') renderPrintSheet(ym,3,true);
-  else if(S.tab==='print4') renderPrintSheet(ym,4);
   else renderMaster();
 }
 
@@ -607,7 +603,8 @@ function renderShip(ym){
   const lines=txt.split('\n').length+1;
   let h=`<h2>当月出荷数（自社経理向け・${ymdisp}）</h2>
   <p class="hint">ピュアライフ・エコレイズを<b>合算</b>（請求はピュアライフ1本化）。<b>出荷0も表示</b>。倉庫品は除外。月は上のプルダウンで切替（前月も見られます）。<br>
-  ※これは<b>在庫の出庫ベース</b>。手数料の数え方（2ケース1梱包・セット按分・スティック件数等）はCSV突合で別途補正。</p>
+  ※これは<b>在庫の出庫ベース</b>の照合用。<b>報告メールにそのまま使わない</b>こと。<br>
+  出荷手数料の計算は<b>福山通運・ゆうパックの出荷実績</b>が本体：このマスタに載らない出荷（スティック等・在庫管理外）があり、複数ケースを1梱包にしたら<b>1件</b>と数える等の例外もある。→ 会社アカウントClaudeの「シークAI」プロジェクト（ナレッジ準拠）で計算する。</p>
   <div class="two">
    <div><table><thead><tr><th class="l">商品名</th><th>出荷数</th></tr></thead><tbody>${rows}</tbody></table></div>
    <div>
@@ -752,10 +749,10 @@ function renderMaster(){
   let h=`<h2>製品マスタ（編集できます）</h2>
   <p class="hint">商品名・アラート・注記をその場で編集。<b>発注済</b>にチェックすると在庫一覧の「ご発注」催促が止まります（先方への二重催促を防止）。<br>
   <b>有効</b>を外す＝廃止（在庫一覧・日次入力から消えますが、過去の記録は残ります＝名前は消えません）。<br>
-  <b>並び順</b>＝「記入シート印刷(通常順3列)」の並び（会社ごとに数字の小さい順／同じ数字は現状の順のまま）。${S.fileHandle?'編集は自動保存されます。':'保存は上の「保存（.xlsx）」で。'}</p>
+  <b>シート並び順</b>＝記入シート（印刷・入力）の並び優先度（会社ごとに数字の小さい順／同じ数字は現状の順のまま）。${S.fileHandle?'編集は自動保存されます。':'保存は上の「保存（.xlsx）」で。'}</p>
   <button class="primary" onclick="addProduct()">＋ 製品を追加</button>
   <table style="margin-top:8px"><thead><tr>
-   <th class="l">会社</th><th class="l">商品名</th><th>並び順</th><th>数え方</th><th>入り数</th><th>アラート</th><th>発注済</th><th class="l">注記</th><th>有効</th>
+   <th class="l">会社</th><th class="l">商品名</th><th>シート並び順</th><th>数え方</th><th>入り数</th><th>アラート</th><th>発注済</th><th class="l">注記</th><th>有効</th>
   </tr></thead><tbody>`;
   allProds().forEach(p=>{
     const u=p.uid, dim=p.active===false?' style="opacity:.5"':'';
