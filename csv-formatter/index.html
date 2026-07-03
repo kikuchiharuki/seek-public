@@ -1433,6 +1433,10 @@ document.getElementById('btnReset').addEventListener('click', resetAll);
 document.getElementById('shipDate').addEventListener('click', function() {
   try { this.showPicker(); } catch(_) {}
 });
+// 福山通運の休業日追加欄も同様に、ボックス全体クリックでカレンダーを開く
+document.getElementById('chInput').addEventListener('click', function() {
+  try { this.showPicker(); } catch(_) {}
+});
 // カレンダーで日付を選んだら（手入力確定でも）即反映。明日出荷ボタンと同じ挙動。
 // ※ プログラムからの .value 代入では change は発火しないので二重実行にならない。
 document.getElementById('shipDate').addEventListener('change', async function() {
@@ -1629,10 +1633,19 @@ function buildPrintPages(scale) {
   if (!src) return;
   src.style.zoom = '';  // 実測は等倍で行う
 
-  // 列幅（行削除列 .del-col は印刷で消えるので除外）
+  // 列幅（行削除列 .del-col は印刷で消えるので除外）。
+  // 各列をMath.ceilで切り上げると合計が実測の表幅より数px広がり、zoom後に印刷可能幅を
+  // わずかに超えて右端の罫線が見切れる原因になっていたため、端数は切り捨てずそのまま使う
+  // （最後の列だけ余りを吸収してぴったり合わせる）。
   const headRow = src.querySelector('thead tr') || src.querySelector('tr.col-head-row') || src.querySelector('tr');
   const headCells = headRow ? [...headRow.children].filter(c => !c.classList.contains('del-col')) : [];
-  const colW = headCells.map(c => Math.ceil(c.getBoundingClientRect().width));
+  const rawW = headCells.map(c => c.getBoundingClientRect().width);
+  const colW = rawW.map(w => Math.floor(w));
+  if (colW.length) {
+    const measuredTotal = rawW.reduce((s, w) => s + w, 0);
+    const flooredTotal = colW.reduce((s, w) => s + w, 0);
+    colW[colW.length - 1] += Math.max(0, Math.round(measuredTotal - flooredTotal));
+  }
 
   const H = tr => Math.max(1, tr.getBoundingClientRect().height) * scale * PRINT_PAGE.fudge;
 
@@ -1737,7 +1750,9 @@ window.addEventListener('beforeprint', () => {
   // 右スクロール状態でも左端から印刷されるようスクロールをリセット
   tableWrapper.scrollLeft = 0;
   table.style.zoom = '';
-  const printableWidthPx = (297 - 21 - 5) * 96 / 25.4;  // A4横297mm - 左余白21mm - 右余白5mm → px換算
+  // A4横297mm - 左余白21mm - 右余白5mm → px換算。border-collapseの罫線が右端で
+  // 見切れないよう2px分の余裕を引いておく
+  const printableWidthPx = (297 - 21 - 5) * 96 / 25.4 - 2;
   const scale = Math.min(1, printableWidthPx / table.scrollWidth);
   try {
     buildPrintPages(scale);  // 自前ページ分割（成功すれば body.paged-print で旧表を隠す）
@@ -3482,12 +3497,9 @@ function triggerAlritReply() {
     let h = '<h3>製品マスタ（荷送人・品名記事・梱包ルール）</h3>';
     h += '<p class="cfg-note">送り状CSV生成時に使用。製品名の表記ゆれ（＆/&）は自動で同一視されます。</p>';
     h += '<table class="cfg-table"><thead><tr>';
-    h += '<th>製品名</th><th>荷送人名</th><th>荷送人コード</th><th>品名記事1</th><th>品名記事2</th><th>品名記事3</th><th>まとめ梱包</th>';
+    h += '<th>製品名</th><th>荷送人名</th><th>荷送人コード</th><th>品名記事1</th><th>品名記事2</th><th>品名記事3</th><th>まとめ梱包</th><th>まとめ梱包の品名記事2</th>';
     h += '</tr></thead><tbody>';
     pm.forEach(p => {
-      const bundleLabel = p.まとめ梱包 === 1 ? 'なし（1:1）'
-        : `${p.まとめ梱包}ケース1梱包`;
-      const bundleClass = p.まとめ梱包 > 1 ? ' class="cfg-tag orange"' : '';
       h += '<tr>';
       h += `<td>${tags(p.製品名)}</td>`;
       h += `<td>${esc(p.荷送人名)}</td>`;
@@ -3495,13 +3507,13 @@ function triggerAlritReply() {
       h += `<td>${esc(p.品名記事1)}</td>`;
       h += `<td>${esc(p.品名記事2)}</td>`;
       h += `<td>${esc(p.品名記事3)}</td>`;
-      h += `<td><span${bundleLabel !== 'なし（1:1）' ? ' class="cfg-tag orange"' : ''}>${esc(bundleLabel)}</span>`;
-      if (p.まとめ梱包 > 1 && p.まとめ梱包の品名記事2) {
-        h += `<br><span style="font-size:11px;color:#888">品名記事2: ${esc(p.まとめ梱包の品名記事2)}</span>`;
-      }
-      h += '</td></tr>';
+      // マスタの生の値をそのまま表示（1=まとめない）。意味の説明は表の外に注記として出す
+      h += `<td${p.まとめ梱包 > 1 ? ' class="cfg-tag orange"' : ''}>${esc(p.まとめ梱包)}</td>`;
+      h += `<td>${esc(p.まとめ梱包の品名記事2 || '')}</td>`;
+      h += '</tr>';
     });
     h += '</tbody></table>';
+    h += '<p class="cfg-note">「まとめ梱包」は数値そのまま（マスタの値）: <b>1</b>=まとめない（1行=送り状1件）／<b>2以上</b>=そのケース数ずつ1梱包にまとめて送り状を分割し、まとめた行の品名記事2は「まとめ梱包の品名記事2」列の値に差し替わります。</p>';
 
     // 製品ルール（会社名変換）
     if (CONFIG.productRules.length) {
