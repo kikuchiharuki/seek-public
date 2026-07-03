@@ -241,7 +241,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   *:not(html):not(body) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { -webkit-print-color-adjust: economy !important; print-color-adjust: economy !important;
     background: #fff !important; background-color: #fff !important; }
-  .app-header, .drop-zone, .file-info, .raw-section,
+  .app-header, .drop-zone, .file-info, .raw-section, .carrier-holiday-bar,
   .preview-header, .toast, #invoiceSection, .del-col, .mail-overlay { display: none !important; }
   .container { max-width: none; padding: 0 !important; margin: 0 !important; }
   .preview-section { box-shadow: none !important; border: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; background: none !important; }
@@ -326,6 +326,33 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   }
   /* テーブル本体は既存 .data-table の印刷ルール(枠線/フォント/行高)をそのまま継承 */
 }
+
+/* ── 運送会社（福山通運）休業日バー ── */
+.carrier-holiday-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  background: #fff; border-radius: 8px; padding: 8px 14px; margin-top: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 13px;
+}
+.carrier-holiday-bar .ch-title { font-weight: 700; color: #2c3e50; white-space: nowrap; }
+.carrier-holiday-bar .ch-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.carrier-holiday-bar .ch-chip {
+  background: #fdecea; color: #c0392b; border: 1px solid #f5b7b1;
+  border-radius: 12px; padding: 1px 8px; white-space: nowrap;
+}
+.carrier-holiday-bar .ch-chip.past { background: #f4f4f4; color: #999; border-color: #ddd; }
+.carrier-holiday-bar .ch-chip button {
+  border: none; background: none; color: inherit; cursor: pointer;
+  font-size: 12px; padding: 0 0 0 4px; line-height: 1;
+}
+.carrier-holiday-bar .ch-none { color: #999; }
+.carrier-holiday-bar .ch-add { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.carrier-holiday-bar .ch-add input { padding: 2px 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+.carrier-holiday-bar .ch-add button {
+  background: #3498db; color: #fff; border: none; border-radius: 4px;
+  padding: 3px 10px; cursor: pointer; font-size: 13px;
+}
+.carrier-holiday-bar .ch-add button:hover { background: #2f89c5; }
+.carrier-holiday-bar .ch-updated { color: #888; font-size: 12px; white-space: nowrap; }
 
 /* Preview table */
 .preview-section {
@@ -583,6 +610,18 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
     </div>
     <div class="drop-zone-sub">CSV (.csv) / Excel (.xlsx, .xls) に対応 ｜ 複数ファイル同時OK（最大5ファイル）</div>
     <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple>
+  </div>
+
+  <!-- 運送会社（福山通運）の休業日設定。着日計算で非営業日扱いになる。
+       ブラウザ(localStorage)に保存され翌日も残る。消えたことに気付けるよう更新日を常時表示 -->
+  <div class="carrier-holiday-bar" id="chBar">
+    <span class="ch-title">🚚 福山通運の休業日</span>
+    <span class="ch-chips" id="chChips"></span>
+    <span class="ch-add">
+      <input type="date" id="chInput" aria-label="福山通運の休業日を追加">
+      <button id="chAdd">＋追加</button>
+      <span class="ch-updated" id="chUpdated"></span>
+    </span>
   </div>
 
   <!-- 元データ + 変換ボタン -->
@@ -1106,6 +1145,75 @@ const holidaysReady = (async () => {
   updateNextBizButton();  // 祝日読込後に翌営業日ボタンのラベルを確定
 })();
 
+// ── 運送会社（福山通運）の休業日 ─────────────────────────
+// 自社の休みは着日に影響しない（出荷日は自分たちで選ぶ・出荷後は運送会社の都合）が、
+// 運送会社が休みの日には届かないため、着日計算(calcArrival)で土日祝と同様にスキップする。
+// 出荷日側（翌営業日ボタン等）には影響させない。
+// localStorageに永続保存。消えたことに気付けるよう更新日時を常時表示する。
+const CH_STORE_KEY = 'fukuyamaHolidays';
+let CARRIER_HOLIDAYS = new Set();
+let carrierHolidaysUpdated = '';
+
+function loadCarrierHolidays() {
+  try {
+    const j = JSON.parse(localStorage.getItem(CH_STORE_KEY) || '{}');
+    CARRIER_HOLIDAYS = new Set(Array.isArray(j.dates) ? j.dates : []);
+    carrierHolidaysUpdated = j.updated || '';
+  } catch (e) { CARRIER_HOLIDAYS = new Set(); carrierHolidaysUpdated = ''; }
+}
+function saveCarrierHolidays() {
+  const n = new Date();
+  carrierHolidaysUpdated = `${fmtSlash(n)} ${n.getHours()}:${String(n.getMinutes()).padStart(2, '0')}`;
+  localStorage.setItem(CH_STORE_KEY, JSON.stringify({ dates: [...CARRIER_HOLIDAYS].sort(), updated: carrierHolidaysUpdated }));
+}
+function renderCarrierHolidays() {
+  const chips = document.getElementById('chChips');
+  const dates = [...CARRIER_HOLIDAYS].sort();
+  const todayIso = fmtIso(new Date());
+  chips.innerHTML = dates.length ? '' : '<span class="ch-none">登録なし（土日祝のみで着日計算）</span>';
+  dates.forEach(iso => {
+    const d = parseYmd(iso);
+    const chip = document.createElement('span');
+    chip.className = 'ch-chip' + (iso < todayIso ? ' past' : '');
+    chip.textContent = `${d.getMonth() + 1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})`;
+    const x = document.createElement('button');
+    x.textContent = '✕';
+    x.title = `${fmtSlash(d)} を休業日から削除`;
+    x.addEventListener('click', () => {
+      CARRIER_HOLIDAYS.delete(iso);
+      saveCarrierHolidays();
+      renderCarrierHolidays();
+      recalcAfterCarrierChange(`福山通運の休業日 ${fmtSlash(d)} を削除しました`);
+    });
+    chip.appendChild(x);
+    chips.appendChild(chip);
+  });
+  document.getElementById('chUpdated').textContent =
+    carrierHolidaysUpdated ? `更新: ${carrierHolidaysUpdated}` : '（未設定）';
+}
+// 休業日の追加/削除後: 変換済みで出荷日も入っていれば納期チェックを自動でやり直す
+async function recalcAfterCarrierChange(msg) {
+  const v = document.getElementById('shipDate').value;
+  if (processedFiles.length && v) {
+    showToast(`${msg} — 着日を再計算します`, 'success');
+    await applyShipDateAndRender(v);
+  } else {
+    showToast(msg, 'success');
+  }
+}
+document.getElementById('chAdd').addEventListener('click', () => {
+  const v = document.getElementById('chInput').value;
+  if (!v) { showToast('追加する日付をカレンダーで選んでください', 'error'); return; }
+  if (CARRIER_HOLIDAYS.has(v)) { showToast('その日付は登録済みです', 'error'); return; }
+  CARRIER_HOLIDAYS.add(v);
+  saveCarrierHolidays();
+  renderCarrierHolidays();
+  document.getElementById('chInput').value = '';
+  recalcAfterCarrierChange(`福山通運の休業日 ${fmtSlash(parseYmd(v))} を追加しました`);
+});
+loadCarrierHolidays();
+renderCarrierHolidays();
+
 // 翌営業日（今日から数えて最初の平日・非祝日）。
 // skipped=true は明日が土日祝で飛ばした場合＝「休み明け」。今日はPCの現在日付(new Date())基準。
 function nextBizDay() {
@@ -1168,7 +1276,7 @@ function findLeadTime(pref, address) {
   return null;
 }
 
-// 着日計算: カレンダー日で加算し、着日が非営業日なら翌営業日へ
+// 着日計算: カレンダー日で加算し、着日が非営業日または福山通運の休業日なら翌営業日へ
 function calcArrival(shipDate, ltCode) {
   const m = String(ltCode).match(/^(\d+)(AM|PM)?$/);
   if (!m) return null;
@@ -1177,7 +1285,7 @@ function calcArrival(shipDate, ltCode) {
   const a = parseYmd(shipDate);
   if (!a) return null;
   a.setDate(a.getDate() + parseInt(m[1]));
-  while (isNonBiz(a)) a.setDate(a.getDate() + 1);
+  while (isNonBiz(a) || CARRIER_HOLIDAYS.has(fmtIso(a))) a.setDate(a.getDate() + 1);
   return a;
 }
 
