@@ -842,9 +842,10 @@ function buildPartnerSheet(co, ym){
     putF(42,11,`SUM(${L(10)}41)`);
     if(p.alert!=null&&p.alert!=='') putF(42,15,`IF(${L(10)}42<${L(10)}45,"ご発注ください","")`); // アラート無し(K45空文字)だと数値<文字列=常に真になるため
     put(43,5,'入庫総数'); put(43,8,'出庫総数'); put(43,11,'次月繰越');
-    if(p.note){ put(44,1,p.note); merges.push({s:{r:43,c:off},e:{r:43,c:off+18}}); } // 長い注記が収まるようA44:S44結合
+    if(p.note) put(44,1,p.note);
+    merges.push({s:{r:43,c:off},e:{r:43,c:off+18}}); // 注記行はA44:S44結合(テンプレ由来の行44結合は下でスキップ=重複するとExcelが修復ダイアログを出す)
     put(45,8,'在庫アラート ：'); if(p.alert!=null&&p.alert!=='') put(45,11,+p.alert); put(45,13,'以下');
-    T.merges.forEach(([r1,c1,r2,c2])=> merges.push({s:{r:r1-1,c:off+c1-1},e:{r:r2-1,c:off+c2-1}}));
+    T.merges.forEach(([r1,c1,r2,c2])=>{ if(r1===44) return; merges.push({s:{r:r1-1,c:off+c1-1},e:{r:r2-1,c:off+c2-1}}); });
   });
   // 先頭ブロック＝当月末在庫一覧（各製品ブロックの次月繰越セルを数式参照）
   {
@@ -860,10 +861,9 @@ function buildPartnerSheet(co, ym){
     span(4,1,10,stHead);  ws[A(4,1)]={v:'商品名',t:'s',s:stHead};
     span(4,11,14,stHead); ws[A(4,11)]={v:'月末在庫',t:'s',s:stHead};
     items.forEach((x,bi)=>{
-      const r=4+1+bi, kcol=XLSX.utils.encode_col((bi+1)*STRIDE+10);
+      const r=4+1+bi;
       span(r,1,10,stName); ws[A(r,1)]={v:x.p.name,t:'s',s:stName};
-      const sq=x.p.mode==='pack'? {...stQty,numFmt:PACKFMT} : stQty;
-      span(r,11,14,sq);    ws[A(r,11)]={t:'n',f:`${kcol}42`,s:sq};
+      span(r,11,14,stQty); ws[A(r,11)]={v:fmtQty(x.p,x.a.end),t:'s',s:stQty};
     });
   }
   const totCols=(items.length+1)*STRIDE;
