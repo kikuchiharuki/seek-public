@@ -1524,7 +1524,9 @@ function buildPrintPages(scale) {
       const headerRows = trs.filter(tr => tr.classList.contains('file-sep-row') || tr.classList.contains('col-head-row'));
       const colHead = trs.find(tr => tr.classList.contains('col-head-row')) || null;
       const dataRows = trs.filter(tr => !tr.classList.contains('file-sep-row') && !tr.classList.contains('col-head-row'));
-      groups.push({ headerRows, colHead, dataRows });
+      // 製品間の空白行（画面ではdisplay:none）。同一ページ内で前の製品に続く場合のみ挿入する
+      const blankRow = tb.querySelector('tr.print-blank-row') || null;
+      groups.push({ headerRows, colHead, dataRows, blankRow });
     });
   } else {
     // 単一ファイル: thead の列名行を各ページ先頭に繰り返す
@@ -1540,11 +1542,15 @@ function buildPrintPages(scale) {
   const place = tr => { pages[i].push(tr); cur += H(tr); };
   const newPage = () => { pages.push([]); i++; cur = 0; };
 
+  // 製品間の空白行は画面でdisplay:noneのため実測できない（印刷時は29px）。scale込みで固定見積り
+  const blankH = 29 * scale * PRINT_PAGE.fudge;
   for (const g of groups) {
     const startH = g.headerRows.reduce((s, tr) => s + H(tr), 0);
     const firstDataH = g.dataRows.length ? H(g.dataRows[0]) : 0;
-    // 製品の先頭(見出し+最初の1行)が今のページに入らないなら、製品ごと次ページへ
-    if (cur > 0 && cur + startH + firstDataH > budgetFor(i)) newPage();
+    // 製品の先頭(空白行+見出し+最初の1行)が今のページに入らないなら、製品ごと次ページへ
+    if (cur > 0 && cur + blankH + startH + firstDataH > budgetFor(i)) newPage();
+    // ページ途中から始まる製品の前には空白行を入れる（従来印刷のファイル間空白を維持）
+    if (cur > 0 && g.blankRow) { pages[i].push(g.blankRow); cur += blankH; }
     g.headerRows.forEach(place);
     for (let d = 0; d < g.dataRows.length; d++) {
       const dh = H(g.dataRows[d]);
