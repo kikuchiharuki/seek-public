@@ -1154,32 +1154,45 @@ const CH_STORE_KEY = 'fukuyamaHolidays';
 let CARRIER_HOLIDAYS = new Set();
 let carrierHolidaysUpdated = '';
 
+// 過去日は無期限に蓄積させない。今日から30日より前の日付は自動で捨てる
+// （着日計算は「今日以降」しか意味を持たないため、古い登録が消えても実害はない）
+function pruneOldCarrierHolidays() {
+  const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0); cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffIso = fmtIso(cutoff);
+  let pruned = false;
+  for (const iso of CARRIER_HOLIDAYS) { if (iso < cutoffIso) { CARRIER_HOLIDAYS.delete(iso); pruned = true; } }
+  return pruned;
+}
 function loadCarrierHolidays() {
   try {
     const j = JSON.parse(localStorage.getItem(CH_STORE_KEY) || '{}');
     CARRIER_HOLIDAYS = new Set(Array.isArray(j.dates) ? j.dates : []);
     carrierHolidaysUpdated = j.updated || '';
   } catch (e) { CARRIER_HOLIDAYS = new Set(); carrierHolidaysUpdated = ''; }
+  if (pruneOldCarrierHolidays()) saveCarrierHolidays(false);  // 削除があれば保存し直す（updatedは更新しない）
 }
-function saveCarrierHolidays() {
-  const n = new Date();
-  carrierHolidaysUpdated = `${fmtSlash(n)} ${n.getHours()}:${String(n.getMinutes()).padStart(2, '0')}`;
+function saveCarrierHolidays(touchUpdated = true) {
+  if (touchUpdated) {
+    const n = new Date();
+    carrierHolidaysUpdated = `${fmtSlash(n)} ${n.getHours()}:${String(n.getMinutes()).padStart(2, '0')}`;
+  }
   localStorage.setItem(CH_STORE_KEY, JSON.stringify({ dates: [...CARRIER_HOLIDAYS].sort(), updated: carrierHolidaysUpdated }));
 }
 function renderCarrierHolidays() {
   const chips = document.getElementById('chChips');
   const dates = [...CARRIER_HOLIDAYS].sort();
   const todayIso = fmtIso(new Date());
-  chips.innerHTML = dates.length ? '' : '<span class="ch-none">登録なし（土日祝のみで着日計算）</span>';
+  chips.innerHTML = dates.length ? '' : '<span class="ch-none">登録なし</span>';
   dates.forEach(iso => {
     const d = parseYmd(iso);
     const chip = document.createElement('span');
     chip.className = 'ch-chip' + (iso < todayIso ? ' past' : '');
-    chip.textContent = `${d.getMonth() + 1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})`;
+    chip.textContent = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})`;
     const x = document.createElement('button');
     x.textContent = '✕';
     x.title = `${fmtSlash(d)} を休業日から削除`;
     x.addEventListener('click', () => {
+      if (!confirm(`福山通運の休業日から ${fmtSlash(d)} を削除しますか？`)) return;
       CARRIER_HOLIDAYS.delete(iso);
       saveCarrierHolidays();
       renderCarrierHolidays();
