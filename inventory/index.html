@@ -800,7 +800,7 @@ function buildPartnerSheet(co, ym){
   const ws={};
   const merges=[];
   items.forEach((x,bi)=>{
-    const {p,a}=x, off=bi*STRIDE;
+    const {p,a}=x, off=(bi+1)*STRIDE; // 先頭ブロックは月末在庫一覧
     const L=c0=>XLSX.utils.encode_col(off+c0);           // ブロック内0始まり列→絶対列レター
     const ad=(r,c1)=>XLSX.utils.encode_cell({r:r-1,c:off+c1-1}); // 1始まり(行,ブロック内列)
     // 書式：全セルにテンプレのスタイル。日次行(11..41)の塗りは月に合わせ週末色を掛け直す
@@ -814,13 +814,12 @@ function buildPartnerSheet(co, ym){
       }
       // パック品(ケース.本の擬似小数)は繰越M5と在庫列K10..K42を小数2桁に（元Excelと同じ）
       if(p.mode==='pack' && ((c===13&&r===5) || (c===11&&r>=10&&r<=42))) s={...s, numFmt:PACKFMT};
-      ws[ad(r,c)]={v:'', t:'s', s};
+      ws[ad(r,c)]={v:'', t:'s', s}; // 空文字+スタイル（値なしのスタブは書き出しで落ちて罫線が消える）
     }
     const put=(r,c,v)=>{ if(v==null||v==='')return; const a2=ad(r,c); ws[a2]={...ws[a2], v, t:(typeof v==='number'?'n':'s')}; };
     const putF=(r,c,f)=>{ const a2=ad(r,c); const w=ws[a2]={...ws[a2], t:'n', f}; delete w.v; }; // キャッシュ値なし=Excelが開いた時に計算
     // 固定ラベル
     put(1,1,'在庫管理表'); put(1,6,`${yy}年${m}月`);
-    put(2,11,'№'); put(2,12,String(bi+1));
     put(4,1,'取引先'); put(4,5,'商品名'); put(4,13,'前月繰越在庫数');
     put(5,1,p.torihiki); put(5,5,p.name); put(5,13,a.opening);
     put(8,1,'年月日'); put(8,5,'入庫'); put(8,8,'出庫'); put(8,11,'在庫数'); put(8,15,'備考');
@@ -828,7 +827,7 @@ function buildPartnerSheet(co, ym){
     // 在庫数式（元Excelと同じ =SUM(...) 形式。撤退後もExcel単体で回る保険）
     putF(10,11,`SUM(${L(12)}5)`);
     for(let r=11;r<=41;r++){
-      putF(r,11,`SUM(${L(10)}${r-1}+${L(4)}${r}-${L(7)}${r})`);
+      putF(r,11,`SUM(${L(10)}${r-1},${L(4)}${r})-SUM(${L(7)}${r})`); // 参照引数のSUMは空文字セルを無視する(算術+だと#VALUE!)
       const d=r-10;
       if(d<=dim){
         put(r,1,`${yy}/${m}/${d}`);
@@ -841,15 +840,36 @@ function buildPartnerSheet(co, ym){
     putF(42,5,`SUM(${L(4)}11:${L(6)}41)`);
     putF(42,8,`SUM(${L(7)}11:${L(9)}41)`);
     putF(42,11,`SUM(${L(10)}41)`);
-    putF(42,15,`IF(${L(10)}42<${L(10)}45,"ご発注ください","")`);
+    if(p.alert!=null&&p.alert!=='') putF(42,15,`IF(${L(10)}42<${L(10)}45,"ご発注ください","")`); // アラート無し(K45空文字)だと数値<文字列=常に真になるため
     put(43,5,'入庫総数'); put(43,8,'出庫総数'); put(43,11,'次月繰越');
-    if(p.note) put(44,1,p.note);
+    if(p.note){ put(44,1,p.note); merges.push({s:{r:43,c:off},e:{r:43,c:off+18}}); } // 長い注記が収まるようA44:S44結合
     put(45,8,'在庫アラート ：'); if(p.alert!=null&&p.alert!=='') put(45,11,+p.alert); put(45,13,'以下');
     T.merges.forEach(([r1,c1,r2,c2])=> merges.push({s:{r:r1-1,c:off+c1-1},e:{r:r2-1,c:off+c2-1}}));
   });
-  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:T.rows-1,c:items.length*STRIDE-1}});
+  // 先頭ブロック＝当月末在庫一覧（各製品ブロックの次月繰越セルを数式参照）
+  {
+    const bd={top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}};
+    const F={name:'ＭＳ Ｐゴシック',sz:11};
+    const stTitle={font:{...F,sz:14,bold:true},alignment:{horizontal:'center',vertical:'center'}};
+    const stHead={font:{...F,bold:true},alignment:{horizontal:'center',vertical:'center'},border:bd,fill:{patternType:'solid',fgColor:{rgb:'CCFFCC'}}};
+    const stName={font:F,alignment:{horizontal:'left',vertical:'center'},border:bd};
+    const stQty={font:F,alignment:{horizontal:'center',vertical:'center'},border:bd,numFmt:'#,##0_ '};
+    const A=(r,c1)=>XLSX.utils.encode_cell({r:r-1,c:c1-1});
+    const span=(r,c1,c2,st)=>{ for(let c=c1;c<=c2;c++) ws[A(r,c)]={v:'',t:'s',s:st}; merges.push({s:{r:r-1,c:c1-1},e:{r:r-1,c:c2-1}}); };
+    span(2,1,14,stTitle); ws[A(2,1)]={v:`${yy}年${m}月末　在庫一覧`,t:'s',s:stTitle};
+    span(4,1,10,stHead);  ws[A(4,1)]={v:'商品名',t:'s',s:stHead};
+    span(4,11,14,stHead); ws[A(4,11)]={v:'月末在庫',t:'s',s:stHead};
+    items.forEach((x,bi)=>{
+      const r=4+1+bi, kcol=XLSX.utils.encode_col((bi+1)*STRIDE+10);
+      span(r,1,10,stName); ws[A(r,1)]={v:x.p.name,t:'s',s:stName};
+      const sq=x.p.mode==='pack'? {...stQty,numFmt:PACKFMT} : stQty;
+      span(r,11,14,sq);    ws[A(r,11)]={t:'n',f:`${kcol}42`,s:sq};
+    });
+  }
+  const totCols=(items.length+1)*STRIDE;
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(T.rows,5+items.length)-1,c:totCols-1}});
   ws['!merges']=merges;
-  ws['!cols']=Array.from({length:items.length*STRIDE},(_,i)=>({wch:T.widths[i%STRIDE]??2.625}));
+  ws['!cols']=Array.from({length:totCols},(_,i)=>({wch:T.widths[i%STRIDE]??2.625}));
   ws['!rows']=Array.from({length:T.rows},(_,i)=>({hpt:T.heights[i+1]||13.5}));
   return ws;
 }
