@@ -921,9 +921,10 @@ const CONFIG = {
   addressLookup: {
     enabled: true,
     proxyUrl: 'https://excelapi-proxy.bhk565haru.workers.dev/lookup',
-    requestIntervalMs: 200,   // ExcelAPI負荷軽減（元Excel版と同じ間隔）
+    requestIntervalMs: 500,   // ExcelAPI負荷軽減（連射すると応答を止められるため広め）
     maxRetries: 3,            // 取得失敗時のリトライ回数（元Excel版と同じ）
-    retryWaitMs: 500,         // リトライ間の待機
+    retryWaitMs: 2000,        // リトライ間の待機（制限回避のため広め）
+    timeoutMs: 45000,         // 1回あたりの打ち切り時間（Worker側最悪40秒+余裕）
   },
 
   // ──────────────────────────────────────────────
@@ -1317,7 +1318,8 @@ async function fetchZipcode(pref, address) {
   const kw = zipKeyword(address);
   if (!kw) return '';
   try {
-    const r = await fetch(CONFIG.zipcode.apiUrl + encodeURIComponent(kw));
+    const r = await fetch(CONFIG.zipcode.apiUrl + encodeURIComponent(kw),
+      { signal: AbortSignal.timeout(10000) });  // 応答が来ないとき固まらないよう打ち切り
     if (!r.ok) return '';
     const json = await r.json();
     const locs = json?.response?.location;
@@ -1971,7 +1973,8 @@ async function fetchAddressLookup(address, currentZip) {
     + (currentZip ? '&zipcode=' + encodeURIComponent(currentZip) : '');
   for (let attempt = 0; attempt < cfg.maxRetries; attempt++) {
     try {
-      const res = await fetch(url);
+      // タイムアウトなしだと上流が黙ったとき数分単位で固まるため、必ず打ち切る
+      const res = await fetch(url, { signal: AbortSignal.timeout(cfg.timeoutMs) });
       if (res.ok) {
         const json = await res.json();
         // parts のいずれかが取れていればOK（zipcode は既知の場合 currentZip エコー）
@@ -3024,7 +3027,12 @@ async function runConversion() {
             const z = String(res.zipcode).replace(/[^\d]/g, '');
             if (z.length === 7) { r.postalCode = z.slice(0, 3) + '-' + z.slice(3); totalStats.zipFilled++; zipOk++; }
           }
-          if (Array.isArray(res.parts) && res.parts.some(p => p)) { r._addrParts = res.parts; partsOk++; }
+          // ExcelAPIは負荷時に一部だけ欠けた分割（都道府県や番地が空）を返すことがある。
+          // 欠けた結果を採用すると送り状から県名・番地が消えるため、4要素完全な時のみ採用
+          // （不完全なら従来の 住所1=都道府県/住所2=合算住所 にフォールバック＝情報欠落なし）
+          if (Array.isArray(res.parts) && res.parts.length === 4 && res.parts.every(p => p)) {
+            r._addrParts = res.parts; partsOk++;
+          }
         }
         await sleep(lkCfg.requestIntervalMs);
       }
