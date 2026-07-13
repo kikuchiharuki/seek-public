@@ -1988,6 +1988,16 @@ async function fetchAddressLookup(address, currentZip) {
 
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 
+// ExcelAPIは負荷時に一部だけ欠けた分割（都道府県や番地が空）を返すことがある。
+// 欠けた結果を採用すると送り状から県名・番地が消えるため、4要素完全な時のみ採用する。
+// （不完全なら従来の 住所1=都道府県/住所2=合算住所 にフォールバック＝情報欠落なし）
+const isCompleteParts = parts =>
+  Array.isArray(parts) && parts.length === 4 && parts.every(p => p);
+
+// 処理中ステータスに出す宛先の短い表示名（会社名の末尾行=店名を優先）
+const rowDispName = r =>
+  ((r.companyName || '').split('\n').pop() || r.address || '').trim().slice(0, 12);
+
 // 全角文字数カウント（半角=0.5）。送り状ソフトの全角20文字制限チェック用
 function zenkakuLen(s) {
   let n = 0;
@@ -2081,22 +2091,29 @@ document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
   if (lkCfg.enabled && lkCfg.proxyUrl) {
     const lookupTargets = targetRows.filter(r => !r._addrParts && (r.address || r.prefecture));
     if (lookupTargets.length) {
-      showToast(`住所を分割中... (${lookupTargets.length}件)`, '');
-      let ok = 0;
-      for (const r of lookupTargets) {
-        // 住所セルに建物名が混入していても合算で投げる（元Excelと同じ思想）
-        const full = (r.prefecture || '') + (r.address || '');
-        const res = await fetchAddressLookup(full, r.postalCode);
-        if (res) {
-          r._addrParts = res.parts;
-          // 郵便番号が空ならExcelAPI側の結果で埋める（2段階目フォールバック）
-          if (!r.postalCode && res.zipcode) {
-            const z = String(res.zipcode).replace(/[^\d]/g, '');
-            if (z.length === 7) r.postalCode = z.slice(0, 3) + '-' + z.slice(3);
+      procUI.show();  // 変換と同じ全画面ぐるぐるで進捗表示＋誤操作ブロック
+      let ok = 0, i = 0;
+      try {
+        const p = procUI.line('住所分割中 (ExcelAPI)');
+        for (const r of lookupTargets) {
+          p.set(`${++i}/${lookupTargets.length}件 ${rowDispName(r)}`);
+          // 住所セルに建物名が混入していても合算で投げる（元Excelと同じ思想）
+          const full = (r.prefecture || '') + (r.address || '');
+          const res = await fetchAddressLookup(full, r.postalCode);
+          if (res) {
+            if (isCompleteParts(res.parts)) { r._addrParts = res.parts; ok++; }
+            // 郵便番号が空ならExcelAPI側の結果で埋める（2段階目フォールバック）
+            if (!r.postalCode && res.zipcode) {
+              const z = String(res.zipcode).replace(/[^\d]/g, '');
+              if (z.length === 7) r.postalCode = z.slice(0, 3) + '-' + z.slice(3);
+            }
           }
-          ok++;
+          await sleep(lkCfg.requestIntervalMs);
         }
-        await sleep(lkCfg.requestIntervalMs);
+        p.done();
+        procUI.line(`住所分割 ${ok}/${lookupTargets.length}件（未取得行は従来形式）`).done();
+      } finally {
+        procUI.hide();
       }
       if (ok < lookupTargets.length) {
         showToast(`住所分割: ${ok}/${lookupTargets.length}件成功（未取得行は従来形式）`, '');
@@ -3000,7 +3017,7 @@ async function runConversion() {
       const p = procUI.line('郵便番号を取得中 (HeartRails)');
       let i = 0;
       for (const r of targets) {
-        p.set(`${++i}/${targets.length}件`);  // 件数だけリアルタイム更新
+        p.set(`${++i}/${targets.length}件 ${rowDispName(r)}`);  // 件数+処理中の宛先
         const zip = await fetchZipcode(r.prefecture, r.address);
         if (zip) { r.postalCode = zip; totalStats.zipFilled++; }
         await new Promise(res => setTimeout(res, CONFIG.zipcode.requestIntervalMs));
@@ -3019,7 +3036,7 @@ async function runConversion() {
       const p = procUI.line('住所処理中 (ExcelAPI)');
       let zipOk = 0, partsOk = 0, i = 0;
       for (const r of exTargets) {
-        p.set(`${++i}/${exTargets.length}件`);  // 件数だけリアルタイム更新
+        p.set(`${++i}/${exTargets.length}件 ${rowDispName(r)}`);  // 件数+処理中の宛先
         const full = (r.prefecture || '') + (r.address || '');
         const res = await fetchAddressLookup(full, r.postalCode);
         if (res) {
@@ -3027,12 +3044,7 @@ async function runConversion() {
             const z = String(res.zipcode).replace(/[^\d]/g, '');
             if (z.length === 7) { r.postalCode = z.slice(0, 3) + '-' + z.slice(3); totalStats.zipFilled++; zipOk++; }
           }
-          // ExcelAPIは負荷時に一部だけ欠けた分割（都道府県や番地が空）を返すことがある。
-          // 欠けた結果を採用すると送り状から県名・番地が消えるため、4要素完全な時のみ採用
-          // （不完全なら従来の 住所1=都道府県/住所2=合算住所 にフォールバック＝情報欠落なし）
-          if (Array.isArray(res.parts) && res.parts.length === 4 && res.parts.every(p => p)) {
-            r._addrParts = res.parts; partsOk++;
-          }
+          if (isCompleteParts(res.parts)) { r._addrParts = res.parts; partsOk++; }
         }
         await sleep(lkCfg.requestIntervalMs);
       }
