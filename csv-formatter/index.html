@@ -242,7 +242,8 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   html, body { -webkit-print-color-adjust: economy !important; print-color-adjust: economy !important;
     background: #fff !important; background-color: #fff !important; }
   .app-header, .drop-zone, .file-info, .raw-section, .carrier-holiday-bar,
-  .preview-header, .toast, #invoiceSection, .del-col, .mail-overlay { display: none !important; }
+  .preview-header, .toast, #invoiceSection, .del-col, .mail-overlay,
+  #applyPop { display: none !important; }
   .container { max-width: none; padding: 0 !important; margin: 0 !important; }
   .preview-section { box-shadow: none !important; border: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; background: none !important; }
   .print-only { display: block !important; margin: 0 !important; padding: 0 !important; }
@@ -1636,8 +1637,8 @@ function teardownPrintPages() {
   document.body.classList.remove('paged-print');
 }
 
-// scale: 列をA4横1ページ幅に収めるzoom倍率
-function buildPrintPages(scale) {
+// printableWidthPx: A4横の印刷可能幅(px)。zoom倍率は印刷に出す列の実幅合計から算出する
+function buildPrintPages(printableWidthPx) {
   teardownPrintPages();
   const src = tableWrapper.querySelector('table.data-table');
   if (!src) return;
@@ -1656,6 +1657,11 @@ function buildPrintPages(scale) {
     const flooredTotal = colW.reduce((s, w) => s + w, 0);
     colW[colW.length - 1] += Math.max(0, Math.round(measuredTotal - flooredTotal));
   }
+
+  // 倍率は「印刷に出す列だけ」の合計幅から求める。画面の表幅(scrollWidth)には印刷で
+  // 消える削除ボタン列が含まれており、それを基準にすると1列ぶん余計に縮小されてしまう。
+  const totalW = colW.reduce((s2, w) => s2 + w, 0);
+  const scale = totalW > 0 ? Math.min(1, printableWidthPx / totalW) : 1;
 
   const H = tr => Math.max(1, tr.getBoundingClientRect().height) * scale * PRINT_PAGE.fudge;
 
@@ -1732,6 +1738,9 @@ function buildPrintPages(scale) {
     tbl.className = 'data-table';
     tbl.style.zoom = scale;
     tbl.style.tableLayout = 'fixed';
+    // width:100%（.data-table既定）のままだと余りが各列に配分されて実測幅からズレるため、
+    // 実測幅の合計をそのまま表幅にする
+    tbl.style.width = totalW + 'px';
     const cg = document.createElement('colgroup');
     colW.forEach(w => { const c = document.createElement('col'); c.style.width = w + 'px'; cg.appendChild(c); });
     tbl.appendChild(cg);
@@ -1739,6 +1748,14 @@ function buildPrintPages(scale) {
     rows.forEach(tr => {
       const clone = tr.cloneNode(true);
       const del = clone.querySelector('.del-col'); if (del) del.remove();
+      // ファイル名行・空白行の colspan は画面用（削除ボタン列を含む列数）。印刷では
+      // 削除列を消すため colspan が実列数を1つ超え、table-layout:fixed 下で
+      // 幽霊列が1本生まれて列名と内容の桁がズレる。実列数に丸めておく。
+      if (colW.length) {
+        clone.querySelectorAll('[colspan]').forEach(c => {
+          if (Number(c.getAttribute('colspan')) > colW.length) c.setAttribute('colspan', colW.length);
+        });
+      }
       tb.appendChild(clone);
     });
     tbl.appendChild(tb);
@@ -1763,13 +1780,12 @@ window.addEventListener('beforeprint', () => {
   // A4横297mm - 左余白21mm - 右余白5mm → px換算。border-collapseの罫線が右端で
   // 見切れないよう2px分の余裕を引いておく
   const printableWidthPx = (297 - 21 - 5) * 96 / 25.4 - 2;
-  const scale = Math.min(1, printableWidthPx / table.scrollWidth);
   try {
-    buildPrintPages(scale);  // 自前ページ分割（成功すれば body.paged-print で旧表を隠す）
+    buildPrintPages(printableWidthPx);  // 自前ページ分割（成功すれば body.paged-print で旧表を隠す）
   } catch (e) {
     // 失敗時は従来動作（出荷日は1枚目のみ・ブラウザ自動改ページ）にフォールバック
     teardownPrintPages();
-    table.style.zoom = scale;
+    table.style.zoom = Math.min(1, printableWidthPx / table.scrollWidth);
     console.error('印刷ページ分割に失敗、従来印刷にフォールバック', e);
   }
 });
