@@ -902,6 +902,14 @@ const CONFIG = {
   },
 
   // ──────────────────────────────────────────────
+  // ⑨-2 ちょっとした文字置換（変換ボタン押下時に全項目へ適用）
+  //    元データの文字化け・表記くずれの補正。似たような変換はここに行を足す。
+  // ──────────────────────────────────────────────
+  textReplacements: [
+    { from: '三・本', to: '三柿本' },  // 鹿児島中央の建物名の化け補正
+  ],
+
+  // ──────────────────────────────────────────────
   // ⑩ 郵便番号の自動取得（郵便番号が空白の行のみ）
   //    HeartRails Geo API（無料・ブラウザから直接呼べる）
   // ──────────────────────────────────────────────
@@ -3041,6 +3049,18 @@ async function runConversion() {
   }
 
   const allRows = processedFiles.flatMap(pf => pf.rows);
+
+  // ちょっとした文字置換（文字化け等の補正）。ルールは CONFIG.textReplacements に追加する
+  for (const rule of (CONFIG.textReplacements || [])) {
+    for (const r of allRows) {
+      for (const k of Object.keys(r)) {
+        if (k[0] !== '_' && typeof r[k] === 'string' && r[k].includes(rule.from)) {
+          r[k] = r[k].split(rule.from).join(rule.to);
+        }
+      }
+    }
+  }
+
   lastStats = totalStats;
 
   procUI.line('データを整形').done();  // ここまで（整形・統合・並べ替え）完了を積み上げ表示
@@ -3598,6 +3618,14 @@ function triggerAlritReply() {
     h += '<table class="cfg-table"><thead><tr><th>内部キー</th><th>認識する列名</th></tr></thead><tbody>';
     Object.entries(CONFIG.columnAliases).forEach(([k, v]) => {
       h += `<tr><td style="font-family:monospace">${esc(k)}</td><td>${tags(v)}</td></tr>`;
+    });
+    h += '</tbody></table>';
+
+    h += '<h3>ちょっとした文字置換</h3>';
+    h += '<p class="cfg-note">変換ボタン押下時に全項目へ適用（元データの文字化け・表記くずれの補正）。追加は CONFIG.textReplacements。</p>';
+    h += '<table class="cfg-table"><thead><tr><th>置換前</th><th>置換後</th></tr></thead><tbody>';
+    (CONFIG.textReplacements || []).forEach(r => {
+      h += `<tr><td style="font-family:monospace">${esc(r.from)}</td><td style="font-family:monospace">${esc(r.to)}</td></tr>`;
     });
     h += '</tbody></table>';
 
