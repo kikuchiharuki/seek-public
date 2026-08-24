@@ -265,8 +265,9 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
      （Excelの「すべての列を1ページに印刷」と同じ。倍率はbeforeprintでJSが計算） */
   /* 枠線: 全セル統一の細い黒線（0.5pxでExcel印刷に近い太さ） */
   .data-table th, .data-table td { border: 0.5px solid #000 !important; }
-  /* 列名: 背景なし・黒文字・太字解除 */
-  .data-table th { position: static; background: none !important; color: #000 !important; font-weight: normal !important; }
+  /* 列名: 薄いグレー背景・黒文字・太字解除。
+     ファイル名行のある無しに関わらず全ページで同じ見た目になるよう、背景は常に付ける */
+  .data-table th { position: static; background: #e4e9ef !important; color: #000 !important; font-weight: normal !important; }
   .data-table { font-size: 11pt; }
   .data-table td { line-height: 14px; height: 29px; box-sizing: border-box; }
   .data-table th { line-height: 14px; height: 29px; }
@@ -1685,32 +1686,80 @@ function buildPrintPages(printableWidthPx) {
     groups.push({ headerRows: colHead ? [colHead] : [], colHead, dataRows });
   }
 
-  // ページ詰め（rendered px）。pages[i] = そのページに置く <tr> 参照の配列
+  // ページ詰め（rendered px）。
+  // 方針: 製品(=1ファイル)は途中で割らない。1ページに丸ごと収まる製品は、今のページに
+  // 入りきらなければ次のページへまるごと送る。さらに大きい製品から順に「いちばん隙間の
+  // 少ないページ」へ入れる(best-fit decreasing)ことで、順番を入れ替えてでも枚数を最小化する。
+  // 1製品だけで1ページを超える場合のみ、その製品を複数ページに分割する。
   const budgetFor = i => PRINT_PAGE.contentPx - PRINT_PAGE.headerPx - (i === 0 ? PRINT_PAGE.summaryPx : 0) - PRINT_PAGE.safetyPx;
-  const pages = [[]];
-  let i = 0, cur = 0;
-  const place = tr => { pages[i].push(tr); cur += H(tr); };
-  const newPage = () => { pages.push([]); i++; cur = 0; };
-
   // 製品間の空白行は画面でdisplay:noneのため実測できない（印刷時は29px）。scale込みで固定見積り
   const blankH = 29 * scale * PRINT_PAGE.fudge;
-  for (const g of groups) {
-    const startH = g.headerRows.reduce((s, tr) => s + H(tr), 0);
-    const firstDataH = g.dataRows.length ? H(g.dataRows[0]) : 0;
-    // 製品の先頭(空白行+見出し+最初の1行)が今のページに入らないなら、製品ごと次ページへ
-    if (cur > 0 && cur + blankH + startH + firstDataH > budgetFor(i)) newPage();
-    // ページ途中から始まる製品の前には空白行を入れる（従来印刷のファイル間空白を維持）
-    if (cur > 0 && g.blankRow) { pages[i].push(g.blankRow); cur += blankH; }
-    g.headerRows.forEach(place);
-    for (let d = 0; d < g.dataRows.length; d++) {
-      const dh = H(g.dataRows[d]);
-      if (cur > 0 && cur + dh > budgetFor(i)) {
-        newPage();
-        if (g.colHead) place(g.colHead);  // 継続ページの先頭に列名を再掲
+
+  // ── 1) 各製品をどのページに置くか決める（行の実配置は 2) でまとめて行う）
+  groups.forEach((g, gi) => {
+    g.index = gi;
+    g.headH = g.headerRows.reduce((s2, tr) => s2 + H(tr), 0);
+    g.totalH = g.headH + g.dataRows.reduce((s2, tr) => s2 + H(tr), 0);
+  });
+  // slots[i] = そのページに載る { g, rows, cont } の配列（cont=製品の続き＝列名だけ再掲）
+  const slots = [[]];
+  const used = [0];
+  const addPage = () => { slots.push([]); used.push(0); return slots.length - 1; };
+  const remOf = i => budgetFor(i) - used[i];
+
+  // 大きい製品から順に配置（同じ大きさなら元の順番を保つ）
+  const order = [...groups].sort((a, b) => b.totalH - a.totalH || a.index - b.index);
+  for (const g of order) {
+    // 丸ごと入るページのうち、残りがいちばん少ないページを選ぶ（best-fit）
+    let target = -1, bestRem = Infinity;
+    for (let i = 0; i < slots.length; i++) {
+      const need = g.totalH + (used[i] > 0 ? blankH : 0);
+      const rem = remOf(i);
+      if (need <= rem && rem < bestRem) { target = i; bestRem = rem; }
+    }
+    if (target >= 0) {
+      used[target] += g.totalH + (used[target] > 0 ? blankH : 0);
+      slots[target].push({ g, rows: [...g.dataRows], cont: false });
+      continue;
+    }
+    // どのページにも丸ごとは入らない＝1ページを超える製品。新しいページから順に分割して詰める
+    let i = used[used.length - 1] === 0 ? slots.length - 1 : addPage();
+    used[i] += g.headH;
+    let part = { g, rows: [], cont: false };
+    slots[i].push(part);
+    for (const tr of g.dataRows) {
+      const h = H(tr);
+      if (used[i] > 0 && used[i] + h > budgetFor(i)) {
+        i = addPage();
+        used[i] += g.colHead ? H(g.colHead) : 0;
+        part = { g, rows: [], cont: true };
+        slots[i].push(part);
       }
-      place(g.dataRows[d]);
+      part.rows.push(tr);
+      used[i] += h;
     }
   }
+
+  // ── 2) ページごとに、製品は元の順番で並べて行を書き出す
+  // 空白行は1件目の製品には無い（画面では2件目以降にだけ入れている）ので、
+  // 並べ替えで1件目が途中に来た場合に備えて他の製品のものを流用する
+  const anyBlankRow = groups.find(g => g.blankRow)?.blankRow || null;
+  const pages = slots.map(list => {
+    const rows = [];
+    list.sort((a, b) => a.g.index - b.g.index);
+    list.forEach((part, n) => {
+      if (part.cont) {
+        if (part.g.colHead) rows.push(part.g.colHead);  // 継続ページの先頭に列名を再掲
+      } else {
+        // ページ途中から始まる製品の前には空白行を入れる（従来印刷のファイル間空白を維持）
+        const blank = part.g.blankRow || anyBlankRow;
+        if (n > 0 && blank) rows.push(blank);
+        part.g.headerRows.forEach(tr => rows.push(tr));
+      }
+      part.rows.forEach(tr => rows.push(tr));
+    });
+    return rows;
+  }).filter(rows => rows.length);
 
   const M = pages.length;
   const v = document.getElementById('shipDate').value;
