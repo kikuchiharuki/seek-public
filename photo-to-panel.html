@@ -1,0 +1,2848 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo to Multicolour Panel</title>
+<style>
+  :root{
+    --ink:#12171c; --panel:#f7f4ec; --edge:#dcd6c6;
+    --accent:#2f6f5b; --accent2:#c26b2d; --muted:#7d766a;
+    --shadow:0 1px 0 #fff inset, 0 2px 14px rgba(20,23,28,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif; color:var(--ink);
+    background:#eae5d8;
+    background-image:radial-gradient(circle at 1px 1px,#ded8c8 1px,transparent 0);
+    background-size:22px 22px; -webkit-font-smoothing:antialiased}
+  header{padding:14px 22px 10px; max-width:none; margin:0;
+    display:flex; align-items:baseline; gap:16px; flex-wrap:wrap}
+  .kicker{font-size:11px; letter-spacing:.28em; text-transform:uppercase;
+    color:var(--accent2); font-weight:700}
+  h1{font-family:Georgia,"Times New Roman",serif; font-size:22px; line-height:1.05;
+    margin:0; font-weight:800}
+  h1 .sub{display:inline; font-size:12.5px; color:var(--muted); font-weight:400;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif; margin-left:12px; line-height:1.5}
+  .wrap{margin:0; padding:0 14px 14px;
+    display:grid; grid-template-columns:320px minmax(380px,1fr) 320px; gap:14px;
+    align-items:stretch; height:calc(100vh - 64px)}
+  .col{overflow-y:auto; min-height:0; padding-right:2px; scrollbar-width:thin}
+  @media(max-width:1023px){
+    .wrap{grid-template-columns:1fr; height:auto}
+    .col{overflow:visible}
+    header{display:block; padding:20px 22px 12px}
+    h1{font-size:28px}
+    h1 .sub{display:block; margin:6px 0 0}
+  }
+  .card{background:var(--panel); border:1px solid var(--edge); border-radius:14px;
+    box-shadow:var(--shadow); padding:18px; margin-bottom:18px}
+  .card h2{font-size:13px; letter-spacing:.16em; text-transform:uppercase;
+    margin:0 0 14px; color:var(--muted)}
+  .card h2 em{font-style:normal; color:var(--accent2); margin-right:6px}
+  label{display:block; font-size:13px; font-weight:600; margin:14px 0 6px}
+  label span{font-weight:400; color:var(--muted)}
+  .drop{display:block; border:2px dashed var(--edge); border-radius:12px; padding:24px 16px;
+    text-align:center; cursor:pointer; transition:.15s; background:#fffdf7}
+  .drop:hover,.drop.over{border-color:var(--accent); background:#f3faf6}
+  .drop b{color:var(--accent)}
+  .drop small{display:block; color:var(--muted); margin-top:6px; font-size:12px}
+  input[type=file]{position:absolute; width:1px; height:1px; opacity:0;
+    overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%)}
+  input[type=range]{width:100%; accent-color:var(--accent)}
+  input[type=number]{width:100%; padding:8px 9px; border:1px solid var(--edge);
+    border-radius:8px; background:#fffdf7; font:inherit}
+  .rowval{display:flex; justify-content:space-between; align-items:baseline}
+  .rowval output{font-variant-numeric:tabular-nums; font-weight:700}
+  .seg{display:flex; gap:6px; margin-top:6px}
+  .seg button{flex:1; padding:9px 6px; border:1px solid var(--edge); background:#fffdf7;
+    border-radius:9px; cursor:pointer; font-size:13px; font-family:inherit}
+  .seg button[aria-pressed=true]{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .go{width:100%; margin-top:18px; padding:13px; border:none; border-radius:11px;
+    background:var(--accent2); color:#fff; font-weight:700; font-size:15px; cursor:pointer;
+    box-shadow:0 2px 0 #9c541f; font-family:inherit}
+  .go.alt{background:var(--accent); box-shadow:0 2px 0 #235244}
+  .go:disabled{background:#c9c2b3; box-shadow:none; cursor:not-allowed}
+  .go:active:not(:disabled){transform:translateY(1px); box-shadow:0 1px 0 #9c541f}
+  .stage{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media(max-width:560px){.stage{grid-template-columns:1fr}}
+  .frame{background:var(--panel); border:1px solid var(--edge); border-radius:14px;
+    box-shadow:var(--shadow); padding:12px; text-align:center}
+  .frame h3{margin:0 0 8px; font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted)}
+  .frame canvas{max-width:100%; max-height:32vh; width:auto; height:auto;
+    border-radius:8px; image-rendering:pixelated;
+    background:linear-gradient(45deg,#eee 25%,transparent 25%,transparent 75%,#eee 75%) 0 0/16px 16px,
+    linear-gradient(45deg,#eee 25%,#fff 25%,#fff 75%,#eee 75%) 8px 8px/16px 16px}
+  @media(max-width:1023px){.frame canvas{max-height:none}}
+  .empty{color:var(--muted); font-size:13px; padding:42px 10px}
+  .mini{border:1px solid var(--edge); border-radius:20px; padding:7px 15px;
+    background:#fffdf7; cursor:pointer; font:inherit; font-size:13px}
+  .mini:hover{border-color:var(--accent2); color:var(--accent2)}
+  .palette{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+  .sw{display:flex; align-items:center; gap:7px; background:#fffdf7; border:1px solid var(--edge);
+    border-radius:20px; padding:4px 11px 4px 5px; font-size:12px; font-variant-numeric:tabular-nums;
+    position:relative; cursor:pointer}
+  .sw i{width:18px; height:18px; border-radius:50%; border:1px solid rgba(0,0,0,.15)}
+  .hint{font-size:12.5px; color:var(--muted); line-height:1.65; margin-top:12px}
+  .stat{display:flex; gap:16px; margin-top:12px; font-size:12.5px; color:var(--muted); flex-wrap:wrap}
+  .stat b{color:var(--ink)}
+  table.h{width:100%; border-collapse:collapse; margin-top:8px; font-size:13px}
+  table.h td{padding:5px 4px; border-bottom:1px solid var(--edge)}
+  table.h td:first-child{width:34px}
+  table.h td:last-child{width:96px}
+  table.h i{display:block; width:22px; height:22px; border-radius:5px;
+    border:1px solid rgba(0,0,0,.15)}
+  footer{max-width:1240px; margin:0 auto; padding:0 22px 40px; color:var(--muted);
+    font-size:12.5px; line-height:1.75}
+  .note{background:#eef4f1; border:1px solid #cfe2da; border-radius:10px; padding:11px 13px;
+    font-size:12.5px; line-height:1.65; color:#2c4a41; margin-top:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">Photo &rarr; multicolour panel</div>
+  <h1>写真から多色パネル
+    <span class="sub">写真を数色に減色して、色ごとに分かれた3Dデータ（3MF / STL）にします。CADは要りません。写真はブラウザ内だけで処理され、どこにも送信されません。</span></h1>
+</header>
+
+<div class="wrap">
+<!-- ================= left column : image + colours ================= -->
+<div class="col">
+  <div class="card">
+    <h2><em>1</em>画像 / Image</h2>
+    <label class="drop" id="drop" for="file">
+      <b>タップ</b>して写真を選ぶ（PCはドロップも可）<br>
+      <small>Tap to choose a photo &mdash; JPG / PNG</small>
+    </label>
+    <input type="file" id="file" accept="image/*">
+    <div class="hint" id="fileMsg" style="display:none"></div>
+    <label class="rowval" style="margin-top:16px">
+      <span>きめ細かさ <span>/ Detail</span></span><output id="resOut">240 px</output></label>
+    <input type="range" id="res" min="120" max="1200" value="240" step="20">
+    <div class="hint">細かいほど絵はきれいですが、データが重くなります。
+      Higher looks better but makes a heavier file.</div>
+  </div>
+
+  <div class="card">
+    <h2><em>2</em>色 / Colours</h2>
+    <label>色の分け方 <span>/ How colours are chosen</span></label>
+    <div class="seg" id="modeSeg">
+      <button data-mode="auto" aria-pressed="true">自動 Auto</button>
+      <button data-mode="filament">フィラメント</button>
+      <button data-mode="lineart">線画</button>
+      <button data-mode="laser">レーザー</button>
+      <button data-mode="manual">自分で Pick</button>
+    </div>
+    <div class="hint" id="modeHint" style="margin-top:8px">写真から目立つ色をそのまま選びます。イラスト向き。</div>
+    <div id="laserBox" style="display:none">
+      <label style="margin-top:12px">仕上がり <span>/ Output</span></label>
+      <div class="seg" id="laserKindSeg">
+        <button data-lk="line" aria-pressed="true">線画</button>
+        <button data-lk="dither">写真（点描）</button>
+        <button data-lk="thresh">白黒2値</button>
+      </div>
+      <label class="rowval" style="margin-top:12px">
+        <span>明るさ <span>/ Brightness</span></span><output id="lzBrightOut">0</output></label>
+      <input type="range" id="lzBright" min="-100" max="100" value="0" step="5">
+      <label class="rowval" style="margin-top:12px">
+        <span>コントラスト <span>/ Contrast</span></span><output id="lzContOut">0</output></label>
+      <input type="range" id="lzCont" min="-100" max="100" value="0" step="5">
+      <label class="rowval" style="margin-top:12px">
+        <span>しきい値 <span>/ Threshold</span></span><output id="lzThOut">自動</output></label>
+      <input type="range" id="lzTh" min="0" max="255" value="0" step="1">
+      <label class="rowval" style="margin-top:12px">
+        <span>途切れ補修 <span>/ Close gaps</span></span><output id="lzGapOut">2 px</output></label>
+      <input type="range" id="lzGap" min="0" max="10" value="2" step="1">
+      <label class="rowval" style="margin-top:12px">
+        <span>線を太らせる <span>/ Thicken</span></span><output id="lzGrowOut">0 px</output></label>
+      <input type="range" id="lzGrow" min="0" max="10" value="0" step="1">
+      <label style="margin-top:12px">背景 <span>/ Background</span></label>
+      <div class="seg" id="laserBgSeg">
+        <button data-lbg="white" aria-pressed="true">白</button>
+        <button data-lbg="alpha">透過</button>
+        <button data-lbg="invert">白黒反転</button>
+      </div>
+      <div class="hint">レーザー加工機用。<b>元画像のフル解像度</b>で処理して、白黒PNG/JPEGを保存します（3D化はしません）。
+        線画＝線だけ黒。写真（点描）＝濃淡を細かい点の密度で表す（Floyd–Steinbergディザ）。白黒2値＝明るさで白黒に分ける（ステンシル向き）。
+        しきい値0は自動。途切れ補修は線の小さな切れ目をつなぎます（元画像のピクセル単位）。</div>
+    </div>
+    <div id="lineBox" style="display:none">
+      <label class="rowval" style="margin-top:12px">
+        <span>線の濃さしきい値 <span>/ Ink threshold</span></span><output id="lthOut">自動</output></label>
+      <input type="range" id="lth" min="0" max="255" value="0" step="1">
+      <label class="rowval" style="margin-top:12px">
+        <span>線の太さ <span>/ Line width</span></span><output id="lwOut">元のまま</output></label>
+      <input type="range" id="lw" min="0" max="20" value="0" step="1">
+      <label class="rowval" style="margin-top:12px">
+        <span>途切れ補修 <span>/ Close gaps</span></span><output id="lgapOut">0.3 mm</output></label>
+      <input type="range" id="lgap" min="0" max="15" value="3" step="1">
+      <div class="hint">線のわずかな切れ目（この長さ以下）をつないで閉じます。3Dプリントで色が漏れないように。
+        線画モードでは「きめ細かさ」を<b>800px以上</b>にするのがおすすめ。線画は軽いので重くなりません。</div>
+      <div class="hint">線画（マンガ・線だけのイラスト）専用。元画像のフル解像度で線を拾います。
+        「線の太さ」は<b>最低保証</b>で、元の線がそれより細いときだけ太らせます（元のままなら0）。
+        小さく印刷して線が0.4mm未満になるときは 0.5〜0.6mm にしてください。
+        しきい値0は自動（大津法）。薄い線が拾えないときは上げてください。</div>
+    </div>
+    <div id="autoBox">
+      <label class="rowval"><span>色数 <span>/ Number of colours</span></span><output id="kOut">4</output></label>
+      <input type="range" id="k" min="2" max="16" value="4" step="1">
+      <div class="hint" id="kHint"></div>
+    </div>
+    <div id="manualBox" style="display:none">
+      <label>使う色 <span>/ Your colours (click a chip to change)</span></label>
+      <div class="palette" id="pick"></div>
+    </div>
+    <label class="rowval" style="margin-top:16px">
+      <span>なめらかさ <span>/ Smoothing</span></span><output id="smOut">中</output></label>
+    <input type="range" id="sm" min="0" max="3" value="1" step="1">
+    <div class="hint">小さな点や模様を掃除して、色のかたまりを大きくします。3Dプリント向き。<br>
+      Cleans up speckle so each colour is one solid region.</div>
+    <label class="rowval" style="margin-top:14px">
+      <span>背景を抜く <span>/ Cut background</span></span><output id="bgOut">しない</output></label>
+    <input type="range" id="bg" min="0" max="1" value="0" step="1">
+    <div class="hint">画像の縁からつながった色だけを抜きます。絵の中の白目などは残ります。</div>
+    <label class="rowval" style="margin-top:14px">
+      <span>縁取り <span>/ Outline</span></span><output id="olOut">なし</output></label>
+    <input type="range" id="ol" min="0" max="4" value="0" step="1">
+    <div class="hint">使っている色の中から<b>一番暗い色</b>を自動で選び、色の境目に線を引きます。
+      減色で消えてしまった線画を復活させたいときに。<br>
+      Draws a line along every colour boundary using the darkest colour in the palette.</div>
+    <button class="go" id="go" disabled>減色する / Reduce</button>
+    <div class="hint" id="msg"></div>
+  </div>
+
+</div>
+
+<!-- ================= middle column : previews ================= -->
+<div class="col">
+  <div class="stage">
+    <div class="frame">
+      <h3>元の写真 / Original</h3>
+      <div class="empty" id="e1">まだ画像がありません</div>
+      <canvas id="src" hidden></canvas>
+    </div>
+    <div class="frame">
+      <h3>減色プレビュー / Reduced</h3>
+      <div class="empty" id="e2">ここに結果が出ます</div>
+      <canvas id="out" hidden></canvas>
+    </div>
+  </div>
+
+  <div class="card" id="result" style="margin-top:18px; display:none">
+    <h2>使われた色 / Palette</h2>
+    <div class="palette" id="pal"></div>
+    <div class="stat" id="stat"></div>
+    <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+      <button type="button" id="savePng"  class="mini">PNG 保存（透過）</button>
+      <button type="button" id="saveJpg"  class="mini">JPEG 保存（白背景）</button>
+    </div>
+  </div>
+
+  <div class="card" id="meshCard" style="display:none">
+    <h2>立体プレビュー / 3D preview</h2>
+    <canvas id="view" style="width:100%;max-width:620px;max-height:38vh;object-fit:contain;border-radius:10px;background:#e7e2d5"></canvas>
+    <div class="stat" id="mstat"></div>
+    <div class="hint">ドラッグで360°回転、<b>ホイール／ピンチで拡大縮小</b>、Shift＋ドラッグ（右ドラッグ・2本指）で移動、ダブルクリックでリセット。
+      薄いグレーの面がビルドプレート（実線10mm・点線5mm）。キーホルダー穴は<b>点線の輪をドラッグ</b>して位置を変えられます。<br>
+      Drag to orbit (full 360°). The faint grey plane is the build plate. Drag the dashed ring to move the keychain tab.</div>
+  </div>
+</div>
+
+<!-- ================= right column : make it 3D ================= -->
+<div class="col">
+  <div class="card" id="exportPlaceholder">
+    <h2><em>3</em>立体にする / Make it 3D</h2>
+    <div class="hint" style="margin-top:4px">左で写真を選んで「減色する」を押すと、ここに立体化と書き出しの設定が出ます。<br>
+      Reduce the photo first &mdash; the 3D &amp; export controls will appear here.</div>
+  </div>
+  <div class="card" id="exportCard" style="display:none">
+    <h2><em>3</em>立体にする / Make it 3D</h2>
+
+    <label class="rowval">
+      <span>ゴミ掃除 <span>/ Clean specks</span></span><output id="minIsleOut">1.0 mm²</output></label>
+    <input type="range" id="minIsle" min="0" max="50" value="10" step="1">
+    <div class="hint">背景の中に浮いている、この面積未満のゴミを消します。
+      絵の中の小さな点（目のハイライトなど）は消えません。0で無効。</div>
+
+    <label style="margin-top:12px">輪郭 <span>/ Outline</span></label>
+    <div class="seg" id="smoothSeg">
+      <button data-smooth="0" aria-pressed="true">ドット Pixel</button>
+      <button data-smooth="1">なめらか Smooth</button>
+    </div>
+    <div class="hint">「なめらか」は色の境目をドットの階段ではなく、曲線でつないで押し出します。
+      線画や丸い形がきれいになります。三角形数はほぼ同じか少し減ります。</div>
+
+    <label style="margin-top:12px">形 <span>/ Shape</span></label>
+    <div class="seg" id="shapeSeg">
+      <button data-shape="flat" aria-pressed="true">フラット Flat</button>
+      <button data-shape="relief">立体 Relief</button>
+    </div>
+
+    <div id="flatBox">
+      <label class="rowval" style="margin-top:14px">
+        <span>色ごとの段差 <span>/ Step between colours</span></span>
+        <output id="stepOut">0.05 mm</output></label>
+      <input type="range" id="step" min="0" max="400" value="50" step="1">
+      <div class="note">スライサーのバケツ塗りは<b>面の角度</b>で塗る範囲を決めます。
+        ごく小さな段差でも90°の角ができるので、そこで塗りが止まります。
+        積層の厚みよりずっと小さいので、印刷結果には現れません。<br>
+        <b>0.0001〜0.4mm</b> で試して、確実に効く一番小さい値を見つけてください。
+        0にすると完全にフラット（塗り分けは効かなくなります）。</div>
+      <label class="rowval" style="margin-top:14px">
+        <span>絵の厚み <span>/ Artwork thickness</span></span><output id="flatHOut">1.00 mm</output></label>
+      <input type="range" id="flatH" min="20" max="300" value="100" step="5">
+    </div>
+
+    <div id="reliefBox" style="display:none">
+      <label style="margin-top:14px">色ごとの高さ <span>/ Height per colour (mm)</span></label>
+      <table class="h" id="hTable"></table>
+      <div class="hint">奥行きを出したいときに。レリーフや小物にも使えます。</div>
+    </div>
+
+    <label class="rowval" style="margin-top:16px">
+      <span>横幅 <span>/ Width of the panel</span></span><output id="wOut">60 mm</output></label>
+    <div style="display:flex; gap:10px; align-items:center">
+      <input type="range" id="wmm" min="5" max="200" value="60" step="0.5" style="flex:1">
+      <input type="number" id="wmmNum" min="1" max="500" value="60" step="0.1" style="width:86px">
+    </div>
+    <div class="hint">小物に貼るときは<b>実寸</b>で書き出してください。スライサーで縮小すると厚みまで縮んで1層に満たなくなります。<br>
+      Export at final size &mdash; scaling in the slicer shrinks the thickness too.</div>
+
+    <label style="margin-top:14px">土台 <span>/ Backing plate</span></label>
+    <div class="seg" id="baseSeg">
+      <button data-base="1" aria-pressed="true">つける With</button>
+      <button data-base="0">なし None</button>
+    </div>
+    <div id="baseBox">
+      <div id="faceBox">
+        <label style="margin-top:12px">印刷の向き <span>/ Print face</span></label>
+        <div class="seg" id="faceSeg">
+          <button data-face="up" aria-pressed="true">絵を上 Normal</button>
+          <button data-face="down">絵を下 つるつる</button>
+        </div>
+        <div class="hint">「絵を下」は、絵の面をビルドプレートに向けて印刷する用。
+          土台とキーホルダー穴が絵と同じ面まで伸びるので、浮く部分がありません。
+          絵は自動で左右反転され、印刷面で正しい向きになります。
+          書き出したらそのまま印刷してください（反転・沈める操作は不要）。</div>
+      </div>
+      <label style="margin-top:12px">土台の形 <span>/ Plate shape</span></label>
+      <div class="seg" id="bShapeSeg">
+        <button data-bshape="rect" aria-pressed="true">□ 四角</button>
+        <button data-bshape="circle">◯ 丸</button>
+        <button data-bshape="contour">縁に沿う</button>
+      </div>
+      <label class="rowval" style="margin-top:12px">
+        <span>ふち余白 <span>/ Margin</span></span><output id="bMarginOut">1.5 mm</output></label>
+      <input type="range" id="bMargin" min="0" max="50" value="15" step="1">
+      <label style="margin-top:12px">キーホルダー穴 <span>/ Keychain tab</span></label>
+      <div class="seg" id="tabSeg">
+        <button data-tab="0" aria-pressed="true">なし None</button>
+        <button data-tab="1">つける With</button>
+      </div>
+      <div id="tabBox" style="display:none">
+        <label class="rowval" style="margin-top:10px">
+          <span>穴の位置 <span>/ Tab position</span></span><output id="tabAngOut">上</output></label>
+        <input type="range" id="tabAng" min="0" max="359" value="90" step="1">
+        <div class="seg" id="tabQuick" style="margin-top:6px">
+          <button data-ang="90">上</button><button data-ang="135">左上</button>
+          <button data-ang="45">右上</button><button data-ang="180">左</button>
+          <button data-ang="0">右</button>
+        </div>
+        <label class="rowval" style="margin-top:10px">
+          <span>つけ根の補強 <span>/ Fillet</span></span><output id="tabNeckOut">3.0 mm</output></label>
+        <input type="range" id="tabNeck" min="10" max="60" value="30" step="5">
+        <div class="hint">土台の縁に沿って穴の位置を動かせます。3Dプレビュー上で<b>穴をドラッグ</b>しても動きます。
+          「つけ根の補強」は輪と土台のあいだを両側からなだらかに埋める丸み（フィレット）の大きさ。
+          大きいほど折れにくくなります。四角・丸・縁沿い、どの土台でも同じ形に付きます。</div>
+      </div>
+      <label class="rowval" style="margin-top:12px">
+        <span>土台の厚み <span>/ Backing thickness</span></span><output id="baseHOut">0.80 mm</output></label>
+      <input type="range" id="baseH" min="20" max="300" value="80" step="5">
+    </div>
+    <div id="embedBox" style="display:none">
+      <label class="rowval" style="margin-top:12px">
+        <span>埋め込み代 <span>/ Embed depth</span></span><output id="embedOut">なし</output></label>
+      <input type="range" id="embed" min="0" max="200" value="0" step="5">
+      <div class="hint">別のモデルの面に貼る（めり込ませる）用。各色を裏側へこの分だけ延長します。
+        スライサーで本体に「パーツを追加」して沈めても、絵と本体の間に隙間ができません。<br>
+        Extends every colour downwards so the art can sink into another model with no gap.
+        In Bambu / Orca, add the colour files as <b>parts of the same object</b> &mdash;
+        parts may overlap freely; separate objects may not.</div>
+    </div>
+
+    <button class="go alt" id="make3d">プレビューを作る / Build</button>
+    <div id="dlBox" style="display:none">
+      <button class="go" id="dl3mf">3MF をダウンロード（色つき）</button>
+      <button class="go" id="dlstl" style="margin-top:8px;background:#5a6b73;box-shadow:0 2px 0 #3f4c52">
+        STL をダウンロード（色ごと・ZIP）</button>
+    </div>
+    <div class="hint" id="msg3"></div>
+  </div>
+</div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let img=null, srcData=null, W=0, H=0;
+let mode="auto", shape="flat", useBase=true;
+let manualPal=["#f2c14e","#e8955b","#2b2b2b","#ffffff"];
+let reduced=null;      // {pal, labels, W, H, BG, keep[]}
+let mesh=null;         // {objects:[{name,color,verts,tris}], stats}
+let heights={};
+
+/* ---------------- image ---------------- */
+function fileNote(t){ const m=$("fileMsg");
+  if(!t){ m.style.display="none"; return; }
+  m.style.display=""; m.textContent=t; }
+function loadFile(f){
+  if(!f) return;
+  fileNote("");
+  // MIMEで弾かない: Androidのファイルアプリ経由だと type が空で来ることがある。
+  // 読めるかどうかはデコードの成否で判断する。
+  const url=URL.createObjectURL(f);
+  const im=new Image();
+  im.onload=()=>{ URL.revokeObjectURL(url);
+    img=im; drawSource(); $("go").disabled=false; };
+  im.onerror=()=>{ URL.revokeObjectURL(url);
+    fileNote("この画像は読み込めませんでした。JPGかPNGでお試しください。"+
+      (/\.hei[cf]$/i.test(f.name||"")?
+       " iPhoneのHEIC写真は、写真アプリから共有→「画像を保存」でJPEGにするか、設定→カメラ→フォーマットを「互換性優先」にすると読み込めます。":"")); };
+  im.src=url;
+}
+function drawSource(){
+  const MAXW=+$("res").value;
+  const s=Math.min(1,MAXW/img.width);
+  W=Math.max(8,Math.round(img.width*s)); H=Math.max(8,Math.round(img.height*s));
+  const c=$("src"); c.width=W; c.height=H; c.hidden=false; $("e1").style.display="none";
+  const g=c.getContext("2d",{willReadFrequently:true});
+  g.clearRect(0,0,W,H); g.drawImage(img,0,0,W,H);
+  srcData=g.getImageData(0,0,W,H);
+}
+const drop=$("drop");
+// クリックはlabel+forのネイティブ動作に任せる（WebView対策でJSのclick()は使わない）
+$("file").onchange=e=>loadFile(e.target.files[0]);
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>loadFile(e.dataTransfer.files[0]));
+window.addEventListener("dragover",e=>e.preventDefault());
+window.addEventListener("drop",e=>e.preventDefault());
+
+/* ---------------- controls ---------------- */
+$("res").oninput=e=>{$("resOut").textContent=e.target.value+" px"; if(img) drawSource();};
+$("k").oninput=e=>{
+  const v=+e.target.value; $("kOut").textContent=v;
+  $("kHint").innerHTML = v>8
+    ? "色が多いほど境目が増え、データが重くなります。重い場合は「きめ細かさ」を下げてください。"
+    : "";
+};
+const smW=["なし","中","強","最大"];
+$("sm").oninput=e=>$("smOut").textContent=smW[e.target.value];
+$("bg").oninput=e=>$("bgOut").textContent=["しない","抜く"][e.target.value];
+const olW=["なし","細い","ふつう","太い","極太"];
+$("ol").oninput=e=>$("olOut").textContent=olW[e.target.value];
+function widthMM(){ return Math.max(1, +$("wmmNum").value || 60); }
+$("wmm").oninput=e=>{ $("wmmNum").value=e.target.value;
+  $("wOut").textContent=(+e.target.value)+" mm"; };
+$("wmmNum").oninput=e=>{ const v=widthMM();
+  $("wmm").value=Math.min(200,Math.max(5,v));
+  $("wOut").textContent=v+" mm"; };
+$("embed").oninput=e=>{ const v=e.target.value/100;
+  $("embedOut").textContent = v===0 ? "なし" : v.toFixed(2)+" mm"; };
+$("minIsle").oninput=e=>{ const v=e.target.value/10;
+  $("minIsleOut").textContent = v===0 ? "なし" : v.toFixed(1)+" mm²"; };
+$("flatH").oninput=e=>$("flatHOut").textContent=(e.target.value/100).toFixed(2)+" mm";
+$("baseH").oninput=e=>$("baseHOut").textContent=(e.target.value/100).toFixed(2)+" mm";
+// step slider is non-linear: 0 .. 0.4mm, fine at the small end
+function stepVal(){
+  const v=+$("step").value;
+  if(v===0) return 0;
+  return +(0.0001*Math.pow(0.4/0.0001, (v-1)/399)).toFixed(4);
+}
+$("step").oninput=()=>{const v=stepVal();
+  $("stepOut").textContent = v===0 ? "0（完全フラット）" : v.toFixed(4).replace(/0+$/,"").replace(/\.$/,"")+" mm";};
+$("step").dispatchEvent(new Event("input"));
+
+function seg(id,setter){
+  $(id).addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b) return;
+    [...$(id).children].forEach(x=>x.setAttribute("aria-pressed",x===b));
+    setter(b.dataset);
+  });
+}
+seg("modeSeg",d=>{mode=d.mode;
+  $("autoBox").style.display=(mode==="auto"||mode==="filament")?"":"none";
+  $("manualBox").style.display=mode==="manual"?"":"none";
+  $("lineBox").style.display=mode==="lineart"?"":"none";
+  $("laserBox").style.display=mode==="laser"?"":"none";
+  $("kBox") && ($("kBox").style.display=mode==="laser"?"none":"");
+  if(mode==="laser"){ $("modeHint").textContent="レーザー加工機用の白黒画像を、元画像のフル解像度で作ります。3Dにはしません。"; }
+  if(mode==="lineart" && +$("res").value<800){ $("res").value=800; $("res").dispatchEvent(new Event("input")); }
+  if(mode==="lineart"){ smoothOutline=true; const b=$("smoothSeg").querySelectorAll("button"); b.forEach(x=>x.setAttribute("aria-pressed",x.dataset.smooth==="1"?"true":"false")); }
+  $("modeHint").textContent = mode==="filament"
+    ? "写真の色を、よくあるフィラメント色（肌色・茶・赤・青・金など約20色）に寄せます。写真におすすめ。"
+    : mode==="auto" ? "写真から目立つ色をそのまま選びます。イラスト向き。"
+    : mode==="lineart" ? "黒い線だけを拾って2色（線＝黒、地＝白）にします。なめらかさは効きません（線が消えないように）。" : "";});
+
+let laserKind="line", laserBg="white";
+seg("laserKindSeg",d=>{laserKind=d.lk; $("lzThOut").textContent="自動"; });
+seg("laserBgSeg",d=>{laserBg=d.lbg;});
+$("lzBright").oninput=e=>$("lzBrightOut").textContent=e.target.value;
+$("lzCont").oninput=e=>$("lzContOut").textContent=e.target.value;
+$("lzTh").oninput=e=>$("lzThOut").textContent=+e.target.value===0?"自動":e.target.value;
+$("lzGap").oninput=e=>$("lzGapOut").textContent=e.target.value+" px";
+$("lzGrow").oninput=e=>$("lzGrowOut").textContent=e.target.value+" px";
+$("lth").oninput=e=>$("lthOut").textContent=+e.target.value===0?"自動":e.target.value;
+$("lw").oninput=e=>$("lwOut").textContent=+e.target.value===0?"元のまま":"最低 "+(e.target.value/10).toFixed(1)+" mm";
+$("lgap").oninput=e=>$("lgapOut").textContent=(e.target.value/10).toFixed(1)+" mm";
+seg("shapeSeg",d=>{shape=d.shape;
+  $("flatBox").style.display=shape==="flat"?"":"none";
+  $("reliefBox").style.display=shape==="relief"?"":"none";
+  $("faceBox").style.display=shape==="flat"?"":"none";});
+let faceMode="up";
+seg("faceSeg",d=>{faceMode=d.face;});
+let smoothOutline=false;
+seg("smoothSeg",d=>{smoothOutline=d.smooth==="1";});
+seg("baseSeg",d=>{useBase=d.base==="1";
+  $("baseBox").style.display=useBase?"":"none";
+  $("embedBox").style.display=useBase?"none":"";});
+let baseShape="rect", tabOn=false;
+seg("bShapeSeg",d=>{baseShape=d.bshape;});
+seg("tabSeg",d=>{tabOn=d.tab==="1"; $("tabBox").style.display=tabOn?"":"none";});
+function angLabel(a){ const n=["右","右上","上","左上","左","左下","下","右下"];
+  return n[Math.round(((a%360)+360)%360/45)%8]; }
+$("tabAng").oninput=e=>$("tabAngOut").textContent=angLabel(+e.target.value)+" "+e.target.value+"°";
+$("tabNeck").oninput=e=>$("tabNeckOut").textContent=(e.target.value/10).toFixed(1)+" mm";
+$("tabQuick").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  $("tabAng").value=b.dataset.ang; $("tabAng").dispatchEvent(new Event("input"));
+  if(mesh) build3d();
+});
+$("bMargin").oninput=e=>$("bMarginOut").textContent=(e.target.value/10).toFixed(1)+" mm";
+
+function renderPicker(){
+  const box=$("pick"); box.innerHTML="";
+  manualPal.forEach((hex,i)=>{
+    const w=document.createElement("label"); w.className="sw";
+    const dot=document.createElement("i"); dot.style.background=hex;
+    const txt=document.createTextNode(hex);
+    const inp=document.createElement("input"); inp.type="color"; inp.value=hex;
+    inp.style.cssText="position:absolute;opacity:0;width:100%;height:100%;left:0;top:0;cursor:pointer";
+    inp.oninput=ev=>{manualPal[i]=ev.target.value; dot.style.background=ev.target.value;
+      txt.nodeValue=ev.target.value;};
+    w.append(dot,txt,inp); box.appendChild(w);
+  });
+  const mk=(t,fn)=>{const b=document.createElement("button"); b.textContent=t; b.type="button";
+    b.style.cssText="border:1px dashed var(--edge);border-radius:20px;padding:4px 13px;background:#fffdf7;cursor:pointer;font:inherit";
+    b.onclick=fn; return b;};
+  box.appendChild(mk("+",()=>{if(manualPal.length<16){manualPal.push("#888888");renderPicker();}}));
+  box.appendChild(mk("\u2212",()=>{if(manualPal.length>2){manualPal.pop();renderPicker();}}));
+}
+renderPicker();
+
+/* ---------------- colour maths ---------------- */
+const hexToRgb=h=>{h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];};
+const rgbToHex=(r,g,b)=>'#'+[r,g,b].map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
+function dist(a,b){const dr=a[0]-b[0],dg=a[1]-b[1],db=a[2]-b[2];
+  return 0.30*dr*dr+0.59*dg*dg+0.11*db*db;}
+
+function kmeans(px,k){
+  const N=px.length/4, cents=[];
+  let f=Math.floor(Math.random()*N);
+  cents.push([px[f*4],px[f*4+1],px[f*4+2]]);
+  const d2=new Float64Array(N).fill(Infinity);
+  while(cents.length<k){
+    let sum=0; const c=cents[cents.length-1];
+    for(let i=0;i<N;i++){
+      const dd=dist([px[i*4],px[i*4+1],px[i*4+2]],c);
+      if(dd<d2[i]) d2[i]=dd; sum+=d2[i];
+    }
+    let r=Math.random()*sum, idx=0;
+    for(let i=0;i<N;i++){ r-=d2[i]; if(r<=0){idx=i;break;} }
+    cents.push([px[idx*4],px[idx*4+1],px[idx*4+2]]);
+  }
+  const assign=new Uint8Array(N);
+  for(let it=0;it<12;it++){
+    for(let i=0;i<N;i++){
+      const p=[px[i*4],px[i*4+1],px[i*4+2]];
+      let best=0,bd=Infinity;
+      for(let c=0;c<k;c++){const dd=dist(p,cents[c]); if(dd<bd){bd=dd;best=c;}}
+      assign[i]=best;
+    }
+    const s=Array.from({length:k},()=>[0,0,0,0]);
+    for(let i=0;i<N;i++){const a=assign[i];
+      s[a][0]+=px[i*4];s[a][1]+=px[i*4+1];s[a][2]+=px[i*4+2];s[a][3]++;}
+    for(let c=0;c<k;c++) if(s[c][3]) cents[c]=[s[c][0]/s[c][3],s[c][1]/s[c][3],s[c][2]/s[c][3]];
+  }
+  return {cents,assign};
+}
+function nearest(p,pal){let b=0,bd=Infinity;
+  for(let c=0;c<pal.length;c++){const d=dist(p,pal[c]); if(d<bd){bd=d;b=c;}} return b;}
+
+/* ---------------- filament palette ----------------
+   よくあるPLAフィラメントの色。写真の濁った色をここへ寄せる。 */
+const FILAMENT=[
+  "#F2F0EB", /* 白 white          */ "#1A1A1A", /* 黒 black          */
+  "#8E8E8E", /* グレー grey       */ "#4A4A4A", /* 濃グレー dk-grey  */
+  "#C62828", /* 赤 red            */ "#E8791D", /* オレンジ orange   */
+  "#F2C230", /* 黄 yellow         */ "#BFA13A", /* 金 gold           */
+  "#2E7D32", /* 緑 green          */ "#7CB342", /* 黄緑 lt-green     */
+  "#1565C0", /* 青 blue           */ "#5EA9DC", /* 水色 sky          */
+  "#223A70", /* 紺 navy           */ "#6A3FA0", /* 紫 purple         */
+  "#E0559C", /* ピンク pink       */ "#F2BCCB", /* 薄ピンク lt-pink  */
+  "#EFC9A5", /* 肌色 skin         */ "#C8905F", /* 褐色 tan          */
+  "#6D4C33", /* 茶 brown          */ "#433022", /* 濃茶 dk-brown     */
+].map(hexToRgb);
+
+// snap a k-means centre to the nearest filament colour. The chroma of the
+// centre is boosted first, because photo clusters are muddy: without the boost
+// a dull red snaps to grey instead of red.
+function snapToFilament(c){
+  const m=(c[0]+c[1]+c[2])/3, B=1.45;
+  const p=[0,1,2].map(i=>Math.max(0,Math.min(255,m+(c[i]-m)*B)));
+  return nearest(p,FILAMENT);
+}
+
+// Otsu threshold over perceptual luminance → crisp black & white for photos.
+// 2色のときはこちら。k平均だと写真がネガっぽく割れるため。
+function otsuLabels(px){
+  const N=px.length/4, luma=new Float32Array(N), hist=new Float64Array(256);
+  for(let i=0;i<N;i++){
+    const l=0.299*px[i*4]+0.587*px[i*4+1]+0.114*px[i*4+2];
+    luma[i]=l; hist[Math.min(255,l|0)]++;
+  }
+  let sum=0; for(let t=0;t<256;t++) sum+=t*hist[t];
+  let wB=0,sumB=0,best=127,bv=-1;
+  for(let t=0;t<256;t++){
+    wB+=hist[t]; if(!wB) continue;
+    const wF=N-wB; if(!wF) break;
+    sumB+=t*hist[t];
+    const mB=sumB/wB, mF=(sum-sumB)/wF, v=wB*wF*(mB-mF)*(mB-mF);
+    if(v>bv){bv=v;best=t;}
+  }
+  const labels=new Uint8Array(N);
+  for(let i=0;i<N;i++) labels[i]=luma[i]>best?1:0;   // 0=dark, 1=light
+  return labels;
+}
+
+function denoise(lab,w,h,passes){
+  let cur=lab;
+  for(let p=0;p<passes;p++){
+    const nx=new Uint8Array(cur.length);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const cnt={};
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const ax=x+dx, ay=y+dy; if(ax<0||ay<0||ax>=w||ay>=h) continue;
+        const l=cur[ay*w+ax]; cnt[l]=(cnt[l]||0)+1;
+      }
+      let bl=cur[y*w+x], bc=-1;
+      for(const l in cnt) if(cnt[l]>bc){bc=cnt[l];bl=+l;}
+      nx[y*w+x]=bl;
+    }
+    cur=nx;
+  }
+  return cur;
+}
+function despeckle(lab,w,h,minArea){
+  const seen=new Uint8Array(lab.length), st=[];
+  for(let i=0;i<lab.length;i++){
+    if(seen[i]) continue;
+    const L=lab[i], cells=[]; st.length=0; st.push(i); seen[i]=1;
+    const border={};
+    while(st.length){
+      const p=st.pop(); cells.push(p);
+      const x=p%w, y=(p/w)|0;
+      const nb=[[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
+      for(const [nx,ny] of nb){
+        if(nx<0||ny<0||nx>=w||ny>=h) continue;
+        const q=ny*w+nx;
+        if(lab[q]===L){ if(!seen[q]){seen[q]=1;st.push(q);} }
+        else border[lab[q]]=(border[lab[q]]||0)+1;
+      }
+    }
+    if(cells.length<minArea){
+      let bl=L,bc=-1; for(const l in border) if(border[l]>bc){bc=border[l];bl=+l;}
+      if(bc>0) for(const c of cells) lab[c]=bl;
+    }
+  }
+  return lab;
+}
+// Draw a line along every colour boundary, using the darkest colour already in
+// the palette. Reduction tends to swallow thin line art, and this brings it back.
+// 色の境目に線を引く。線の色はパレットの中で一番暗い色を自動で選ぶ。
+function luma(c){ return 0.299*c[0]+0.587*c[1]+0.114*c[2]; }
+function addOutline(lab,w,h,pal,BG,width){
+  // pick the darkest colour actually present
+  const present=new Set();
+  for(let i=0;i<lab.length;i++) if(lab[i]!==BG) present.add(lab[i]);
+  if(present.size<2) return lab;
+  let dark=-1, dl=Infinity;
+  present.forEach(l=>{ const v=luma(pal[l]); if(v<dl){dl=v; dark=l;} });
+  if(dark<0) return lab;
+
+  let edge=new Uint8Array(lab.length);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const i=y*w+x, L=lab[i];
+    if(L===BG) continue;
+    if((x>0   && lab[i-1]!==L) || (x<w-1 && lab[i+1]!==L) ||
+       (y>0   && lab[i-w]!==L) || (y<h-1 && lab[i+w]!==L)) edge[i]=1;
+  }
+  for(let p=1;p<width;p++){
+    const nx=Uint8Array.from(edge);
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const i=y*w+x; if(lab[i]===BG || edge[i]) continue;
+      if((x>0&&edge[i-1])||(x<w-1&&edge[i+1])||(y>0&&edge[i-w])||(y<h-1&&edge[i+w])) nx[i]=1;
+    }
+    edge=nx;
+  }
+  for(let i=0;i<lab.length;i++) if(edge[i]) lab[i]=dark;
+  return lab;
+}
+
+// Colours that touch only at a corner make a non-manifold pinch point, which
+// stops the mesh being watertight. Filling one pixel breaks the diagonal.
+// 色が角だけで接していると水密にならないので、1ピクセル埋めて解消する
+function fixDiagonals(lab,w,h){
+  for(let pass=0; pass<12; pass++){
+    let changed=0;
+    for(let y=1;y<h;y++) for(let x=1;x<w;x++){
+      let a=lab[(y-1)*w+x-1], b=lab[(y-1)*w+x], c=lab[y*w+x-1], d=lab[y*w+x];
+      // a colour sitting on both diagonals of a 2x2 block, with neither of the
+      // other two cells matching it, is pinched to a point. Note the two other
+      // cells do NOT have to match each other.
+      if(a===d && a!==b && a!==c){ lab[y*w+x-1]=a; changed++; continue; }
+      if(b===c && b!==a && b!==d){ lab[(y-1)*w+x-1]=b; changed++; }
+    }
+    if(!changed) break;
+  }
+  return lab;
+}
+function edgeLabel(lab,w,h){
+  const c={};
+  for(let x=0;x<w;x++){c[lab[x]]=(c[lab[x]]||0)+1; c[lab[(h-1)*w+x]]=(c[lab[(h-1)*w+x]]||0)+1;}
+  for(let y=0;y<h;y++){c[lab[y*w]]=(c[lab[y*w]]||0)+1; c[lab[y*w+w-1]]=(c[lab[y*w+w-1]]||0)+1;}
+  let bl=0,bc=-1; for(const l in c) if(c[l]>bc){bc=c[l];bl=+l;} return bl;
+}
+// Remove only the background that is CONNECTED to the border, so islands of the
+// same colour inside the picture (the whites of the eyes, for instance) survive.
+// 背景は「画像の縁からつながっている部分だけ」を抜く。絵の中に島として存在する
+// 同じ色（白目など）は残す。
+function cutBackground(lab,w,h,BG){
+  const bl=edgeLabel(lab,w,h);
+  const st=[];
+  const push=i=>{ if(lab[i]===bl){ lab[i]=BG; st.push(i); } };
+  for(let x=0;x<w;x++){ push(x); push((h-1)*w+x); }
+  for(let y=0;y<h;y++){ push(y*w); push(y*w+w-1); }
+  while(st.length){
+    const p=st.pop(), x=p%w, y=(p/w)|0;
+    if(x>0)   push(p-1);
+    if(x<w-1) push(p+1);
+    if(y>0)   push(p-w);
+    if(y<h-1) push(p+w);
+  }
+  return lab;
+}
+
+
+/* ---------------- line-art extraction ----------------
+   フル解像度で二値化 → 「1つでも黒があれば黒」の縮小(min-pool)で線を落とさない
+   → 実寸mm指定の太さまで膨張。細い線画をそのまま印刷可能な太さの線にする。 */
+function lineartLabels(imgEl,W,H,threshold,lineMM,widthMM,gapMM){
+  const fw=imgEl.width, fh=imgEl.height;
+  const c=document.createElement("canvas"); c.width=fw; c.height=fh;
+  const g=c.getContext("2d",{willReadFrequently:true});
+  g.drawImage(imgEl,0,0); const d=g.getImageData(0,0,fw,fh).data;
+  const N=fw*fh, lum=new Float32Array(N);
+  for(let i=0;i<N;i++){ const a=d[i*4+3]/255;
+    const l=0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2];
+    lum[i]=l*a+255*(1-a); }                                 // 透過は白
+  let th=threshold;
+  if(th<=0){ // Otsu, then bias toward including anti-aliased greys
+    const hist=new Float64Array(256); for(let i=0;i<N;i++) hist[Math.min(255,lum[i]|0)]++;
+    let sum=0; for(let t=0;t<256;t++) sum+=t*hist[t];
+    let wB=0,sumB=0,best=127,bv=-1;
+    for(let t=0;t<256;t++){ wB+=hist[t]; if(!wB) continue; const wF=N-wB; if(!wF) break;
+      sumB+=t*hist[t]; const mB=sumB/wB,mF=(sum-sumB)/wF,v=wB*wF*(mB-mF)*(mB-mF); if(v>bv){bv=v;best=t;} }
+    th=Math.min(250, best+(255-best)*0.35);
+  }
+  // full-res ink mask
+  let ink=new Uint8Array(N); for(let i=0;i<N;i++) ink[i]=lum[i]<th?1:0;
+
+  // ---- 実寸換算: 元画像1px = mmSrc mm（横幅で決まる）
+  const mmSrc=widthMM/fw;
+  // ---- 元の線幅を推定（黒ランの中央値、横方向）
+  const runs=[]; for(let y=0;y<fh;y+=Math.max(1,(fh/200)|0)){ let r=0; for(let x=0;x<fw;x++){ if(ink[y*fw+x]) r++; else if(r){ runs.push(r); r=0; } } }
+  runs.sort((a,b)=>a-b); const medRun=runs.length?runs[(runs.length/2)|0]:1;
+  const srcLineMM=medRun*mmSrc;
+  // ---- 目標線幅: 指定値(lineMM)。ただし「0=そのまま」。実際に足すのは不足分のみ。
+  const target=lineMM>0?lineMM:0;
+  const growMM=Math.max(0,(target-srcLineMM)/2);
+  const growPx=Math.round(growMM/mmSrc);
+  // 太らせは元解像度で丸ブラシ膨張（縮小前）→ 線が均一に太り、細い髪もつぶれにくい
+  const dilate=(src,w,h,r)=>{ if(r<=0) return src; const dst=new Uint8Array(w*h);
+    const offs=[]; for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++) if(ox*ox+oy*oy<=r*r) offs.push(oy*w+ox);
+    // separable-ish: only from boundary pixels for speed
+    for(let y=r;y<h-r;y++)for(let x=r;x<w-r;x++){ const i=y*w+x; if(!src[i]) continue;
+      if(src[i-1]&&src[i+1]&&src[i-w]&&src[i+w]){ dst[i]=1; continue; }   // interior: no need to spray
+      for(const o of offs) dst[i+o]=1; }
+    return dst; };
+  const erode=(src,w,h,r)=>{ if(r<=0) return src; const dst=new Uint8Array(w*h);
+    const offs=[]; for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++) if(ox*ox+oy*oy<=r*r) offs.push(oy*w+ox);
+    for(let y=r;y<h-r;y++)for(let x=r;x<w-r;x++){ const i=y*w+x; if(!src[i]) continue; let ok=1; for(const o of offs){ if(!src[i+o]){ ok=0; break; } } dst[i]=ok; }
+    return dst; };
+  // ---- 途切れ補修（元解像度でクロージング。線幅は戻す）
+  const gapPx=Math.round((gapMM||0)/mmSrc/2);
+  if(gapPx>0){ const closed=erode(dilate(ink,fw,fh,gapPx),fw,fh,gapPx); for(let i=0;i<N;i++) if(closed[i]) ink[i]=1; }
+  if(growPx>0) ink=dilate(ink,fw,fh,growPx);
+
+  // ---- 縮小: 面積比で判定（セル内のインク占有率が閾値以上なら黒）。線が細いところは
+  //      "1つでもあれば黒"(min-pool)にすると太りすぎるので、線幅相応の閾値にする。
+  const lab=new Uint8Array(W*H); const cov=new Float32Array(W*H);
+  const sx=fw/W, sy=fh/H;
+  const finalLinePx = Math.max(1, (srcLineMM+2*growMM)/mmSrc);   // 元解像度での線幅(px)
+  // 出力1セル(sx px)に対して線が占める割合の目安。線幅がセルより細い→低い閾値で拾う
+  const thr = Math.max(0.15, Math.min(0.5, 0.5*finalLinePx/sx));
+  for(let y=0;y<H;y++){
+    const y0=Math.floor(y*sy), y1=Math.min(fh-1,Math.ceil((y+1)*sy)-1);
+    for(let x=0;x<W;x++){
+      const x0=Math.floor(x*sx), x1=Math.min(fw-1,Math.ceil((x+1)*sx)-1);
+      let cnt=0,tot=0;
+      for(let yy=y0;yy<=y1;yy++){ const row=yy*fw; for(let xx=x0;xx<=x1;xx++){ tot++; cnt+=ink[row+xx]; } }
+      cov[y*W+x]=cnt/tot;
+      lab[y*W+x]= (cnt/tot>=thr)?1:0;
+    }
+  }
+  const labels=new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++) labels[i]=lab[i]?0:1;    // 0=線(黒), 1=地(白)
+  lineartInfo={srcLineMM, medRun, thr, growMM};
+  lineartCov={cov,thr,W,H};                          // sub-pixel iso-contouring 用
+  return labels;
+}
+let lineartInfo=null, lineartCov=null;
+
+/* ---------------- laser mode (full-resolution B/W) ----------------
+   元画像のフル解像度で: 明るさ/コントラスト → (線画|点描|2値) → 途切れ補修/太らせ。
+   結果は 1=黒 のUint8Array と、表示用の縮小ラベルを返す。 */
+let laserResult=null;   // {ink:Uint8Array, fw, fh}
+function laserProcess(imgEl,kind,bright,cont,threshold,gapPx,growPx){
+  const fw=imgEl.width, fh=imgEl.height, N=fw*fh;
+  const c=document.createElement("canvas"); c.width=fw; c.height=fh;
+  const g=c.getContext("2d",{willReadFrequently:true}); g.drawImage(imgEl,0,0);
+  const d=g.getImageData(0,0,fw,fh).data;
+  const lum=new Float32Array(N);
+  const cf=(259*(cont+255))/(255*(259-cont));            // contrast factor
+  for(let i=0;i<N;i++){ const a=d[i*4+3]/255;
+    let l=0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2]; l=l*a+255*(1-a);
+    l=cf*(l-128)+128+bright; lum[i]=Math.max(0,Math.min(255,l)); }
+  const ink=new Uint8Array(N);
+  if(kind==="dither"){
+    // Floyd–Steinberg (serpentine)
+    const err=Float32Array.from(lum);
+    for(let y=0;y<fh;y++){ const ltr=(y%2===0);
+      for(let k=0;k<fw;k++){ const x=ltr?k:fw-1-k; const i=y*fw+x;
+        const old=err[i]; const nv=old<128?0:255; ink[i]=nv===0?1:0; const e=old-nv;
+        const dx=ltr?1:-1;
+        if(x+dx>=0&&x+dx<fw) err[i+dx]+=e*7/16;
+        if(y+1<fh){ if(x-dx>=0&&x-dx<fw) err[i+fw-dx]+=e*3/16; err[i+fw]+=e*5/16; if(x+dx>=0&&x+dx<fw) err[i+fw+dx]+=e*1/16; } } }
+  }else{
+    let th=threshold;
+    if(th<=0){ // Otsu
+      const hist=new Float64Array(256); for(let i=0;i<N;i++) hist[Math.min(255,lum[i]|0)]++;
+      let sum=0; for(let t=0;t<256;t++) sum+=t*hist[t];
+      let wB=0,sumB=0,best=127,bv=-1;
+      for(let t=0;t<256;t++){ wB+=hist[t]; if(!wB) continue; const wF=N-wB; if(!wF) break;
+        sumB+=t*hist[t]; const mB=sumB/wB,mF=(sum-sumB)/wF,v=wB*wF*(mB-mF)*(mB-mF); if(v>bv){bv=v;best=t;} }
+      th= kind==="line" ? Math.min(250, best+(255-best)*0.35) : best;   // 線画はアンチエイリアスのグレーも線に
+    }
+    for(let i=0;i<N;i++) ink[i]=lum[i]<th?1:0;
+    laserResult_th=th;
+  }
+  // morphology helpers (disc)
+  const offsOf=(r)=>{ const o=[]; for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++) if(ox*ox+oy*oy<=r*r) o.push([ox,oy]); return o; };
+  const dil=(src,r)=>{ if(r<=0) return src; const dst=new Uint8Array(N), offs=offsOf(r);
+    for(let y=0;y<fh;y++)for(let x=0;x<fw;x++){ const i=y*fw+x; if(!src[i]) continue;
+      if(x>0&&x<fw-1&&y>0&&y<fh-1&&src[i-1]&&src[i+1]&&src[i-fw]&&src[i+fw]){ dst[i]=1; continue; }
+      for(const [ox,oy] of offs){ const X=x+ox,Y=y+oy; if(X>=0&&Y>=0&&X<fw&&Y<fh) dst[Y*fw+X]=1; } } return dst; };
+  const ero=(src,r)=>{ if(r<=0) return src; const dst=new Uint8Array(N), offs=offsOf(r);
+    for(let y=0;y<fh;y++)for(let x=0;x<fw;x++){ const i=y*fw+x; if(!src[i]) continue; let ok=1;
+      for(const [ox,oy] of offs){ const X=x+ox,Y=y+oy; if(X<0||Y<0||X>=fw||Y>=fh||!src[Y*fw+X]){ ok=0; break; } } dst[i]=ok; } return dst; };
+  let out=ink;
+  if(kind!=="dither" && gapPx>0){ const closed=ero(dil(out,gapPx),gapPx); for(let i=0;i<N;i++) if(closed[i]) out[i]=1; }
+  if(kind!=="dither" && growPx>0) out=dil(out,growPx);
+  return {ink:out,fw,fh};
+}
+let laserResult_th=0;
+
+/* ---------------- reduce ---------------- */
+$("go").onclick=()=>{ if(!srcData) return;
+  $("go").disabled=true; $("msg").textContent="処理中… / working…";
+  setTimeout(runReduce,30); };
+
+function runReduce(){
+  const px=srcData.data;
+  let pal,labels;
+  const kv=+$("k").value;
+  if(mode==="manual" && manualPal.length===2){
+    // 2色指定: 輝度のしきい値で白黒風に分け、暗い方の色を暗部に割り当てる
+    pal=manualPal.map(hexToRgb);
+    labels=otsuLabels(px);
+    const l0=0.299*pal[0][0]+0.587*pal[0][1]+0.114*pal[0][2];
+    const l1=0.299*pal[1][0]+0.587*pal[1][1]+0.114*pal[1][2];
+    if(l0>l1) for(let i=0;i<labels.length;i++) labels[i]^=1;
+  }else if(mode==="manual"){
+    pal=manualPal.map(hexToRgb);
+    const N=px.length/4; labels=new Uint8Array(N);
+    for(let i=0;i<N;i++) labels[i]=nearest([px[i*4],px[i*4+1],px[i*4+2]],pal);
+  }else if(kv===2){
+    // 2色: 大津の二値化でくっきり白黒。k平均だと写真がネガっぽくなるため
+    pal=[hexToRgb("#1A1A1A"),hexToRgb("#F2F0EB")];
+    labels=otsuLabels(px);
+  }else if(mode==="filament"){
+    // k平均で分けたあと、各クラスタをフィラメント色へスナップして統合
+    const r=kmeans(px,kv);
+    const map=r.cents.map(snapToFilament);
+    const uniq=[...new Set(map)];
+    pal=uniq.map(i=>FILAMENT[i].slice());
+    const remap=map.map(f=>uniq.indexOf(f));
+    labels=new Uint8Array(r.assign.length);
+    for(let i=0;i<labels.length;i++) labels[i]=remap[r.assign[i]];
+  }else if(mode==="laser"){
+    pal=[hexToRgb("#000000"),hexToRgb("#FFFFFF")];
+    laserResult=laserProcess(img,laserKind,+$("lzBright").value,+$("lzCont").value,+$("lzTh").value,+$("lzGap").value,+$("lzGrow").value);
+    // preview: area-average downsample of ink to the working grid (shown as grey levels? no—labels are 2 colours;
+    // use majority so the preview stays B/W, dither shows as texture)
+    const {ink,fw,fh}=laserResult; labels=new Uint8Array(W*H);
+    const sx=fw/W, sy=fh/H;
+    for(let y=0;y<H;y++){ const y0=Math.floor(y*sy), y1=Math.min(fh-1,Math.ceil((y+1)*sy)-1);
+      for(let x=0;x<W;x++){ const x0=Math.floor(x*sx), x1=Math.min(fw-1,Math.ceil((x+1)*sx)-1);
+        let cnt=0,tot=0; for(let yy=y0;yy<=y1;yy++){ const row=yy*fw; for(let xx=x0;xx<=x1;xx++){ tot++; cnt+=ink[row+xx]; } }
+        labels[y*W+x]= (cnt/tot>= (laserKind==="dither"?0.5:0.35)) ? 0 : 1; } }
+    if(+$("lzTh").value===0 && laserKind!=="dither") $("lzThOut").textContent="自動 ("+Math.round(laserResult_th)+")";
+  }else if(mode==="lineart"){
+    pal=[hexToRgb("#1A1A1A"),hexToRgb("#F2F0EB")];
+    labels=lineartLabels(img,W,H,+$("lth").value,(+$("lw").value)/10,widthMM(),(+$("lgap").value)/10);
+  }else{
+    const r=kmeans(px,kv); pal=r.cents; labels=r.assign;
+  }
+  const sm=+$("sm").value;
+  if(sm>0 && mode!=="lineart" && mode!=="laser"){ labels=denoise(labels,W,H,sm);
+    labels=despeckle(labels,W,H,[0,6,14,30][sm]); }
+
+  const BG=255;
+  if(+$("bg").value===1) labels=cutBackground(labels,W,H,BG);
+  const olw=+$("ol").value;
+  if(olw>0) labels=addOutline(labels,W,H,pal,BG,olw);
+  labels=fixDiagonals(labels,W,H);
+
+  const used=new Array(pal.length).fill(0);
+  let bgCount=0;
+  for(let i=0;i<labels.length;i++){
+    if(labels[i]===BG){ bgCount++; continue; }
+    used[labels[i]]++;
+  }
+  const keep=[]; for(let i=0;i<pal.length;i++) if(used[i]>0) keep.push(i);
+
+  // paint
+  const out=$("out"); out.width=W; out.height=H; out.hidden=false; $("e2").style.display="none";
+  const g=out.getContext("2d"); const id=g.createImageData(W,H);
+  for(let i=0;i<labels.length;i++){
+    const l=labels[i];
+    if(l===BG){ id.data[i*4+3]=0; continue; }
+    id.data[i*4]=pal[l][0]; id.data[i*4+1]=pal[l][1]; id.data[i*4+2]=pal[l][2]; id.data[i*4+3]=255;
+  }
+  g.putImageData(id,0,0);
+
+  // chips
+  const pb=$("pal"); pb.innerHTML="";
+  keep.forEach(i=>{
+    const hex=rgbToHex(...pal[i]);
+    const pct=(100*used[i]/labels.length).toFixed(0);
+    const el=document.createElement("div"); el.className="sw";
+    el.innerHTML=`<i style="background:${hex}"></i>${hex} <b style="color:var(--muted);font-weight:400">${pct}%</b>`;
+    pb.appendChild(el);
+  });
+  $("stat").innerHTML=`<div>色数 / colours <b>${keep.length}</b></div>`+
+    `<div>解像度 / grid <b>${W}&times;${H}</b></div>`+
+    (bgCount?`<div>背景 / background <b>抜き済み</b></div>`:"");
+  $("result").style.display="";
+  reduced={pal,labels,W,H,BG,keep};
+
+  // relief height table
+  const t=$("hTable"); t.innerHTML="";
+  keep.forEach((i,n)=>{
+    if(heights[i]===undefined) heights[i]=(0.4+0.3*n).toFixed(1);
+    const tr=document.createElement("tr");
+    const hex=rgbToHex(...pal[i]);
+    tr.innerHTML=`<td><i style="background:${hex}"></i></td><td>${hex}</td>`;
+    const td=document.createElement("td");
+    const inp=document.createElement("input"); inp.type="number";
+    inp.min="0.1"; inp.max="20"; inp.step="0.1"; inp.value=heights[i];
+    inp.oninput=e=>heights[i]=e.target.value;
+    td.appendChild(inp); tr.appendChild(td); t.appendChild(tr);
+  });
+
+  if(mode==="laser"){ $("exportCard").style.display="none"; $("exportPlaceholder").style.display="";
+    $("exportPlaceholder").querySelector(".hint").innerHTML="レーザーモードでは3D化しません。真ん中の「PNG保存／JPEG保存」で<b>元画像と同じ解像度</b>の白黒画像が保存されます。<br>Laser mode: no 3D. Use PNG/JPEG save (full resolution).";
+    $("meshCard").style.display="none"; }
+  else { $("exportCard").style.display=""; $("exportPlaceholder").style.display="none"; }
+  $("go").disabled=false; $("msg").textContent="完了 / done";
+}
+
+/* ================= geometry ================= */
+function greedyRects(mask,w,h){
+  const m=Uint8Array.from(mask), out=[];
+  for(let y=0;y<h;y++){
+    let x=0;
+    while(x<w){
+      if(!m[y*w+x]){x++;continue;}
+      let x2=x; while(x2+1<w && m[y*w+x2+1]) x2++;
+      let y2=y;
+      outer: while(y2+1<h){
+        for(let i=x;i<=x2;i++) if(!m[(y2+1)*w+i]) break outer;
+        y2++;
+      }
+      out.push([x,y,x2-x+1,y2-y+1]);
+      for(let j=y;j<=y2;j++) for(let i=x;i<=x2;i++) m[j*w+i]=0;
+      x=x2+1;
+    }
+  }
+  return out;
+}
+// build a watertight prism for one mask.
+// Grid y is mirrored into world Y, which flips handedness, so the top/bottom
+// fans are emitted reversed while the walls keep their natural order.
+// Verified: watertight, consistent winding, positive volume, top normal +z.
+
+/* ---- earcut 2.2.4 (Mapbox, ISC License) — fast robust polygon triangulation with holes ---- */
+
+
+function earcut(data, holeIndices, dim) {
+
+    dim = dim || 2;
+
+    var hasHoles = holeIndices && holeIndices.length,
+        outerLen = hasHoles ? holeIndices[0] * dim : data.length,
+        outerNode = linkedList(data, 0, outerLen, dim, true),
+        triangles = [];
+
+    if (!outerNode || outerNode.next === outerNode.prev) return triangles;
+
+    var minX, minY, maxX, maxY, x, y, invSize;
+
+    if (hasHoles) outerNode = eliminateHoles(data, holeIndices, outerNode, dim);
+
+    // if the shape is not too simple, we'll use z-order curve hash later; calculate polygon bbox
+    if (data.length > 80 * dim) {
+        minX = maxX = data[0];
+        minY = maxY = data[1];
+
+        for (var i = dim; i < outerLen; i += dim) {
+            x = data[i];
+            y = data[i + 1];
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+        }
+
+        // minX, minY and invSize are later used to transform coords into integers for z-order calculation
+        invSize = Math.max(maxX - minX, maxY - minY);
+        invSize = invSize !== 0 ? 32767 / invSize : 0;
+    }
+
+    earcutLinked(outerNode, triangles, dim, minX, minY, invSize, 0);
+
+    return triangles;
+}
+
+// create a circular doubly linked list from polygon points in the specified winding order
+function linkedList(data, start, end, dim, clockwise) {
+    var i, last;
+
+    if (clockwise === (signedArea(data, start, end, dim) > 0)) {
+        for (i = start; i < end; i += dim) last = insertNode(i, data[i], data[i + 1], last);
+    } else {
+        for (i = end - dim; i >= start; i -= dim) last = insertNode(i, data[i], data[i + 1], last);
+    }
+
+    if (last && equals(last, last.next)) {
+        removeNode(last);
+        last = last.next;
+    }
+
+    return last;
+}
+
+// eliminate colinear or duplicate points
+function filterPoints(start, end) {
+    if (!start) return start;
+    if (!end) end = start;
+
+    var p = start,
+        again;
+    do {
+        again = false;
+
+        if (!p.steiner && (equals(p, p.next) || area(p.prev, p, p.next) === 0)) {
+            removeNode(p);
+            p = end = p.prev;
+            if (p === p.next) break;
+            again = true;
+
+        } else {
+            p = p.next;
+        }
+    } while (again || p !== end);
+
+    return end;
+}
+
+// main ear slicing loop which triangulates a polygon (given as a linked list)
+function earcutLinked(ear, triangles, dim, minX, minY, invSize, pass) {
+    if (!ear) return;
+
+    // interlink polygon nodes in z-order
+    if (!pass && invSize) indexCurve(ear, minX, minY, invSize);
+
+    var stop = ear,
+        prev, next;
+
+    // iterate through ears, slicing them one by one
+    while (ear.prev !== ear.next) {
+        prev = ear.prev;
+        next = ear.next;
+
+        if (invSize ? isEarHashed(ear, minX, minY, invSize) : isEar(ear)) {
+            // cut off the triangle
+            triangles.push(prev.i / dim | 0);
+            triangles.push(ear.i / dim | 0);
+            triangles.push(next.i / dim | 0);
+
+            removeNode(ear);
+
+            // skipping the next vertex leads to less sliver triangles
+            ear = next.next;
+            stop = next.next;
+
+            continue;
+        }
+
+        ear = next;
+
+        // if we looped through the whole remaining polygon and can't find any more ears
+        if (ear === stop) {
+            // try filtering points and slicing again
+            if (!pass) {
+                earcutLinked(filterPoints(ear), triangles, dim, minX, minY, invSize, 1);
+
+            // if this didn't work, try curing all small self-intersections locally
+            } else if (pass === 1) {
+                ear = cureLocalIntersections(filterPoints(ear), triangles, dim);
+                earcutLinked(ear, triangles, dim, minX, minY, invSize, 2);
+
+            // as a last resort, try splitting the remaining polygon into two
+            } else if (pass === 2) {
+                splitEarcut(ear, triangles, dim, minX, minY, invSize);
+            }
+
+            break;
+        }
+    }
+}
+
+// check whether a polygon node forms a valid ear with adjacent nodes
+function isEar(ear) {
+    var a = ear.prev,
+        b = ear,
+        c = ear.next;
+
+    if (area(a, b, c) >= 0) return false; // reflex, can't be an ear
+
+    // now make sure we don't have other points inside the potential ear
+    var ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y;
+
+    // triangle bbox; min & max are calculated like this for speed
+    var x0 = ax < bx ? (ax < cx ? ax : cx) : (bx < cx ? bx : cx),
+        y0 = ay < by ? (ay < cy ? ay : cy) : (by < cy ? by : cy),
+        x1 = ax > bx ? (ax > cx ? ax : cx) : (bx > cx ? bx : cx),
+        y1 = ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy);
+
+    var p = c.next;
+    while (p !== a) {
+        if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 &&
+            pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) &&
+            area(p.prev, p, p.next) >= 0) return false;
+        p = p.next;
+    }
+
+    return true;
+}
+
+function isEarHashed(ear, minX, minY, invSize) {
+    var a = ear.prev,
+        b = ear,
+        c = ear.next;
+
+    if (area(a, b, c) >= 0) return false; // reflex, can't be an ear
+
+    var ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y;
+
+    // triangle bbox; min & max are calculated like this for speed
+    var x0 = ax < bx ? (ax < cx ? ax : cx) : (bx < cx ? bx : cx),
+        y0 = ay < by ? (ay < cy ? ay : cy) : (by < cy ? by : cy),
+        x1 = ax > bx ? (ax > cx ? ax : cx) : (bx > cx ? bx : cx),
+        y1 = ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy);
+
+    // z-order range for the current triangle bbox;
+    var minZ = zOrder(x0, y0, minX, minY, invSize),
+        maxZ = zOrder(x1, y1, minX, minY, invSize);
+
+    var p = ear.prevZ,
+        n = ear.nextZ;
+
+    // look for points inside the triangle in both directions
+    while (p && p.z >= minZ && n && n.z <= maxZ) {
+        if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p !== a && p !== c &&
+            pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0) return false;
+        p = p.prevZ;
+
+        if (n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1 && n !== a && n !== c &&
+            pointInTriangle(ax, ay, bx, by, cx, cy, n.x, n.y) && area(n.prev, n, n.next) >= 0) return false;
+        n = n.nextZ;
+    }
+
+    // look for remaining points in decreasing z-order
+    while (p && p.z >= minZ) {
+        if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p !== a && p !== c &&
+            pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0) return false;
+        p = p.prevZ;
+    }
+
+    // look for remaining points in increasing z-order
+    while (n && n.z <= maxZ) {
+        if (n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1 && n !== a && n !== c &&
+            pointInTriangle(ax, ay, bx, by, cx, cy, n.x, n.y) && area(n.prev, n, n.next) >= 0) return false;
+        n = n.nextZ;
+    }
+
+    return true;
+}
+
+// go through all polygon nodes and cure small local self-intersections
+function cureLocalIntersections(start, triangles, dim) {
+    var p = start;
+    do {
+        var a = p.prev,
+            b = p.next.next;
+
+        if (!equals(a, b) && intersects(a, p, p.next, b) && locallyInside(a, b) && locallyInside(b, a)) {
+
+            triangles.push(a.i / dim | 0);
+            triangles.push(p.i / dim | 0);
+            triangles.push(b.i / dim | 0);
+
+            // remove two nodes involved
+            removeNode(p);
+            removeNode(p.next);
+
+            p = start = b;
+        }
+        p = p.next;
+    } while (p !== start);
+
+    return filterPoints(p);
+}
+
+// try splitting polygon into two and triangulate them independently
+function splitEarcut(start, triangles, dim, minX, minY, invSize) {
+    // look for a valid diagonal that divides the polygon into two
+    var a = start;
+    do {
+        var b = a.next.next;
+        while (b !== a.prev) {
+            if (a.i !== b.i && isValidDiagonal(a, b)) {
+                // split the polygon in two by the diagonal
+                var c = splitPolygon(a, b);
+
+                // filter colinear points around the cuts
+                a = filterPoints(a, a.next);
+                c = filterPoints(c, c.next);
+
+                // run earcut on each half
+                earcutLinked(a, triangles, dim, minX, minY, invSize, 0);
+                earcutLinked(c, triangles, dim, minX, minY, invSize, 0);
+                return;
+            }
+            b = b.next;
+        }
+        a = a.next;
+    } while (a !== start);
+}
+
+// link every hole into the outer loop, producing a single-ring polygon without holes
+function eliminateHoles(data, holeIndices, outerNode, dim) {
+    var queue = [],
+        i, len, start, end, list;
+
+    for (i = 0, len = holeIndices.length; i < len; i++) {
+        start = holeIndices[i] * dim;
+        end = i < len - 1 ? holeIndices[i + 1] * dim : data.length;
+        list = linkedList(data, start, end, dim, false);
+        if (list === list.next) list.steiner = true;
+        queue.push(getLeftmost(list));
+    }
+
+    queue.sort(compareX);
+
+    // process holes from left to right
+    for (i = 0; i < queue.length; i++) {
+        outerNode = eliminateHole(queue[i], outerNode);
+    }
+
+    return outerNode;
+}
+
+function compareX(a, b) {
+    return a.x - b.x;
+}
+
+// find a bridge between vertices that connects hole with an outer ring and and link it
+function eliminateHole(hole, outerNode) {
+    var bridge = findHoleBridge(hole, outerNode);
+    if (!bridge) {
+        return outerNode;
+    }
+
+    var bridgeReverse = splitPolygon(bridge, hole);
+
+    // filter collinear points around the cuts
+    filterPoints(bridgeReverse, bridgeReverse.next);
+    return filterPoints(bridge, bridge.next);
+}
+
+// David Eberly's algorithm for finding a bridge between hole and outer polygon
+function findHoleBridge(hole, outerNode) {
+    var p = outerNode,
+        hx = hole.x,
+        hy = hole.y,
+        qx = -Infinity,
+        m;
+
+    // find a segment intersected by a ray from the hole's leftmost point to the left;
+    // segment's endpoint with lesser x will be potential connection point
+    do {
+        if (hy <= p.y && hy >= p.next.y && p.next.y !== p.y) {
+            var x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y);
+            if (x <= hx && x > qx) {
+                qx = x;
+                m = p.x < p.next.x ? p : p.next;
+                if (x === hx) return m; // hole touches outer segment; pick leftmost endpoint
+            }
+        }
+        p = p.next;
+    } while (p !== outerNode);
+
+    if (!m) return null;
+
+    // look for points inside the triangle of hole point, segment intersection and endpoint;
+    // if there are no points found, we have a valid connection;
+    // otherwise choose the point of the minimum angle with the ray as connection point
+
+    var stop = m,
+        mx = m.x,
+        my = m.y,
+        tanMin = Infinity,
+        tan;
+
+    p = m;
+
+    do {
+        if (hx >= p.x && p.x >= mx && hx !== p.x &&
+                pointInTriangle(hy < my ? hx : qx, hy, mx, my, hy < my ? qx : hx, hy, p.x, p.y)) {
+
+            tan = Math.abs(hy - p.y) / (hx - p.x); // tangential
+
+            if (locallyInside(p, hole) &&
+                (tan < tanMin || (tan === tanMin && (p.x > m.x || (p.x === m.x && sectorContainsSector(m, p)))))) {
+                m = p;
+                tanMin = tan;
+            }
+        }
+
+        p = p.next;
+    } while (p !== stop);
+
+    return m;
+}
+
+// whether sector in vertex m contains sector in vertex p in the same coordinates
+function sectorContainsSector(m, p) {
+    return area(m.prev, m, p.prev) < 0 && area(p.next, m, m.next) < 0;
+}
+
+// interlink polygon nodes in z-order
+function indexCurve(start, minX, minY, invSize) {
+    var p = start;
+    do {
+        if (p.z === 0) p.z = zOrder(p.x, p.y, minX, minY, invSize);
+        p.prevZ = p.prev;
+        p.nextZ = p.next;
+        p = p.next;
+    } while (p !== start);
+
+    p.prevZ.nextZ = null;
+    p.prevZ = null;
+
+    sortLinked(p);
+}
+
+// Simon Tatham's linked list merge sort algorithm
+// http://www.chiark.greenend.org.uk/~sgtatham/algorithms/listsort.html
+function sortLinked(list) {
+    var i, p, q, e, tail, numMerges, pSize, qSize,
+        inSize = 1;
+
+    do {
+        p = list;
+        list = null;
+        tail = null;
+        numMerges = 0;
+
+        while (p) {
+            numMerges++;
+            q = p;
+            pSize = 0;
+            for (i = 0; i < inSize; i++) {
+                pSize++;
+                q = q.nextZ;
+                if (!q) break;
+            }
+            qSize = inSize;
+
+            while (pSize > 0 || (qSize > 0 && q)) {
+
+                if (pSize !== 0 && (qSize === 0 || !q || p.z <= q.z)) {
+                    e = p;
+                    p = p.nextZ;
+                    pSize--;
+                } else {
+                    e = q;
+                    q = q.nextZ;
+                    qSize--;
+                }
+
+                if (tail) tail.nextZ = e;
+                else list = e;
+
+                e.prevZ = tail;
+                tail = e;
+            }
+
+            p = q;
+        }
+
+        tail.nextZ = null;
+        inSize *= 2;
+
+    } while (numMerges > 1);
+
+    return list;
+}
+
+// z-order of a point given coords and inverse of the longer side of data bbox
+function zOrder(x, y, minX, minY, invSize) {
+    // coords are transformed into non-negative 15-bit integer range
+    x = (x - minX) * invSize | 0;
+    y = (y - minY) * invSize | 0;
+
+    x = (x | (x << 8)) & 0x00FF00FF;
+    x = (x | (x << 4)) & 0x0F0F0F0F;
+    x = (x | (x << 2)) & 0x33333333;
+    x = (x | (x << 1)) & 0x55555555;
+
+    y = (y | (y << 8)) & 0x00FF00FF;
+    y = (y | (y << 4)) & 0x0F0F0F0F;
+    y = (y | (y << 2)) & 0x33333333;
+    y = (y | (y << 1)) & 0x55555555;
+
+    return x | (y << 1);
+}
+
+// find the leftmost node of a polygon ring
+function getLeftmost(start) {
+    var p = start,
+        leftmost = start;
+    do {
+        if (p.x < leftmost.x || (p.x === leftmost.x && p.y < leftmost.y)) leftmost = p;
+        p = p.next;
+    } while (p !== start);
+
+    return leftmost;
+}
+
+// check if a point lies within a convex triangle
+function pointInTriangle(ax, ay, bx, by, cx, cy, px, py) {
+    return (cx - px) * (ay - py) >= (ax - px) * (cy - py) &&
+           (ax - px) * (by - py) >= (bx - px) * (ay - py) &&
+           (bx - px) * (cy - py) >= (cx - px) * (by - py);
+}
+
+// check if a diagonal between two polygon nodes is valid (lies in polygon interior)
+function isValidDiagonal(a, b) {
+    return a.next.i !== b.i && a.prev.i !== b.i && !intersectsPolygon(a, b) && // dones't intersect other edges
+           (locallyInside(a, b) && locallyInside(b, a) && middleInside(a, b) && // locally visible
+            (area(a.prev, a, b.prev) || area(a, b.prev, b)) || // does not create opposite-facing sectors
+            equals(a, b) && area(a.prev, a, a.next) > 0 && area(b.prev, b, b.next) > 0); // special zero-length case
+}
+
+// signed area of a triangle
+function area(p, q, r) {
+    return (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+}
+
+// check if two points are equal
+function equals(p1, p2) {
+    return p1.x === p2.x && p1.y === p2.y;
+}
+
+// check if two segments intersect
+function intersects(p1, q1, p2, q2) {
+    var o1 = sign(area(p1, q1, p2));
+    var o2 = sign(area(p1, q1, q2));
+    var o3 = sign(area(p2, q2, p1));
+    var o4 = sign(area(p2, q2, q1));
+
+    if (o1 !== o2 && o3 !== o4) return true; // general case
+
+    if (o1 === 0 && onSegment(p1, p2, q1)) return true; // p1, q1 and p2 are collinear and p2 lies on p1q1
+    if (o2 === 0 && onSegment(p1, q2, q1)) return true; // p1, q1 and q2 are collinear and q2 lies on p1q1
+    if (o3 === 0 && onSegment(p2, p1, q2)) return true; // p2, q2 and p1 are collinear and p1 lies on p2q2
+    if (o4 === 0 && onSegment(p2, q1, q2)) return true; // p2, q2 and q1 are collinear and q1 lies on p2q2
+
+    return false;
+}
+
+// for collinear points p, q, r, check if point q lies on segment pr
+function onSegment(p, q, r) {
+    return q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y);
+}
+
+function sign(num) {
+    return num > 0 ? 1 : num < 0 ? -1 : 0;
+}
+
+// check if a polygon diagonal intersects any polygon segments
+function intersectsPolygon(a, b) {
+    var p = a;
+    do {
+        if (p.i !== a.i && p.next.i !== a.i && p.i !== b.i && p.next.i !== b.i &&
+                intersects(p, p.next, a, b)) return true;
+        p = p.next;
+    } while (p !== a);
+
+    return false;
+}
+
+// check if a polygon diagonal is locally inside the polygon
+function locallyInside(a, b) {
+    return area(a.prev, a, a.next) < 0 ?
+        area(a, b, a.next) >= 0 && area(a, a.prev, b) >= 0 :
+        area(a, b, a.prev) < 0 || area(a, a.next, b) < 0;
+}
+
+// check if the middle point of a polygon diagonal is inside the polygon
+function middleInside(a, b) {
+    var p = a,
+        inside = false,
+        px = (a.x + b.x) / 2,
+        py = (a.y + b.y) / 2;
+    do {
+        if (((p.y > py) !== (p.next.y > py)) && p.next.y !== p.y &&
+                (px < (p.next.x - p.x) * (py - p.y) / (p.next.y - p.y) + p.x))
+            inside = !inside;
+        p = p.next;
+    } while (p !== a);
+
+    return inside;
+}
+
+// link two polygon vertices with a bridge; if the vertices belong to the same ring, it splits polygon into two;
+// if one belongs to the outer ring and another to a hole, it merges it into a single ring
+function splitPolygon(a, b) {
+    var a2 = new Node(a.i, a.x, a.y),
+        b2 = new Node(b.i, b.x, b.y),
+        an = a.next,
+        bp = b.prev;
+
+    a.next = b;
+    b.prev = a;
+
+    a2.next = an;
+    an.prev = a2;
+
+    b2.next = a2;
+    a2.prev = b2;
+
+    bp.next = b2;
+    b2.prev = bp;
+
+    return b2;
+}
+
+// create a node and optionally link it with previous one (in a circular doubly linked list)
+function insertNode(i, x, y, last) {
+    var p = new Node(i, x, y);
+
+    if (!last) {
+        p.prev = p;
+        p.next = p;
+
+    } else {
+        p.next = last.next;
+        p.prev = last;
+        last.next.prev = p;
+        last.next = p;
+    }
+    return p;
+}
+
+function removeNode(p) {
+    p.next.prev = p.prev;
+    p.prev.next = p.next;
+
+    if (p.prevZ) p.prevZ.nextZ = p.nextZ;
+    if (p.nextZ) p.nextZ.prevZ = p.prevZ;
+}
+
+function Node(i, x, y) {
+    // vertex index in coordinates array
+    this.i = i;
+
+    // vertex coordinates
+    this.x = x;
+    this.y = y;
+
+    // previous and next vertex nodes in a polygon ring
+    this.prev = null;
+    this.next = null;
+
+    // z-order curve value
+    this.z = 0;
+
+    // previous and next nodes in z-order
+    this.prevZ = null;
+    this.nextZ = null;
+
+    // indicates whether this is a steiner point
+    this.steiner = false;
+}
+
+// return a percentage difference between the polygon area and its triangulation area;
+// used to verify correctness of triangulation
+earcut.deviation = function (data, holeIndices, dim, triangles) {
+    var hasHoles = holeIndices && holeIndices.length;
+    var outerLen = hasHoles ? holeIndices[0] * dim : data.length;
+
+    var polygonArea = Math.abs(signedArea(data, 0, outerLen, dim));
+    if (hasHoles) {
+        for (var i = 0, len = holeIndices.length; i < len; i++) {
+            var start = holeIndices[i] * dim;
+            var end = i < len - 1 ? holeIndices[i + 1] * dim : data.length;
+            polygonArea -= Math.abs(signedArea(data, start, end, dim));
+        }
+    }
+
+    var trianglesArea = 0;
+    for (i = 0; i < triangles.length; i += 3) {
+        var a = triangles[i] * dim;
+        var b = triangles[i + 1] * dim;
+        var c = triangles[i + 2] * dim;
+        trianglesArea += Math.abs(
+            (data[a] - data[c]) * (data[b + 1] - data[a + 1]) -
+            (data[a] - data[b]) * (data[c + 1] - data[a + 1]));
+    }
+
+    return polygonArea === 0 && trianglesArea === 0 ? 0 :
+        Math.abs((trianglesArea - polygonArea) / polygonArea);
+};
+
+function signedArea(data, start, end, dim) {
+    var sum = 0;
+    for (var i = start, j = end - dim; i < end; i += dim) {
+        sum += (data[j] - data[i]) * (data[i + 1] + data[j + 1]);
+        j = i;
+    }
+    return sum;
+}
+
+// turn a polygon in a multi-dimensional array form (e.g. as in GeoJSON) into a form Earcut accepts
+earcut.flatten = function (data) {
+    var dim = data[0][0].length,
+        result = {vertices: [], holes: [], dimensions: dim},
+        holeIndex = 0;
+
+    for (var i = 0; i < data.length; i++) {
+        for (var j = 0; j < data[i].length; j++) {
+            for (var d = 0; d < dim; d++) result.vertices.push(data[i][j][d]);
+        }
+        if (i > 0) {
+            holeIndex += data[i - 1].length;
+            result.holes.push(holeIndex);
+        }
+    }
+    return result;
+};
+
+/* ---------------- smooth prism (contour tracing + extrusion) ----------------
+   マスクを「なめらかな輪郭ポリゴン」に変換してから押し出す。
+   ・境界追跡: マスクの4連結セル境界を辺のグラフとして拾い、閉ループにつなぐ
+   ・角の丸め: チャイキン細分化(2回)。斜めや曲線がドットの階段でなくなる
+   ・穴: 外周(反時計回り)と穴(時計回り)を向きで区別。earcutで穴付き三角化
+   ・側面: 各ループの各辺から縦の四角形。上下面と合わせて水密 */
+
+/* ---- sub-pixel iso-contour tracing (marching squares) on a coverage field ----
+   field f[y*W+x] in 0..1 sampled at cell centres; iso at level `iso`.
+   Returns closed loops in the SAME coordinate frame as traceLoops (lattice
+   corners at integer coords, cell (x,y) spans [x,x+1]×[y,y+1]); the field sample
+   for cell (x,y) is placed at (x+0.5, y+0.5). `inside` = f>=iso.              */
+function traceLoopsIso(f,W,H,iso){
+  // grid of samples with a 1-cell padding of "outside" so loops always close
+  // nudge samples that sit exactly on the iso level, so no contour vertex lands
+  // exactly on a lattice corner (which would make two loops share a vertex)
+  const F=(x,y)=>{ if(x<0||y<0||x>=W||y>=H) return 0; const v=f[y*W+x]; return v===iso? iso+1e-6 : v; };
+  // segments per square, keyed by (i,j) of the square whose corners are samples (i,j),(i+1,j),(i,j+1),(i+1,j+1)
+  // sample (i,j) is at world (i+0.5, j+0.5) for i,j in [-1..W], we index squares by their top-left sample (i,j), i in [-1..W-1]
+  const segs=[]; // [x0,y0,x1,y1] world coords
+  const lerp=(a,b,fa,fb)=>{ const t=(iso-fa)/((fb-fa)||1e-9); return a+(b-a)*Math.max(0.02,Math.min(0.98,t)); };
+  for(let j=-1;j<H;j++)for(let i=-1;i<W;i++){
+    const f00=F(i,j),f10=F(i+1,j),f01=F(i,j+1),f11=F(i+1,j+1);
+    const c=(f00>=iso?1:0)|(f10>=iso?2:0)|(f11>=iso?4:0)|(f01>=iso?8:0);
+    if(c===0||c===15) continue;
+    // corner world positions
+    const x0=i+0.5,y0=j+0.5,x1=i+1.5,y1=j+1.5;
+    // edge points
+    const T=[lerp(x0,x1,f00,f10), y0], R=[x1, lerp(y0,y1,f10,f11)], B=[lerp(x0,x1,f01,f11), y1], L=[x0, lerp(y0,y1,f00,f01)];
+    // orientation: keep INSIDE on the RIGHT of segment direction (matches crack tracer: fill on right, y-down)
+    const push=(a,b)=>segs.push([a[0],a[1],b[0],b[1]]);
+    switch(c){
+      case 1: push(L,T); break;              // inside: TL
+      case 2: push(T,R); break;              // TR
+      case 3: push(L,R); break;
+      case 4: push(R,B); break;              // BR
+      case 5: { const mid=(f00+f10+f01+f11)/4>=iso; if(mid){ push(L,B); push(R,T);} else { push(L,T); push(R,B);} } break;
+      case 6: push(T,B); break;
+      case 7: push(L,B); break;
+      case 8: push(B,L); break;              // BL
+      case 9: push(B,T); break;
+      case 10:{ const mid=(f00+f10+f01+f11)/4>=iso; if(mid){ push(T,R); push(B,L);} else { push(T,L); push(B,R);} } break;
+      case 11:push(B,R); break;
+      case 12:push(R,L); break;
+      case 13:push(R,T); break;
+      case 14:push(T,L); break;
+    }
+  }
+  // chain segments into loops by matching endpoints (quantised)
+  const key=(x,y)=>Math.round(x*1e4)+","+Math.round(y*1e4);
+  const bystart=new Map();
+  segs.forEach((s,idx)=>{ const k=key(s[0],s[1]); let a=bystart.get(k); if(!a){a=[];bystart.set(k,a);} a.push(idx); });
+  const used=new Uint8Array(segs.length); const loops=[];
+  for(let sidx=0;sidx<segs.length;sidx++){
+    if(used[sidx]) continue;
+    const loop=[]; let cur=sidx; let guard=0;
+    const startK=key(segs[sidx][0],segs[sidx][1]);
+    while(!used[cur] && guard++<segs.length+5){
+      used[cur]=1; const sg=segs[cur]; loop.push([sg[0],sg[1]]);
+      const k=key(sg[2],sg[3]); if(k===startK) break;
+      const cands=bystart.get(k); if(!cands) break;
+      let nxt=-1, best=-1e9;
+      const idx=sg[2]-sg[0], idy=sg[3]-sg[1];
+      for(const c of cands){ if(used[c]) continue;
+        const t=segs[c]; const odx=t[2]-t[0], ody=t[3]-t[1];
+        const cross=idx*ody-idy*odx, dot=idx*odx+idy*ody;
+        // prefer right turn (cross>0 in y-down coords), then straight, then left
+        const score=(cross>1e-12?2:cross<-1e-12?0:1)*10+dot/(Math.hypot(odx,ody)*Math.hypot(idx,idy)||1);
+        if(score>best){best=score;nxt=c;} }
+      if(nxt<0) break; cur=nxt;
+    }
+    if(loop.length>=3) loops.push(loop);
+  }
+  // quantise to 1/1024 cell so vertices shared between loops (saddle touches) are bit-identical
+  for(const l of loops) for(const P of l){ P[0]=Math.round(P[0]*1024)/1024; P[1]=Math.round(P[1]*1024)/1024; }
+  return loops;
+}
+
+function traceLoops(mask,w,h){
+  // "Crack following": walk along pixel edges keeping FILLED pixels on the RIGHT
+  // (image coords, x right, y down). At every lattice vertex the next direction is
+  // decided from the 2x2 pixel neighbourhood, which makes the walk deterministic
+  // and never folds back. Outer loops come out clockwise on screen, holes CCW.
+  const at=(x,y)=>(x<0||y<0||x>=w||y>=h)?0:mask[y*w+x];
+  // For a horizontal edge between pixel (x,y-1) [above] and (x,y) [below] at row y, from x to x+1:
+  // it's a boundary if at(x,y-1)!==at(x,y). We walk it East if the filled pixel is BELOW (right of east is south).
+  // Track visited directed edges: id = (y*(w+1)+x)*4 + dir
+  const DX=[1,0,-1,0], DY=[0,1,0,-1];   // 0=E,1=S,2=W,3=N
+  const seen=new Uint8Array((w+1)*(h+1)*4);
+  const loops=[];
+  // "right pixel" of a directed edge starting at vertex (x,y) going dir d:
+  //   E: pixel (x, y)      S: pixel (x-1, y)    W: pixel (x-1, y-1)   N: pixel (x, y-1)
+  // "left pixel":
+  //   E: (x, y-1)          S: (x, y)            W: (x-1, y)           N: (x-1, y-1)
+  const rightPix=(x,y,d)=> d===0?at(x,y): d===1?at(x-1,y): d===2?at(x-1,y-1): at(x,y-1);
+  const leftPix =(x,y,d)=> d===0?at(x,y-1): d===1?at(x,y): d===2?at(x-1,y): at(x-1,y-1);
+  const isBoundary=(x,y,d)=> rightPix(x,y,d)===1 && leftPix(x,y,d)===0;
+  for(let y=0;y<=h;y++)for(let x=0;x<=w;x++)for(let d0=0;d0<4;d0++){
+    if(!isBoundary(x,y,d0)) continue;
+    if(seen[(y*(w+1)+x)*4+d0]) continue;
+    // walk
+    const loop=[]; let cx=x, cy=y, d=d0; let guard=0;
+    do{
+      seen[(cy*(w+1)+cx)*4+d]=1;
+      loop.push([cx,cy]);
+      cx+=DX[d]; cy+=DY[d];
+      // choose next dir at (cx,cy): prefer right turn, then straight, then left (keeps fill on right, tight around holes)
+      const cands=[(d+1)%4, d, (d+3)%4];
+      let nd=-1;
+      for(const c of cands){ if(isBoundary(cx,cy,c)){ nd=c; break; } }
+      if(nd<0) break;                      // should not happen on a closed boundary
+      d=nd;
+    }while(!(cx===x&&cy===y&&d===d0) && guard++<4*(w+1)*(h+1));
+    if(loop.length>=4) loops.push(loop);
+  }
+  return loops;
+}
+function chaikin(pts,iters){
+  // Corner-cutting Chaikin shrinks toward each polygon's own interior (holes get
+  // smaller, outers get smaller → asymmetric). Instead we use a *midpoint-anchored*
+  // scheme that first moves pixel-corner vertices onto the midpoints of their two
+  // incident pixel edges (this removes the staircase without bias: outer and hole
+  // corners are treated identically, and total area is preserved to first order),
+  // then applies interpolating 4-point subdivision which passes through the points
+  // (no shrinkage) to get a smooth curve.
+  const n=pts.length;
+  // step 1: midpoints of consecutive vertices (like one Chaikin step at 0.5 = pure midpoint)
+  let p=[]; for(let i=0;i<n;i++){ const a=pts[i], b=pts[(i+1)%n]; p.push([(a[0]+b[0])/2,(a[1]+b[1])/2]); }
+  // step 2: 4-point interpolating subdivision (w=1/16)
+  for(let it=0;it<iters;it++){
+    const m=p.length, q=[];
+    for(let i=0;i<m;i++){
+      const pm1=p[(i-1+m)%m], p0=p[i], p1=p[(i+1)%m], p2=p[(i+2)%m];
+      q.push(p0);
+      q.push([ (9*(p0[0]+p1[0]) - (pm1[0]+p2[0]))/16, (9*(p0[1]+p1[1]) - (pm1[1]+p2[1]))/16 ]);
+    }
+    p=q;
+  }
+  return p;
+}
+// Douglas–Peucker for closed loops (tolerance in grid px). Removes vertices that
+// deviate less than `eps` from the chord — long gentle arcs collapse to few points,
+// tight curves keep their detail.
+function simplifyDP(pts,eps,keepFn){
+  const n=pts.length; if(n<8) return pts;
+  if(keepFn){ // split at every "must keep" vertex and run DP between them
+    const ks=[]; for(let i=0;i<n;i++) if(keepFn(pts[i])) ks.push(i);
+    if(ks.length>=2){
+      const out=[];
+      for(let s_=0;s_<ks.length;s_++){
+        const a=ks[s_], b=ks[(s_+1)%ks.length];
+        const seg=[]; for(let i=a;;i=(i+1)%n){ seg.push(pts[i]); if(i===b) break; }
+        const r=simplifyDP.open(seg,eps); for(let i=0;i<r.length-1;i++) out.push(r[i]);
+      }
+      return out.length>=3?out:pts;
+    }
+  }
+  // split closed loop at the two farthest-apart points to run open DP twice
+  let a=0,b=0,best=-1;
+  for(let i=0;i<n;i+=Math.max(1,(n/64)|0)){ const p=pts[i];
+    for(let j=i+1;j<n;j+=Math.max(1,(n/64)|0)){ const q=pts[j]; const d=(p[0]-q[0])**2+(p[1]-q[1])**2; if(d>best){best=d;a=i;b=j;} } }
+  const seg1=pts.slice(a,b+1), seg2=pts.slice(b).concat(pts.slice(0,a+1));
+  const dp=(arr)=>{
+    const keep=new Uint8Array(arr.length); keep[0]=1; keep[arr.length-1]=1;
+    const stack=[[0,arr.length-1]];
+    while(stack.length){ const [i,j]=stack.pop(); if(j<=i+1) continue;
+      const A=arr[i],B=arr[j]; const dx=B[0]-A[0], dy=B[1]-A[1]; const L=Math.hypot(dx,dy)||1e-9;
+      let mi=-1,md=-1;
+      for(let k=i+1;k<j;k++){ const P=arr[k]; const d=Math.abs(dx*(A[1]-P[1])-(A[0]-P[0])*dy)/L; if(d>md){md=d;mi=k;} }
+      if(md>eps){ keep[mi]=1; stack.push([i,mi],[mi,j]); } }
+    const out=[]; for(let k=0;k<arr.length;k++) if(keep[k]) out.push(arr[k]); return out; };
+  const r1=dp(seg1), r2=dp(seg2);
+  const out=r1.concat(r2.slice(1,-1));
+  return out.length>=3?out:pts;
+}
+simplifyDP.open=function(arr,eps){
+  if(arr.length<3) return arr;
+  const keep=new Uint8Array(arr.length); keep[0]=1; keep[arr.length-1]=1;
+  const stack=[[0,arr.length-1]];
+  while(stack.length){ const [i,j]=stack.pop(); if(j<=i+1) continue;
+    const A=arr[i],B=arr[j]; const dx=B[0]-A[0], dy=B[1]-A[1]; const L=Math.hypot(dx,dy)||1e-9;
+    let mi=-1,md=-1;
+    for(let k=i+1;k<j;k++){ const P=arr[k]; const d=Math.abs(dx*(A[1]-P[1])-(A[0]-P[0])*dy)/L; if(d>md){md=d;mi=k;} }
+    if(md>eps){ keep[mi]=1; stack.push([i,mi],[mi,j]); } }
+  const out=[]; for(let k=0;k<arr.length;k++) if(keep[k]) out.push(arr[k]); return out;
+};
+function simplifyCollinear(pts,keepFn){
+  // remove (nearly) collinear vertices and exact duplicates; iterate until stable
+  let p=pts;
+  for(let pass=0;pass<4;pass++){
+    const out=[]; const n=p.length; let changed=false;
+    for(let i=0;i<n;i++){ const a=p[(i-1+n)%n], b=p[i], c=p[(i+1)%n];
+      if(Math.abs(b[0]-a[0])<1e-9 && Math.abs(b[1]-a[1])<1e-9){ changed=true; continue; }   // duplicate
+      const abx=b[0]-a[0], aby=b[1]-a[1], bcx=c[0]-b[0], bcy=c[1]-b[1];
+      const cr=abx*bcy-aby*bcx;
+      const scale=(Math.hypot(abx,aby)*Math.hypot(bcx,bcy))||1;
+      if(Math.abs(cr)/scale > 1e-4 || (keepFn&&keepFn(b))) out.push(b); else changed=true; }   // ~0.006° angular tolerance
+    p=out.length>=3?out:p;
+    if(!changed) break;
+  }
+  return p;
+}
+function loopArea(p){ let a=0; for(let i=0;i<p.length;i++){ const q=p[i], r=p[(i+1)%p.length]; a+=q[0]*r[1]-r[0]*q[1]; } return a/2; }
+// wrapper: outer + holes → flat coordinate array → earcut → {poly, tris}
+function earcutPoly(outer,holes){
+  // earcut bridges holes with a horizontal ray. Pixel-derived contours have MANY
+  // vertices on exactly the same y, so a bridge can pass through a third vertex
+  // and produce a T-junction. Feed earcut a copy rotated by an irrational angle
+  // (breaks all axis alignment); the returned INDICES apply to the original points.
+  const ca=Math.cos(0.3141592653589793*0.5773502691896258), sa=Math.sin(0.3141592653589793*0.5773502691896258);
+  const coords=[]; const holeIdx=[]; const poly=[];
+  const push=(p)=>{ poly.push([p[0],p[1]]); coords.push(p[0]*ca-p[1]*sa, p[0]*sa+p[1]*ca); };
+  for(const p of outer) push(p);
+  for(const hl of holes){ holeIdx.push(coords.length/2); for(const p of hl) push(p); }
+  const idx=earcut(coords, holeIdx.length?holeIdx:null, 2);
+  const tris=[]; for(let i=0;i<idx.length;i+=3) tris.push([idx[i],idx[i+1],idx[i+2]]);
+  return {poly,tris};
+}
+function buildPrismSmooth(mask,w,h,z0,z1,px,ox,oy,field){
+  if(ox===undefined) ox=0; if(oy===undefined) oy=h;
+  const V=[],T=[]; const key=new Map();
+  // exact-key vertex map: distinct points never merge (points meant to be shared
+  // are already bit-identical); merging near points is what creates bow-ties
+  const vi=(x,y,z)=>{ const k=x+"_"+y+"_"+z; let i=key.get(k);
+    if(i===undefined){ i=V.length/3; key.set(k,i); V.push((x+ox)*px,(oy-y)*px,z); } return i; };
+  // field: optional {cov,thr,inside:true|false} — when given, contours are traced at
+  //        sub-pixel positions on the coverage field instead of the binary mask
+  let raw;
+  if(field){
+    const f=field.inside ? field.cov : Float32Array.from(field.cov, v=>1-v);
+    const iso=field.inside ? field.thr : 1-field.thr;
+    raw=traceLoopsIso(f,w,h,iso);
+  } else raw=traceLoops(mask,w,h);
+  // orientation from the tracer is consistent: determine which sign means "outer"
+  // by looking at the loop with the largest |area| (must be an outer).
+  let bigSign=0, bigA=-1;
+  for(const l of raw){ const A=loopArea(l); if(Math.abs(A)>bigA){bigA=Math.abs(A); bigSign=Math.sign(A);} }
+  // loops that touch another loop at a lattice vertex (diagonal pixel contact,
+  // or a hole kissing the outer) must NOT be simplified independently, or a
+  // T-junction appears between them. Detect shared lattice vertices first.
+  // owner map: which loop occupies each lattice vertex; a loop "touches" another if any of
+  // its vertices is within 2 lattice cells of a vertex owned by a different loop.
+  const owner=new Int32Array((w+1)*(h+1)).fill(-1);
+  if(!field) raw.forEach((l,i)=>{ for(const [x,y] of l) owner[y*(w+1)+x]=i; });
+  const touches=field ? raw.map(()=>false) : raw.map((l,i)=>{
+    for(const [x,y] of l){
+      for(let dy=-1;dy<=1;dy++){ const yy=y+dy; if(yy<0||yy>h) continue;
+        for(let dx=-1;dx<=1;dx++){ const xx=x+dx; if(xx<0||xx>w) continue;
+          const o=owner[yy*(w+1)+xx]; if(o>=0&&o!==i) return true; } } }
+    return false; });
+  let keepFn=null;
+  if(field){ // vertices shared by 2+ loops (saddle touches) must survive simplification
+    const cnt=new Map(); for(const l of raw) for(const P of l){ const k=P[0]+","+P[1]; cnt.set(k,(cnt.get(k)||0)+1); }
+    keepFn=(P)=>cnt.get(P[0]+","+P[1])>1;
+  }
+  // iso loops: already sub-pixel smooth → collinear cleanup only (DP on iso loops can
+  // create self-touches on hairline features; the pixel path still uses DP)
+  const loops=raw.map((l,i)=>{ const sm=field?l:chaikin(l,2); return simplifyCollinear((field||touches[i])?sm:simplifyDP(sm,0.12),keepFn); });
+  const outers=[], holes=[], outersRaw=[], holesRaw=[];
+  raw.forEach((l,i)=>{ if(Math.sign(loopArea(l))===bigSign){ outers.push(loops[i]); outersRaw.push(l); } else { holes.push(loops[i]); holesRaw.push(l); } });
+  // assign holes to the outer that contains them (point-in-polygon on first vertex)
+  const pip=(p,poly)=>{ let c=false; for(let i=0,j=poly.length-1;i<poly.length;j=i++){ const a=poly[i],b=poly[j];
+    if(((a[1]>p[1])!==(b[1]>p[1])) && (p[0] < (b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])) c=!c; } return c; };
+  const groups=outers.map((o,i)=>({o,oRaw:outersRaw[i],h:[],hRaw:[]}));
+  holes.forEach((hl,hi)=>{ let bestI=-1,bestA=1e18; for(let i=0;i<groups.length;i++){ if(pip(hl[0],groups[i].o)){ const A=Math.abs(loopArea(groups[i].o)); if(A<bestA){bestA=A;bestI=i;} } }
+    if(bestI>=0){ groups[bestI].h.push(hl); groups[bestI].hRaw.push(holesRaw[hi]); } });
+  for(const gr of groups){
+    // world-space orientation: our y is flipped (oy-y), so a CW loop in image coords is CCW in world.
+    // Triangulate in image coords, then emit top with flipped winding to face +z.
+    // --- pre-pass: resolve near-touches between loops of this group.
+    // If a vertex of one loop lies within eps of an EDGE of another loop, insert that
+    // exact point into the other loop (split its edge). Both loops then share the vertex,
+    // earcut sees a proper touching configuration, and walls stay matched (no T-junction).
+    {
+      const eps=0.06;                                    // grid px
+      const all=[gr.o, ...gr.h];
+      // snap all loop coordinates to the same 1e-4 grid that vi() uses, so that
+      // "same point" is exact everywhere downstream
+      for(const L of all) for(const P of L){ P[0]=Math.round(P[0]*1e4)/1e4; P[1]=Math.round(P[1]*1e4)/1e4; }
+      // spatial hash of edges by cell
+      const cell=1; const hash=new Map();
+      const keyOf=(x,y)=>Math.floor(x/cell)+","+Math.floor(y/cell);
+      const rebuild=()=>{ hash.clear(); all.forEach((L,li)=>{ for(let i=0;i<L.length;i++){ const a=L[i], b=L[(i+1)%L.length];
+        const x0=Math.min(a[0],b[0]), x1=Math.max(a[0],b[0]), y0=Math.min(a[1],b[1]), y1=Math.max(a[1],b[1]);
+        for(let cy=Math.floor(y0/cell); cy<=Math.floor(y1/cell); cy++) for(let cx=Math.floor(x0/cell); cx<=Math.floor(x1/cell); cx++){
+          const k=cx+","+cy; let arr=hash.get(k); if(!arr){arr=[];hash.set(k,arr);} arr.push([li,i]); } } }); };
+      rebuild();
+      let inserted=0;
+      // bounded: iterate a SNAPSHOT of each loop's original vertices; insertions go
+      // only into OTHER loops, so the outer iteration cannot grow unboundedly
+      const snaps=all.map(L=>L.slice());
+      for(let li=0;li<all.length;li++){ const L=snaps[li];
+        for(let vi_=0;vi_<L.length;vi_++){ const P=L[vi_];
+          const cands=[]; { const cx0=Math.floor(P[0]/cell), cy0=Math.floor(P[1]/cell);
+            for(let cy=cy0-1;cy<=cy0+1;cy++)for(let cx=cx0-1;cx<=cx0+1;cx++){ const arr=hash.get(cx+","+cy); if(arr) for(const it of arr) cands.push(it); } }
+          for(const [lj,ei] of cands){
+            if(lj===li) continue;              // never split the loop being scanned
+            const M=all[lj]; if(ei>=M.length) continue;
+            const a=M[ei], b=M[(ei+1)%M.length];
+            const dx=b[0]-a[0], dy=b[1]-a[1]; const L2=dx*dx+dy*dy; if(L2<1e-12) continue;
+            const t=((P[0]-a[0])*dx+(P[1]-a[1])*dy)/L2; if(t<=1e-6||t>=1-1e-6) continue;
+            const px_=a[0]+t*dx, py_=a[1]+t*dy; const d=Math.hypot(P[0]-px_,P[1]-py_);
+            if(d<eps){ // insert P (exact same coords) into M after a
+              M.splice(ei+1,0,[P[0],P[1]]); inserted++;
+              // incremental hash update: edge indices in M after ei shift by +1
+              for(const [kk,arr] of hash){ for(const it of arr){ if(it[0]===lj && it[1]>ei) it[1]++; } }
+              // register the two new edges (a→P) as ei and (P→b) as ei+1
+              const reg=(i0)=>{ const A=M[i0], B=M[(i0+1)%M.length];
+                const x0=Math.min(A[0],B[0]), x1=Math.max(A[0],B[0]), y0=Math.min(A[1],B[1]), y1=Math.max(A[1],B[1]);
+                for(let cy=Math.floor(y0/cell); cy<=Math.floor(y1/cell); cy++) for(let cx=Math.floor(x0/cell); cx<=Math.floor(x1/cell); cx++){
+                  const k2=cx+","+cy; let arr=hash.get(k2); if(!arr){arr=[];hash.set(k2,arr);} arr.push([lj,i0]); } };
+              reg(ei+1);   // (P→b); the (a→P) edge keeps index ei and its old cells (superset) — fine
+              break; } } } }
+    }
+    const {poly,tris}=earcutPoly(gr.o,gr.h);
+    const capStart=T.length;
+    // dominant winding of this group's cap triangles (earcut is consistent per polygon)
+    let groupSign=-1; { let acc=0; for(const [a,b,c] of tris){ const A=poly[a],B=poly[b],C=poly[c]; acc+=(B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0]); } groupSign=acc<0?-1:1; }
+    // Decide winding from geometry: world Y = (oy - y) flips orientation vs image coords.
+    // Compute image-space signed area of the outer loop; in world it has the opposite sign.
+    for(const [a,b,c] of tris){
+      const A=poly[a],B=poly[b],C=poly[c];
+      // decide winding per triangle from its own image-space signed area
+      // (image y-down → world y-up flips orientation): world CCW ⇔ image area < 0
+      let ar=(B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0]);
+      // degenerate (collinear) slivers can occur at earcut hole-bridges; keep them
+      // (removing them would orphan the neighbouring edges) and give them the
+      // group's dominant winding so edge pairing stays consistent.
+      if(Math.abs(ar)<1e-12) ar=groupSign;
+      const iA=vi(A[0],A[1],z1), iB=vi(B[0],B[1],z1), iC=vi(C[0],C[1],z1);
+      const jA=vi(A[0],A[1],z0), jB=vi(B[0],B[1],z0), jC=vi(C[0],C[1],z0);
+      if(ar<0){ T.push(iA,iB,iC); T.push(jA,jC,jB); }   // top faces +z when CCW in world
+      else    { T.push(iA,iC,iB); T.push(jA,jB,jC); }
+    }
+    // walls: orient each quad so that its shared edge with the TOP cap runs
+    // opposite to the cap's directed edge (manifold rule) — no orientation
+    // assumptions about tracer or earcut needed.
+    const topEdges=new Set();
+    for(let t=capStart;t<T.length;t+=3){
+      // only top-cap triangles were pushed at even positions? no — we pushed top,bottom pairs.
+      // Rebuild set from the top triangles: those whose z==z1 (all three vertices at z1)
+      const a=T[t],b=T[t+1],c=T[t+2];
+      if(V[a*3+2]===z1&&V[b*3+2]===z1&&V[c*3+2]===z1){ topEdges.add(a+"_"+b); topEdges.add(b+"_"+c); topEdges.add(c+"_"+a); }
+    }
+    const wallLoop=(l)=>{
+      for(let i=0;i<l.length;i++){ const a=l[i], b=l[(i+1)%l.length];
+        const a0=vi(a[0],a[1],z0), b0=vi(b[0],b[1],z0), a1=vi(a[0],a[1],z1), b1=vi(b[0],b[1],z1);
+        // top cap owns directed edge either a1→b1 or b1→a1; wall must use the reverse along the top
+        // cap owns a1→b1  ⇒ wall must own b1→a1 : triangles (b1,a1,a0),(b1,a0,b0)
+        // cap owns b1→a1  ⇒ wall must own a1→b1 : triangles (a1,b1,b0),(a1,b0,a0)
+        if(topEdges.has(a1+"_"+b1)){ T.push(b1,a1,a0); T.push(b1,a0,b0); }
+        else                        { T.push(a1,b1,b0); T.push(a1,b0,a0); }
+      } };
+    wallLoop(gr.o); gr.h.forEach(wallLoop);
+  }
+  return {V:new Float32Array(V), T:new Uint32Array(T)};
+}
+
+function buildPrism(mask,w,h,z0,z1,px,ox,oy){
+  if(ox===undefined) ox=0;
+  if(oy===undefined) oy=h;
+  const V=[],T=[],key=new Map();
+  const vi=(x,y,z)=>{ const k=x+"_"+y+"_"+z;
+    let i=key.get(k);
+    if(i===undefined){ i=V.length/3; key.set(k,i); V.push((x+ox)*px,(oy-y)*px,z); }
+    return i; };
+  const triF=(a,b,c)=>T.push(a,c,b);   // top / bottom fans
+  const triW=(a,b,c)=>T.push(a,b,c);   // walls
+  const at=(x,y)=>(x<0||y<0||x>=w||y>=h)?0:mask[y*w+x];
+
+  // ---- top and bottom: greedy rectangles, perimeter split at every unit so
+  //      the edges line up with the walls (no T-junctions)
+  for(const [rx,ry,rw,rh] of greedyRects(mask,w,h)){
+    const pts=[];
+    for(let i=0;i<rw;i++) pts.push([rx+i,ry]);
+    for(let j=0;j<rh;j++) pts.push([rx+rw,ry+j]);
+    for(let i=rw;i>0;i--) pts.push([rx+i,ry+rh]);
+    for(let j=rh;j>0;j--) pts.push([rx,ry+j]);
+    const ct=vi(rx+rw/2,ry+rh/2,z1), cb=vi(rx+rw/2,ry+rh/2,z0);
+    for(let i=0;i<pts.length;i++){
+      const p=pts[i], q=pts[(i+1)%pts.length];
+      triF(ct, vi(p[0],p[1],z1), vi(q[0],q[1],z1));
+      triF(cb, vi(q[0],q[1],z0), vi(p[0],p[1],z0));
+    }
+  }
+  // ---- walls, one quad per unit edge
+  for(let x=0;x<=w;x++) for(let y=0;y<h;y++){
+    const a=at(x-1,y), b=at(x,y); if(a===b) continue;
+    const A=vi(x,y,z0),B=vi(x,y+1,z0),C=vi(x,y+1,z1),D=vi(x,y,z1);
+    if(b){ triW(A,B,C); triW(A,C,D); } else { triW(A,D,C); triW(A,C,B); }
+  }
+  for(let y=0;y<=h;y++) for(let x=0;x<w;x++){
+    const a=at(x,y-1), b=at(x,y); if(a===b) continue;
+    const A=vi(x,y,z0),B=vi(x+1,y,z0),C=vi(x+1,y,z1),D=vi(x,y,z1);
+    if(b){ triW(A,D,C); triW(A,C,B); } else { triW(A,B,C); triW(A,C,D); }
+  }
+  return {V:new Float32Array(V), T:new Uint32Array(T)};
+}
+
+// Two-zone prism sharing one top face: pixels in `mask` get top z1;
+// bottom is zA where `low` is set (e.g. rim + tab that reach the plate) and zB
+// elsewhere (e.g. the cover behind the art). Internal step wall generated
+// between the zones, all in ONE vertex map → single watertight shell.
+function buildPrism2(mask,low,w,h,zA,zB,z1,px,ox,oy){
+  if(ox===undefined) ox=0;
+  if(oy===undefined) oy=h;
+  const V=[],T=[],key=new Map();
+  const vi=(x,y,z)=>{ const k=x+"_"+y+"_"+z;
+    let i=key.get(k);
+    if(i===undefined){ i=V.length/3; key.set(k,i); V.push((x+ox)*px,(oy-y)*px,z); }
+    return i; };
+  const triF=(a,b,c)=>T.push(a,c,b);
+  const triW=(a,b,c)=>T.push(a,b,c);
+  const at=(x,y)=>(x<0||y<0||x>=w||y>=h)?0:mask[y*w+x];
+  const zb=(x,y)=>low[y*w+x]?zA:zB;
+  // top: whole mask
+  for(const [rx,ry,rw,rh] of greedyRects(mask,w,h)){
+    const pts=[];
+    for(let i=0;i<rw;i++) pts.push([rx+i,ry]);
+    for(let j=0;j<rh;j++) pts.push([rx+rw,ry+j]);
+    for(let i=rw;i>0;i--) pts.push([rx+i,ry+rh]);
+    for(let j=rh;j>0;j--) pts.push([rx,ry+j]);
+    const ct=vi(rx+rw/2,ry+rh/2,z1);
+    for(let i=0;i<pts.length;i++){ const p=pts[i], q=pts[(i+1)%pts.length];
+      triF(ct, vi(p[0],p[1],z1), vi(q[0],q[1],z1)); }
+  }
+  // bottoms: per zone
+  const mA=new Uint8Array(w*h), mB=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++){ if(!mask[i]) continue; if(low[i]) mA[i]=1; else mB[i]=1; }
+  for(const [zm,zz] of [[mA,zA],[mB,zB]]){
+    for(const [rx,ry,rw,rh] of greedyRects(zm,w,h)){
+      const pts=[];
+      for(let i=0;i<rw;i++) pts.push([rx+i,ry]);
+      for(let j=0;j<rh;j++) pts.push([rx+rw,ry+j]);
+      for(let i=rw;i>0;i--) pts.push([rx+i,ry+rh]);
+      for(let j=rh;j>0;j--) pts.push([rx,ry+j]);
+      const cb=vi(rx+rw/2,ry+rh/2,zz);
+      for(let i=0;i<pts.length;i++){ const p=pts[i], q=pts[(i+1)%pts.length];
+        triF(cb, vi(q[0],q[1],zz), vi(p[0],p[1],zz)); }
+    }
+  }
+  // walls: outer walls (mask edge) span from that pixel's bottom to z1;
+  // internal walls (zone edge, both inside mask) span zA..zB facing the higher-bottom side
+  const wall=(A,B,C,D,outward)=>{ if(outward){ triW(A,B,C); triW(A,C,D); } else { triW(A,D,C); triW(A,C,B); } };
+  for(let x=0;x<=w;x++) for(let y=0;y<h;y++){
+    const a=at(x-1,y), b=at(x,y);
+    if(a!==b){ const zlo=b?zb(x,y):zb(x-1,y);
+      wall(vi(x,y,zlo),vi(x,y+1,zlo),vi(x,y+1,z1),vi(x,y,z1), !!b); continue; }
+    if(a&&b){ const la=low[y*w+x-1], lb=low[y*w+x]; if(la===lb) continue;
+      // step wall between zA and zB at this x; the zA (lower) side is "solid" below zB
+      wall(vi(x,y,zA),vi(x,y+1,zA),vi(x,y+1,zB),vi(x,y,zB), !!lb); }
+  }
+  for(let y=0;y<=h;y++) for(let x=0;x<w;x++){
+    const a=at(x,y-1), b=at(x,y);
+    if(a!==b){ const zlo=b?zb(x,y):zb(x,y-1);
+      wall(vi(x,y,zlo),vi(x+1,y,zlo),vi(x+1,y,z1),vi(x,y,z1), !b); continue; }
+    if(a&&b){ const la=low[(y-1)*w+x], lb=low[y*w+x]; if(la===lb) continue;
+      wall(vi(x,y,zA),vi(x+1,y,zA),vi(x+1,y,zB),vi(x,y,zB), !lb); }
+  }
+  return {V:new Float32Array(V), T:new Uint32Array(T)};
+}
+
+$("make3d").onclick=()=>{
+  if(!reduced) return;
+  $("make3d").disabled=true; $("msg3").textContent="組み立て中… / building…";
+  setTimeout(build3d,30);
+};
+
+// 実寸ベースのゴミ掃除。
+// 「小さいから消す」ではなく「まわりが背景の、浮いている島だけ消す」:
+//   ・小さな色の島で、隣の多数派が背景 → ゴミとして削除（背景に吸収）
+//   ・小さな色の島でも、絵の中にある（隣が色）→ 目のハイライト等なので残す
+//   ・絵の中の小さな背景の島（ピンホール）→ まわりの色で塞ぐ
+function cleanIslands(src,w,h,BG,minPx){
+  const lab=Int32Array.from(src);
+  const seen=new Uint8Array(w*h), q=new Int32Array(w*h);
+  let removed=0;
+  for(let s=0;s<w*h;s++){
+    if(seen[s]) continue;
+    const L=lab[s];
+    let head=0,tail=0; q[tail++]=s; seen[s]=1;
+    let border=false; const cells=[];
+    while(head<tail){
+      const i=q[head++]; cells.push(i);
+      const x=i%w, y=(i/w)|0;
+      if(x===0||y===0||x===w-1||y===h-1) border=true;
+      if(x>0     && !seen[i-1] && lab[i-1]===L){seen[i-1]=1;q[tail++]=i-1;}
+      if(x<w-1   && !seen[i+1] && lab[i+1]===L){seen[i+1]=1;q[tail++]=i+1;}
+      if(y>0     && !seen[i-w] && lab[i-w]===L){seen[i-w]=1;q[tail++]=i-w;}
+      if(y<h-1   && !seen[i+w] && lab[i+w]===L){seen[i+w]=1;q[tail++]=i+w;}
+    }
+    if(cells.length>=minPx) continue;
+    if(L===BG && border) continue;
+    const cnt=new Map();
+    for(const i of cells){
+      const x=i%w, y=(i/w)|0;
+      const nb=[]; if(x>0)nb.push(i-1); if(x<w-1)nb.push(i+1);
+      if(y>0)nb.push(i-w); if(y<h-1)nb.push(i+w);
+      for(const j of nb){ const l2=lab[j];
+        if(l2!==L) cnt.set(l2,(cnt.get(l2)||0)+1); }
+    }
+    let best=-1,bc=-1; for(const [k,v] of cnt) if(v>bc){bc=v;best=k;}
+    if(best<0) continue;
+    if(L!==BG && best!==BG) continue;   // 絵の中のディテールは残す
+    for(const i of cells) lab[i]=best;
+    removed++;
+  }
+  return {lab,removed};
+}
+
+function build3d(){
+  const {pal,labels:rawLabels,W:w,H:h,BG,keep}=reduced;
+  const wmm=widthMM();
+  const px=wmm/w;
+  // 実寸ベースのゴミ掃除（labelsのコピーに対して行う。減色結果そのものは変えない）
+  const minA=(+$("minIsle").value)/10;   // mm²
+  let labels=rawLabels, cleaned=0;
+  if(minA>0){
+    const r=cleanIslands(rawLabels,w,h,BG,Math.max(1,Math.round(minA/(px*px))));
+    labels=r.lab; cleaned=r.removed;
+  }
+  // 絵を下(つるつる)モード: 印刷面=下面は鏡像になるため、絵をあらかじめ左右反転する
+  const facedown = faceMode==="down" && useBase && shape==="flat";
+  let covLocal=lineartCov;
+  if(facedown){
+    const fl=new Int32Array(w*h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++) fl[y*w+x]=labels[y*w+(w-1-x)];
+    labels=fl;
+    if(lineartCov && lineartCov.W===w && lineartCov.H===h){   // mirror the coverage field too
+      const c2=new Float32Array(w*h);
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++) c2[y*w+x]=lineartCov.cov[y*w+(w-1-x)];
+      covLocal={cov:c2,thr:lineartCov.thr,W:w,H:h};
+    }
+  }
+  const baseT = useBase ? (+$("baseH").value)/100 : 0;
+  const embed = useBase ? 0 : (+$("embed").value)/100;
+  const st = stepVal();
+  const flatH = (+$("flatH").value)/100;
+
+  const objs=[];
+  let basePadPx=0, tabInfo=null;
+  // ---- base plate: shaped mask built on a padded grid so margin, circle and
+  //      keychain tab may extend beyond the artwork bounds
+  if(useBase){
+    const content=new Uint8Array(w*h);
+    let any=false, x0=w,x1=-1,y0=h,y1=-1;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      if(labels[y*w+x]!==BG){ content[y*w+x]=1; any=true;
+        if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+    }
+    if(any){
+      const mg=(+$("bMargin").value)/10;          // mm
+      const mgPx=Math.round(mg/px);
+      const tabR=Math.max(4,Math.round(4.0/px));  // tab outer r = 4 mm
+      const holeR=Math.max(2,Math.round(2.0/px)); // hole r = 2 mm
+      const ovPx=Math.max(2,Math.round(1.5/px));  // fuse overlap 1.5 mm
+      // uniform padding on all sides: the tab may sit at any angle.
+      // For the circle plate the disc can extend well beyond the art's bbox
+      // (up to half the diagonal), so size the pad from the circle radius.
+      let extraPx=0;
+      if(baseShape==="circle"){
+        const ccx=(x0+x1)/2, ccy=(y0+y1)/2; let r2=0;
+        for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){ if(!content[y*w+x]) continue;
+          const d=(x-ccx)*(x-ccx)+(y-ccy)*(y-ccy); if(d>r2) r2=d; }
+        const R=Math.sqrt(r2)+mgPx+1;
+        // the disc can overshoot the art bbox by (R - halfWidth) horizontally
+        // and (R - halfHeight) vertically; pad enough for the larger of the two
+        extraPx=Math.max(0, Math.ceil(R-(x1-x0)/2), Math.ceil(R-(y1-y0)/2));
+      }
+      const padS=mgPx+2+extraPx+(tabOn?2*tabR+2:0)+(tabOn?Math.round(((+$("tabNeck").value)/10)/px):0);
+      basePadPx=padS;
+      const padT=padS;
+      const w2=w+2*padS, h2=h+2*padS;
+      const bm=new Uint8Array(w2*h2);
+
+      if(baseShape==="rect"){
+        const rx0=padS+x0-mgPx, rx1=padS+x1+mgPx;
+        const ry0=padT+y0-mgPx, ry1=padT+y1+mgPx;
+        for(let y=Math.max(0,ry0);y<=Math.min(h2-1,ry1);y++)
+          for(let x=Math.max(0,rx0);x<=Math.min(w2-1,rx1);x++) bm[y*w2+x]=1;
+      }else if(baseShape==="circle"){
+        const ccx=(x0+x1)/2, ccy=(y0+y1)/2;
+        let r2max=0;
+        for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+          if(!content[y*w+x]) continue;
+          const d=(x-ccx)*(x-ccx)+(y-ccy)*(y-ccy);
+          if(d>r2max) r2max=d;
+        }
+        const R=Math.sqrt(r2max)+mgPx+0.5;
+        const Cx=padS+ccx, Cy=padT+ccy;
+        const yA=Math.max(0,Math.floor(Cy-R)), yB=Math.min(h2-1,Math.ceil(Cy+R));
+        const xA=Math.max(0,Math.floor(Cx-R)), xB=Math.min(w2-1,Math.ceil(Cx+R));
+        for(let y=yA;y<=yB;y++)for(let x=xA;x<=xB;x++)
+          if((x-Cx)*(x-Cx)+(y-Cy)*(y-Cy)<=R*R) bm[y*w2+x]=1;
+      }else{ // contour: dilate the silhouette by the margin (3-4 chamfer distance)
+        const INF=1e9, D=new Float32Array(w2*h2).fill(INF);
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++)
+          if(content[y*w+x]) D[(y+padT)*w2+(x+padS)]=0;
+        for(let y=0;y<h2;y++)for(let x=0;x<w2;x++){
+          const i=y*w2+x; let d=D[i];
+          if(x>0&&D[i-1]+3<d)d=D[i-1]+3;
+          if(y>0&&D[i-w2]+3<d)d=D[i-w2]+3;
+          if(x>0&&y>0&&D[i-w2-1]+4<d)d=D[i-w2-1]+4;
+          if(x<w2-1&&y>0&&D[i-w2+1]+4<d)d=D[i-w2+1]+4;
+          D[i]=d;
+        }
+        for(let y=h2-1;y>=0;y--)for(let x=w2-1;x>=0;x--){
+          const i=y*w2+x; let d=D[i];
+          if(x<w2-1&&D[i+1]+3<d)d=D[i+1]+3;
+          if(y<h2-1&&D[i+w2]+3<d)d=D[i+w2]+3;
+          if(x<w2-1&&y<h2-1&&D[i+w2+1]+4<d)d=D[i+w2+1]+4;
+          if(x>0&&y<h2-1&&D[i+w2-1]+4<d)d=D[i+w2-1]+4;
+          D[i]=d;
+        }
+        const th=mgPx*3;
+        for(let i=0;i<bm.length;i++) bm[i]=D[i]<=th?1:0;
+      }
+
+      // ---- keychain tab: ring + wide tapered neck, at a user-chosen angle
+      //      around the plate. Ray-cast from the plate centre along the angle to
+      //      find the rim, then place the ring just outside and bridge it with a
+      //      neck polygon whose base (on the plate) is neckPx wide.
+      if(tabOn){
+        const ang=(+$("tabAng").value)*Math.PI/180;
+        const dx=Math.cos(ang), dy=-Math.sin(ang);          // grid y grows downward
+        const Cx0=padS+(x0+x1)/2, Cy0=padT+(y0+y1)/2;
+        // walk out from centre until leaving the plate
+        let rr=0, ex=Cx0, ey=Cy0;
+        for(let s=0;s<w2+h2;s++){
+          const tx=Math.round(Cx0+dx*s), ty=Math.round(Cy0+dy*s);
+          if(tx<0||ty<0||tx>=w2||ty>=h2) break;
+          if(bm[ty*w2+tx]){ rr=s; ex=tx; ey=ty; }
+        }
+        const neckPx=Math.max(2,Math.round(((+$("tabNeck").value)/10)/px));
+        const rcx=ex+dx*(tabR-ovPx), rcy=ey+dy*(tabR-ovPx);   // ring centre
+        // grid → mm (same mapping as buildPrism with origin -padS / h+padT), pre-shift
+        tabInfo={x:(rcx-padS)*px, y:(h+padT-rcy)*px, r:tabR*px,
+                 cx:(Cx0-padS)*px, cy:(h+padT-Cy0)*px};
+        // ring
+        for(let y=Math.max(0,Math.floor(rcy-tabR));y<=Math.min(h2-1,Math.ceil(rcy+tabR));y++)
+          for(let x=Math.max(0,Math.floor(rcx-tabR));x<=Math.min(w2-1,Math.ceil(rcx+tabR));x++){
+            const d=(x-rcx)*(x-rcx)+(y-rcy)*(y-rcy);
+            if(d<=tabR*tabR && d>holeR*holeR) bm[y*w2+x]=1;
+          }
+        // ---- fillet between ring and plate (両側フィレット):
+        //   morphological closing restricted to a window around the ring.
+        //   Any pixel that is within `fr` of BOTH the ring and the plate gets
+        //   filled by a disc-closing → smooth concave web on both sides of the
+        //   ring, following whatever shape the rim has (rect / circle / contour).
+        //   `fr` (fillet radius) is driven by the つけ根の幅 slider.
+        {
+          const fr=Math.max(2, Math.round(((+$("tabNeck").value)/10)/px), Math.round(tabR*0.5));   // px, floor = half tab radius
+          const win=tabR+fr+2;
+          const xA=Math.max(0,Math.floor(rcx-win)), xB=Math.min(w2-1,Math.ceil(rcx+win));
+          const yA=Math.max(0,Math.floor(rcy-win)), yB=Math.min(h2-1,Math.ceil(rcy+win));
+          const ww=xB-xA+1, hh=yB-yA+1;
+          // local copy of the (plate ∪ ring) mask
+          const loc=new Uint8Array(ww*hh);
+          for(let y=0;y<hh;y++)for(let x=0;x<ww;x++) loc[y*ww+x]=bm[(y+yA)*w2+(x+xA)];
+          // dilate by fr (disc)
+          const dil=new Uint8Array(ww*hh);
+          const offs=[]; for(let oy=-fr;oy<=fr;oy++)for(let ox=-fr;ox<=fr;ox++) if(ox*ox+oy*oy<=fr*fr) offs.push([ox,oy]);
+          for(let y=0;y<hh;y++)for(let x=0;x<ww;x++){ if(!loc[y*ww+x]) continue;
+            for(const [ox,oy] of offs){ const X=x+ox,Y=y+oy; if(X>=0&&Y>=0&&X<ww&&Y<hh) dil[Y*ww+X]=1; } }
+          // erode by fr → closing
+          const clo=new Uint8Array(ww*hh);
+          for(let y=0;y<hh;y++)for(let x=0;x<ww;x++){
+            let ok=1;
+            for(const [ox,oy] of offs){ const X=x+ox,Y=y+oy;
+              if(X<0||Y<0||X>=ww||Y>=hh){ ok=0; break; }      // treat outside window as empty
+              if(!dil[Y*ww+X]){ ok=0; break; } }
+            clo[y*ww+x]=ok;
+          }
+          // write back only pixels near the ring (so closing never fills far-away
+          // concavities of the plate) and never inside the hole
+          const nearR=(tabR+fr)*(tabR+fr);
+          for(let y=0;y<hh;y++)for(let x=0;x<ww;x++){
+            if(!clo[y*ww+x]||loc[y*ww+x]) continue;
+            const gx=x+xA, gy=y+yA;
+            const d=(gx-rcx)*(gx-rcx)+(gy-rcy)*(gy-rcy);
+            if(d>nearR) continue;
+            if(d<=holeR*holeR) continue;
+            bm[gy*w2+gx]=1;
+          }
+        }
+      }
+      if(facedown){
+        // 絵を下モード: 縁とタブは絵と同じ面(z=0)から、絵の真裏は絵の上端(flatH)から蓋。
+        // 1つの頂点マップで組むので、縁・タブ・蓋が単一の水密シェルになる。
+        const cp=new Uint8Array(w2*h2);
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++)
+          if(content[y*w+x]) cp[(y+padT)*w2+(x+padS)]=1;
+        const low=new Uint8Array(w2*h2);
+        for(let i=0;i<bm.length;i++) if(bm[i]&&!cp[i]) low[i]=1;
+        const flatH0=(+$("flatH").value)/100;
+        const g=buildPrism2(bm,low,w2,h2,0,flatH0,flatH0+baseT,px,-padS,h+padT);
+        objs.push({name:"base", color:"#DDDDDD", ...g});
+      }else{
+        const g=(smoothOutline?buildPrismSmooth:buildPrism)(bm,w2,h2,0,baseT,px,-padS,h+padT);
+        objs.push({name:"base", color:"#DDDDDD", ...g});
+      }
+    }
+  }
+  let n2=0;
+  keep.forEach(L=>{
+    const m=new Uint8Array(w*h); let cnt=0;
+    for(let i=0;i<labels.length;i++) if(labels[i]===L){m[i]=1;cnt++;}
+    if(!cnt) return;                       // ゴミ掃除で消えた色はスキップ
+    const top = facedown ? flatH
+              : shape==="flat" ? baseT + flatH + st*n2
+                               : baseT + parseFloat(heights[L]||0.6);
+    let fld=null;
+    // iso (sub-pixel) contours for line-art; face-down uses the binary smooth path
+    // (proven watertight) — the mirrored field showed rare saddle inconsistencies
+    if(smoothOutline && mode==="lineart" && !facedown && covLocal && covLocal.W===w && covLocal.H===h)
+      fld={cov:covLocal.cov, thr:covLocal.thr, inside:(L===0)};
+    const g=(smoothOutline?buildPrismSmooth:buildPrism)(m,w,h,facedown?0:baseT-embed,top,px,undefined,undefined,fld);
+    objs.push({name:"c"+n2, color:rgbToHex(...pal[L]), ...g});
+    n2++;
+  });
+
+  // shift into positive XY by the (fixed) base-grid padding, so that toggling
+  // ゴミ掃除 etc. never moves the model — re-exports stay aligned in the slicer
+  let mnX=1e9,mnY=1e9,mxX=-1e9,mxY=-1e9;
+  objs.forEach(o=>{for(let i=0;i<o.V.length;i+=3){
+    if(o.V[i]<mnX)mnX=o.V[i]; if(o.V[i]>mxX)mxX=o.V[i];
+    if(o.V[i+1]<mnY)mnY=o.V[i+1]; if(o.V[i+1]>mxY)mxY=o.V[i+1];}});
+  const shX=basePadPx*px, shY=basePadPx*px;   // 0 when no base
+  if(shX!==0||shY!==0) objs.forEach(o=>{for(let i=0;i<o.V.length;i+=3){
+    o.V[i]+=shX; o.V[i+1]+=shY;}});
+
+  let tri=0, ver=0;
+  objs.forEach(o=>{tri+=o.T.length/3; ver+=o.V.length/3;});
+  if(tabInfo){ tabInfo.x+=shX; tabInfo.y+=shY; tabInfo.cx+=shX; tabInfo.cy+=shY; }
+  mesh={objs,px,w,h,tab:tabInfo,facedown};
+  if(!dragTab){ viewZoom=1; panX=0; panY=0; }
+  // 絵を下モードに切り替わった直後は、絵が見える下側からのビューに自動で回す
+  if(facedown && !lastFacedown){ rotX=-2.4; rotZ=0.35; }
+  if(!facedown && lastFacedown){ rotX=-1.05; rotZ=0.5; }
+  lastFacedown=facedown;
+  $("mstat").innerHTML=`<div>パーツ / parts <b>${objs.length}</b></div>`+
+    `<div>三角形 / triangles <b>${tri.toLocaleString()}</b></div>`+
+    `<div>サイズ / size <b>${(mxX-mnX).toFixed(1)}&times;${(mxY-mnY).toFixed(1)} mm</b></div>`+
+    (cleaned>0?`<div>ゴミ掃除 / cleaned <b>${cleaned} 個</b></div>`:"")+
+    (embed>0?`<div>埋め込み代 / embed <b>${embed.toFixed(2)} mm</b></div>`:"");
+  $("meshCard").style.display=""; $("dlBox").style.display="";
+  drawMesh();
+  $("make3d").disabled=false; $("msg3").textContent="できました / done";
+}
+
+/* ---------------- tiny 3D preview ---------------- */
+let rotX=-1.05, rotZ=0.5, dragging=false, lastXY=null, dragTab=false, lastFacedown=false;
+let viewZoom=1, panX=0, panY=0, dragPan=false;
+const view=$("view");
+let viewCache=null;   // projection params of the last frame (for hit-testing)
+function projPt(x,y,z){
+  const v=viewCache; if(!v) return null;
+  const X=(x-v.cx)*v.cb-(y-v.cy)*v.sb, Y=(x-v.cx)*v.sb+(y-v.cy)*v.cb;
+  const Y2=Y*v.ca-(z-v.cz)*v.sa, Z2=Y*v.sa+(z-v.cz)*v.ca;
+  return [v.cw/2+panX+X*v.sc, v.ch/2+panY+Y2*v.sc, Z2];
+}
+function canvasXY(e){ const r=view.getBoundingClientRect();
+  return [(e.clientX-r.left)*view.width/r.width,(e.clientY-r.top)*view.height/r.height]; }
+function tabHit(e){
+  if(!mesh||!mesh.tab||!viewCache) return false;
+  const [mx,my]=canvasXY(e);
+  const p=projPt(mesh.tab.x,mesh.tab.y,viewCache.zTop);
+  const R=Math.max(14, mesh.tab.r*viewCache.sc*1.4);
+  return Math.hypot(mx-p[0],my-p[1])<=R;
+}
+view.addEventListener("pointerdown",e=>{
+  dragging=true; lastXY=[e.clientX,e.clientY]; view.setPointerCapture(e.pointerId);
+  dragPan = (e.button===1 || e.button===2 || e.shiftKey);
+  dragTab = !dragPan && tabHit(e);
+  view.style.cursor="grabbing";
+});
+view.addEventListener("contextmenu",e=>e.preventDefault());
+view.addEventListener("dblclick",()=>{ viewZoom=1; panX=0; panY=0; drawMesh(); });
+view.addEventListener("wheel",e=>{
+  if(!mesh) return; e.preventDefault();
+  const [mx,my]=canvasXY(e);
+  const f=Math.exp(-e.deltaY*0.0015);
+  const nz=Math.max(0.5,Math.min(20,viewZoom*f)); const r=nz/viewZoom;
+  // zoom about the cursor: keep the world point under the cursor fixed on screen
+  panX = mx - view.width/2 - (mx - view.width/2 - panX)*r;
+  panY = my - view.height/2 - (my - view.height/2 - panY)*r;
+  viewZoom=nz; drawMesh();
+},{passive:false});
+// touch: pinch zoom + two-finger pan
+const tp=new Map(); let pinch0=null;
+view.addEventListener("pointerdown",e=>{ if(e.pointerType==="touch"){ tp.set(e.pointerId,[e.clientX,e.clientY]); if(tp.size===2){ const a=[...tp.values()]; pinch0={d:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]), cx:(a[0][0]+a[1][0])/2, cy:(a[0][1]+a[1][1])/2, z:viewZoom, px:panX, py:panY}; dragging=false; } } });
+view.addEventListener("pointermove",e=>{ if(e.pointerType==="touch"&&tp.has(e.pointerId)){ tp.set(e.pointerId,[e.clientX,e.clientY]);
+  if(tp.size===2&&pinch0){ const a=[...tp.values()]; const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]); const cx=(a[0][0]+a[1][0])/2, cy=(a[0][1]+a[1][1])/2;
+    viewZoom=Math.max(0.5,Math.min(20,pinch0.z*d/(pinch0.d||1))); const r=view.getBoundingClientRect(); const k=view.width/r.width;
+    panX=pinch0.px+(cx-pinch0.cx)*k; panY=pinch0.py+(cy-pinch0.cy)*k; drawMesh(); } } });
+["pointerup","pointercancel"].forEach(ev=>view.addEventListener(ev,e=>{ tp.delete(e.pointerId); if(tp.size<2) pinch0=null; }));
+view.addEventListener("pointerup",e=>{ dragging=false; dragPan=false;
+  if(dragTab){ dragTab=false; build3d(); }         // rebuild once, on release
+  view.style.cursor=""; });
+view.addEventListener("pointermove",e=>{
+  if(!dragging){ view.style.cursor=tabHit(e)?"grab":""; return; }
+  if(dragPan){
+    const r=view.getBoundingClientRect(); const k=view.width/r.width;
+    panX+=(e.clientX-lastXY[0])*k; panY+=(e.clientY-lastXY[1])*k;
+    lastXY=[e.clientX,e.clientY]; drawMesh(); return;
+  }
+  if(dragTab){
+    // project the plate centre and the pointer to screen, take the screen-space
+    // angle, un-rotate by rotZ → new tab angle around the plate
+    const c=projPt(mesh.tab.cx,mesh.tab.cy,viewCache.zTop);
+    const [mx,my]=canvasXY(e);
+    // screen y is down; camera tilt (rotX) squashes the vertical axis by cos(rotX)
+    const ux=mx-c[0], uy=(my-c[1])/Math.max(0.15,Math.abs(viewCache.ca));
+    let a=Math.atan2(-uy,ux)-rotZ;             // undo z rotation
+    if(viewCache.ca<0) a=-a;                    // looking from below → mirrored
+    let deg=Math.round(a*180/Math.PI); deg=((deg%360)+360)%360;
+    $("tabAng").value=deg; $("tabAng").dispatchEvent(new Event("input"));
+    drawTabGhost(deg);
+    return;
+  }
+  rotZ+=(e.clientX-lastXY[0])*0.01; rotX+=(e.clientY-lastXY[1])*0.01;
+  rotX=Math.max(-Math.PI,Math.min(Math.PI,rotX));   // full 360°: can look from below
+  lastXY=[e.clientX,e.clientY]; drawMesh();
+});
+// while dragging the tab, don't rebuild the mesh every move; draw a ghost ring
+// at the target angle over the last frame instead.
+let lastFrame=null;
+function drawTabGhost(deg){
+  if(!lastFrame||!mesh.tab) return;
+  const g=view.getContext("2d");
+  g.putImageData(lastFrame,0,0);
+  const t=mesh.tab, a=deg*Math.PI/180;
+  // approximate the new ring centre: same distance from plate centre as now
+  const R=Math.hypot(t.x-t.cx,t.y-t.cy);
+  const nx=t.cx+Math.cos(a)*R, ny=t.cy+Math.sin(a)*R;
+  const p=projPt(nx,ny,viewCache.zTop);
+  g.beginPath(); g.arc(p[0],p[1],Math.max(6,t.r*viewCache.sc),0,Math.PI*2);
+  g.lineWidth=3; g.strokeStyle="rgba(31,111,84,.9)"; g.stroke();
+  g.beginPath(); g.arc(p[0],p[1],Math.max(3,t.r*viewCache.sc*0.5),0,Math.PI*2);
+  g.strokeStyle="rgba(31,111,84,.6)"; g.lineWidth=2; g.stroke();
+}
+function drawMesh(){
+  if(!mesh) return;
+  const c=view;
+  const cw=Math.max(200, c.clientWidth||620), ch=Math.round(cw*0.66);
+  c.width=cw; c.height=ch;
+  const g=c.getContext("2d");
+  // bounds
+  let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9,mnz=1e9,mxz=-1e9;
+  mesh.objs.forEach(o=>{for(let i=0;i<o.V.length;i+=3){
+    if(o.V[i]<mnx)mnx=o.V[i]; if(o.V[i]>mxx)mxx=o.V[i];
+    if(o.V[i+1]<mny)mny=o.V[i+1]; if(o.V[i+1]>mxy)mxy=o.V[i+1];
+    if(o.V[i+2]<mnz)mnz=o.V[i+2]; if(o.V[i+2]>mxz)mxz=o.V[i+2];}});
+  const cx=(mnx+mxx)/2, cy=(mny+mxy)/2, cz=(mnz+mxz)/2;
+  const span=Math.max(mxx-mnx,mxy-mny)||1;
+  const sc=Math.min(cw,ch)*0.60/span*viewZoom;
+  const ca=Math.cos(rotX), sa=Math.sin(rotX), cb=Math.cos(rotZ), sb=Math.sin(rotZ);
+  viewCache={cx,cy,cz,sc,ca,sa,cb,sb,cw,ch,zTop:mxz};
+
+  // z-buffer raster: a painter's sort fails here because the backing plate has
+  // very large triangles whose centroid can land in front of the small coloured
+  // ones sitting on top of it.
+  const img=g.createImageData(cw,ch), D=img.data;
+  const zbuf=new Float32Array(cw*ch).fill(-Infinity);
+  for(let i=0;i<D.length;i+=4){ D[i]=231; D[i+1]=226; D[i+2]=213; D[i+3]=255; }
+
+  const px=new Float32Array(3), py=new Float32Array(3), pz=new Float32Array(3);
+  // rasterise one triangle (screen coords already in px/py/pz)
+  function raster(rr,gg,bb,alpha,twoSided){
+    const ax=px[1]-px[0], ay=py[1]-py[0], bx=px[2]-px[0], by=py[2]-py[0];
+    let area=ax*by-ay*bx;
+    if(area===0) return;
+    if(area<0 && !twoSided) return;
+    const back=area<0; if(back) area=-area;
+    let x0=Math.max(0,Math.floor(Math.min(px[0],px[1],px[2])));
+    let x1=Math.min(cw-1,Math.ceil(Math.max(px[0],px[1],px[2])));
+    let y0=Math.max(0,Math.floor(Math.min(py[0],py[1],py[2])));
+    let y1=Math.min(ch-1,Math.ceil(Math.max(py[0],py[1],py[2])));
+    if(x1<x0||y1<y0) return;
+    const inv=1/(back?-area:area);
+    for(let y=y0;y<=y1;y++){
+      for(let x=x0;x<=x1;x++){
+        const qx=x+0.5-px[0], qy=y+0.5-py[0];
+        const w1=(qx*by-qy*bx)*inv;
+        const w2=(ax*qy-ay*qx)*inv;
+        const w0=1-w1-w2;
+        if(w0<0||w1<0||w2<0) continue;
+        const z=w0*pz[0]+w1*pz[1]+w2*pz[2];
+        const idx=y*cw+x;
+        if(z<=zbuf[idx]) continue;
+        zbuf[idx]=z;
+        const o4=idx*4;
+        if(alpha>=1){ D[o4]=rr; D[o4+1]=gg; D[o4+2]=bb; }
+        else { D[o4]=D[o4]+(rr-D[o4])*alpha; D[o4+1]=D[o4+1]+(gg-D[o4+1])*alpha; D[o4+2]=D[o4+2]+(bb-D[o4+2])*alpha; }
+      }
+    }
+  }
+  function proj(k,x,y,z){
+    x-=cx; y-=cy; z-=cz;
+    const X=x*cb-y*sb, Y=x*sb+y*cb;
+    const Y2=Y*ca-z*sa, Z2=Y*sa+z*ca;
+    px[k]=cw/2+panX+X*sc; py[k]=ch/2+panY+Y2*sc; pz[k]=Z2;
+  }
+  // ---- meshes, both faces (so the underside is visible when looking from below)
+  for(const o of mesh.objs){
+    const r0=parseInt(o.color.slice(1,3),16),
+          g0=parseInt(o.color.slice(3,5),16),
+          b0=parseInt(o.color.slice(5,7),16);
+    for(let t=0;t<o.T.length;t+=3){
+      const i0=o.T[t]*3,i1=o.T[t+1]*3,i2=o.T[t+2]*3;
+      // world-space face normal → Lambert shading with a fixed light (top-front-left);
+      // consistent per face regardless of triangle size (looks right for smooth outlines too)
+      const ux=o.V[i1]-o.V[i0], uy=o.V[i1+1]-o.V[i0+1], uz=o.V[i1+2]-o.V[i0+2];
+      const vx=o.V[i2]-o.V[i0], vy=o.V[i2+1]-o.V[i0+1], vz=o.V[i2+2]-o.V[i0+2];
+      let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+      const nl=Math.hypot(nx,ny,nz)||1; nx/=nl; ny/=nl; nz/=nl;
+      // rotate normal into view space (same rotation as vertices) to get a view-dependent light
+      const NX=nx*cb-ny*sb, NY=nx*sb+ny*cb, NZ2=NY*sa+nz*ca; const NY2=NY*ca-nz*sa;
+      const lx=-0.35, ly=-0.45, lz=0.82;              // light dir in view space
+      let lam=Math.abs(NX*lx+NY2*ly+NZ2*lz);           // abs → two-sided
+      const sh=0.55+0.45*lam;
+      for(let k=0;k<3;k++){ const i=o.T[t+k]*3; proj(k,o.V[i],o.V[i+1],o.V[i+2]); }
+      // frustum cull: skip triangles entirely off-canvas (big win when zoomed in)
+      if((px[0]<0&&px[1]<0&&px[2]<0)||(px[0]>=cw&&px[1]>=cw&&px[2]>=cw)||
+         (py[0]<0&&py[1]<0&&py[2]<0)||(py[0]>=ch&&py[1]>=ch&&py[2]>=ch)) continue;
+      raster(Math.min(255,r0*sh)|0, Math.min(255,g0*sh)|0, Math.min(255,b0*sh)|0, 1, true);
+    }
+  }
+  // ---- build plate at z=0, composited AFTER the model as a translucent sheet:
+  //      where the plate is in front of the model (looking from below) it tints
+  //      it lightly; where it is behind, it just fills the background.
+  {
+    const m=span*0.35, gx0=mnx-m, gx1=mxx+m, gy0=mny-m, gy1=mxy+m;
+    const plate=(alphaFront,alphaBack)=>{
+      const tri=(a,b,c)=>{
+        const ax=px[1]-px[0], ay=py[1]-py[0], bx=px[2]-px[0], by=py[2]-py[0];
+        let area=ax*by-ay*bx; if(area===0) return;
+        const inv=1/area;
+        let x0=Math.max(0,Math.floor(Math.min(px[0],px[1],px[2]))), x1=Math.min(cw-1,Math.ceil(Math.max(px[0],px[1],px[2])));
+        let y0=Math.max(0,Math.floor(Math.min(py[0],py[1],py[2]))), y1=Math.min(ch-1,Math.ceil(Math.max(py[0],py[1],py[2])));
+        for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+          const qx=x+0.5-px[0], qy=y+0.5-py[0];
+          const w1=(qx*by-qy*bx)*inv, w2=(ax*qy-ay*qx)*inv, w0=1-w1-w2;
+          if(w0<0||w1<0||w2<0) continue;
+          const z=w0*pz[0]+w1*pz[1]+w2*pz[2];
+          const idx=y*cw+x, o4=idx*4;
+          const a = z>zbuf[idx] ? alphaFront : alphaBack;   // in front of model, or behind/empty
+          if(a<=0) continue;
+          D[o4]=D[o4]+(168-D[o4])*a; D[o4+1]=D[o4+1]+(168-D[o4+1])*a; D[o4+2]=D[o4+2]+(160-D[o4+2])*a;
+        }
+      };
+      proj(0,gx0,gy0,0); proj(1,gx1,gy0,0); proj(2,gx1,gy1,0); tri();
+      proj(0,gx0,gy0,0); proj(1,gx1,gy1,0); proj(2,gx0,gy1,0); tri();
+    };
+    plate(0.30, 0.42);
+  }
+  g.putImageData(img,0,0);
+  {
+    const m=span*0.35, gx0=mnx-m, gx1=mxx+m, gy0=mny-m, gy1=mxy+m;
+    const P=[[gx0,gy0],[gx1,gy0],[gx1,gy1],[gx0,gy1]].map(([x,y])=>{proj(0,x,y,0);return [px[0],py[0]];});
+    g.beginPath(); g.moveTo(P[0][0],P[0][1]); for(let i=1;i<4;i++) g.lineTo(P[i][0],P[i][1]); g.closePath();
+    g.strokeStyle="rgba(90,90,90,.45)"; g.lineWidth=1; g.stroke();
+    // grid: 10 mm solid, 5 mm dotted (dotted only when zoomed enough to read it)
+    const line=(x0,y0,x1,y1)=>{ proj(0,x0,y0,0); const a=[px[0],py[0]]; proj(0,x1,y1,0); g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(px[0],py[0]); g.stroke(); };
+    const mmPx=sc; // screen px per mm (approx, before tilt)
+    if(mmPx*5>=6){ g.strokeStyle="rgba(120,120,120,.28)"; g.setLineDash([2,4]); g.lineWidth=1;
+      for(let gx=Math.ceil(gx0/5)*5; gx<gx1; gx+=5){ if(gx%10===0) continue; line(gx,gy0,gx,gy1); }
+      for(let gy=Math.ceil(gy0/5)*5; gy<gy1; gy+=5){ if(gy%10===0) continue; line(gx0,gy,gx1,gy); }
+      g.setLineDash([]); }
+    g.strokeStyle="rgba(110,110,110,.38)"; g.lineWidth=1;
+    for(let gx=Math.ceil(gx0/10)*10; gx<gx1; gx+=10) line(gx,gy0,gx,gy1);
+    for(let gy=Math.ceil(gy0/10)*10; gy<gy1; gy+=10) line(gx0,gy,gx1,gy);
+    // label + zoom hint
+    g.fillStyle="rgba(90,90,90,.7)"; g.font="11px system-ui,sans-serif";
+    g.fillText("ビルドプレート / build plate (z=0)  実線10mm・点線5mm", 10, ch-10);
+    g.textAlign="right"; g.fillText((viewZoom!==1?"×"+viewZoom.toFixed(1)+"  ":"")+"ホイール/ピンチ:拡大  Shift+ドラッグ/右ドラッグ:移動  ダブルクリック:リセット", cw-10, ch-10); g.textAlign="left";
+  }
+  // tab handle hint
+  if(mesh.tab){
+    const p=projPt(mesh.tab.x,mesh.tab.y,mxz);
+    g.beginPath(); g.arc(p[0],p[1],Math.max(6,mesh.tab.r*sc),0,Math.PI*2);
+    g.strokeStyle="rgba(31,111,84,.55)"; g.lineWidth=2; g.setLineDash([4,3]); g.stroke(); g.setLineDash([]);
+  }
+  lastFrame=g.getImageData(0,0,cw,ch);
+}
+window.addEventListener("resize",drawMesh);
+
+/* ---------------- exporters ---------------- */
+// 減色画像をPNG(透過)/JPEG(白背景)で保存。グリッド解像度のままだと小さいので、
+// にじまないニアレストネイバーで長辺が約1000pxになるよう整数倍に拡大する。
+function exportImage(kind){
+  const src=$("out"); if(src.hidden) return;
+  if(mode==="laser" && laserResult){
+    const {ink,fw,fh}=laserResult;
+    const c=document.createElement("canvas"); c.width=fw; c.height=fh;
+    const g=c.getContext("2d"); const id=g.createImageData(fw,fh); const D=id.data;
+    const inv=laserBg==="invert";
+    for(let i=0;i<fw*fh;i++){ const black=inv? !ink[i] : !!ink[i];
+      if(black){ D[i*4]=0;D[i*4+1]=0;D[i*4+2]=0;D[i*4+3]=255; }
+      else if(laserBg==="alpha" && kind!=="jpeg"){ D[i*4+3]=0; }
+      else { D[i*4]=255;D[i*4+1]=255;D[i*4+2]=255;D[i*4+3]=255; } }
+    g.putImageData(id,0,0);
+    c.toBlob(b=>saveBlob(b,"laser_"+laserKind+"_"+fw+"x"+fh+"."+(kind==="jpeg"?"jpg":"png")),
+      kind==="jpeg"?"image/jpeg":"image/png", 1.0);
+    return;
+  }
+  const s=Math.max(1, Math.round(1000/Math.max(src.width,src.height)));
+  const c=document.createElement("canvas");
+  c.width=src.width*s; c.height=src.height*s;
+  const g=c.getContext("2d");
+  if(kind==="jpeg"){ g.fillStyle="#ffffff"; g.fillRect(0,0,c.width,c.height); }
+  g.imageSmoothingEnabled=false;
+  g.drawImage(src,0,0,c.width,c.height);
+  c.toBlob(b=>saveBlob(b,"panel."+(kind==="jpeg"?"jpg":"png")),
+    kind==="jpeg"?"image/jpeg":"image/png", 0.92);
+}
+$("savePng").onclick=()=>exportImage("png");
+$("saveJpg").onclick=()=>exportImage("jpeg");
+
+function saveBlob(blob,name){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1500);
+}
+function stlBinary(o){
+  const n=o.T.length/3;
+  const buf=new ArrayBuffer(84+n*50), dv=new DataView(buf);
+  dv.setUint32(80,n,true);
+  let p=84;
+  for(let t=0;t<o.T.length;t+=3){
+    const i0=o.T[t]*3,i1=o.T[t+1]*3,i2=o.T[t+2]*3;
+    const ux=o.V[i1]-o.V[i0], uy=o.V[i1+1]-o.V[i0+1], uz=o.V[i1+2]-o.V[i0+2];
+    const vx=o.V[i2]-o.V[i0], vy=o.V[i2+1]-o.V[i0+1], vz=o.V[i2+2]-o.V[i0+2];
+    let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    const L=Math.hypot(nx,ny,nz)||1; nx/=L;ny/=L;nz/=L;
+    dv.setFloat32(p,nx,true);dv.setFloat32(p+4,ny,true);dv.setFloat32(p+8,nz,true);p+=12;
+    for(const i of [i0,i1,i2]){
+      dv.setFloat32(p,o.V[i],true);dv.setFloat32(p+4,o.V[i+1],true);dv.setFloat32(p+8,o.V[i+2],true);p+=12;
+    }
+    dv.setUint16(p,0,true); p+=2;
+  }
+  return new Uint8Array(buf);
+}
+// ---- minimal ZIP (stored) ----
+const CRC=(()=>{const t=new Uint32Array(256);
+  for(let i=0;i<256;i++){let c=i; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[i]=c>>>0;}
+  return t;})();
+function crc32(u8){let c=0xFFFFFFFF;
+  for(let i=0;i<u8.length;i++) c=CRC[(c^u8[i])&0xFF]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;}
+function zip(files){
+  const enc=new TextEncoder(), parts=[], central=[];
+  let off=0;
+  for(const {name,data} of files){
+    const nb=enc.encode(name), crc=crc32(data);
+    const lh=new Uint8Array(30+nb.length), dv=new DataView(lh.buffer);
+    dv.setUint32(0,0x04034b50,true); dv.setUint16(4,20,true); dv.setUint16(6,0x800,true);
+    dv.setUint16(8,0,true); dv.setUint16(10,0,true); dv.setUint16(12,0,true);
+    dv.setUint32(14,crc,true); dv.setUint32(18,data.length,true); dv.setUint32(22,data.length,true);
+    dv.setUint16(26,nb.length,true); dv.setUint16(28,0,true);
+    lh.set(nb,30);
+    parts.push(lh,data);
+    const ch=new Uint8Array(46+nb.length), cv=new DataView(ch.buffer);
+    cv.setUint32(0,0x02014b50,true); cv.setUint16(4,20,true); cv.setUint16(6,20,true);
+    cv.setUint16(8,0x800,true); cv.setUint16(10,0,true);
+    cv.setUint32(16,crc,true); cv.setUint32(20,data.length,true); cv.setUint32(24,data.length,true);
+    cv.setUint16(28,nb.length,true); cv.setUint32(42,off,true);
+    ch.set(nb,46); central.push(ch);
+    off+=lh.length+data.length;
+  }
+  let cdSize=0; central.forEach(c=>cdSize+=c.length);
+  const eocd=new Uint8Array(22), ev=new DataView(eocd.buffer);
+  ev.setUint32(0,0x06054b50,true);
+  ev.setUint16(8,files.length,true); ev.setUint16(10,files.length,true);
+  ev.setUint32(12,cdSize,true); ev.setUint32(16,off,true);
+  return new Blob([...parts,...central,eocd],{type:"application/zip"});
+}
+function xmlEscape(s){return s.replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));}
+// Bambu Studio ネイティブ形式の3MF:
+// 標準3MFの basematerials は Bambu に無視されるため、Bambu 自身が書くのと同じ
+// 「1オブジェクト＋複数パーツ、パーツごとに extruder 指定」構造で書き出す。
+// 読み込むだけで 色1→フィラメント1、色2→フィラメント2… と自動で割り当たる。
+function build3mf(){
+  const objs=mesh.objs;
+  const NS='xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" '+
+    'xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" '+
+    'xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" '+
+    'requiredextensions="p"';
+  const uu=(a,b)=>`${String(a).padStart(8,"0")}-${String(b).padStart(4,"0")}-4000-9000-000000000000`;
+  // 全体bbox → プレート中央に置き、最下面を z=0 に
+  const mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
+  objs.forEach(o=>{for(let i=0;i<o.V.length;i+=3)
+    for(let a=0;a<3;a++){ const v=o.V[i+a];
+      if(v<mn[a])mn[a]=v; if(v>mx[a])mx[a]=v; }});
+  const tx=128-(mn[0]+mx[0])/2, ty=128-(mn[1]+mx[1])/2, tz=-mn[2];
+  const asmId=objs.length+1;
+
+  // ---- 3D/Objects/object_1.model : 各パーツのメッシュ ----
+  let sub=`<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" ${NS}>\n <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>`;
+  objs.forEach((o,i)=>{
+    let v='<vertices>';
+    for(let j=0;j<o.V.length;j+=3)
+      v+=`<vertex x="${o.V[j].toFixed(4)}" y="${o.V[j+1].toFixed(4)}" z="${o.V[j+2].toFixed(4)}"/>`;
+    v+='</vertices><triangles>';
+    for(let t=0;t<o.T.length;t+=3)
+      v+=`<triangle v1="${o.T[t]}" v2="${o.T[t+1]}" v3="${o.T[t+2]}"/>`;
+    v+='</triangles>';
+    sub+=`\n  <object id="${i+1}" p:UUID="${uu(i+1,0)}" type="model"><mesh>${v}</mesh></object>`;
+  });
+  sub+=`\n </resources>\n <build/>\n</model>`;
+
+  // ---- 3D/3dmodel.model : 全パーツを1オブジェクトに組み立て ----
+  const comps=objs.map((o,i)=>
+    `\n    <component p:path="/3D/Objects/object_1.model" objectid="${i+1}" `+
+    `p:UUID="${uu(i+1,1)}" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>`).join("");
+  const top=`<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" ${NS}>\n <metadata name="Application">BambuStudio-02.00.00.00</metadata>\n <metadata name="BambuStudio:3mfVersion">1</metadata>\n <metadata name="Title">photo_panel</metadata>\n <resources>\n  <object id="${asmId}" p:UUID="${uu(asmId,0)}" type="model">\n   <components>${comps}\n   </components>\n  </object>\n </resources>\n <build p:UUID="${uu(asmId,2)}">\n  <item objectid="${asmId}" p:UUID="${uu(asmId,3)}" transform="1 0 0 0 1 0 0 0 1 ${tx.toFixed(3)} ${ty.toFixed(3)} ${tz.toFixed(3)}" printable="1"/>\n </build>\n</model>`;
+
+  // ---- Metadata/model_settings.config : パーツ→フィラメント割り当て ----
+  let cfg=`<?xml version="1.0" encoding="UTF-8"?>\n<config>\n  <object id="${asmId}">\n    <metadata key="name" value="photo_panel"/>\n    <metadata key="extruder" value="1"/>`;
+  objs.forEach((o,i)=>{
+    const pname=`${String(i+1).padStart(2,"0")}_${o.name}_${o.color.slice(1)}`;
+    cfg+=`\n    <part id="${i+1}" subtype="normal_part">\n      <metadata key="name" value="${xmlEscape(pname)}"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n      <metadata key="extruder" value="${Math.min(i+1,16)}"/>\n      <mesh_stat face_count="${o.T.length/3}" edges_fixed="0" degenerate_facets="0" facets_removed="0" facets_reversed="0" backwards_edges="0"/>\n    </part>`;
+  });
+  cfg+=`\n  </object>\n</config>`;
+
+  const ct=`<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n</Types>`;
+  const rootRels=`<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>\n</Relationships>`;
+  const modelRels=`<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n <Relationship Target="/3D/Objects/object_1.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>\n</Relationships>`;
+  const enc=new TextEncoder();
+  return zip([
+    {name:"[Content_Types].xml",          data:enc.encode(ct)},
+    {name:"_rels/.rels",                  data:enc.encode(rootRels)},
+    {name:"3D/3dmodel.model",             data:enc.encode(top)},
+    {name:"3D/_rels/3dmodel.model.rels",  data:enc.encode(modelRels)},
+    {name:"3D/Objects/object_1.model",    data:enc.encode(sub)},
+    {name:"Metadata/model_settings.config", data:enc.encode(cfg)},
+  ]);
+}
+$("dl3mf").onclick=()=>{ if(!mesh) return;
+  const b=build3mf();
+  saveBlob(new Blob([b],{type:"model/3mf"}),"panel.3mf");
+  $("msg3").textContent="3MF を保存しました / saved";
+};
+$("dlstl").onclick=()=>{ if(!mesh) return;
+  const files=mesh.objs.map((o,i)=>({name:`${String(i+1).padStart(2,"0")}_${o.name}_${o.color.slice(1)}.stl`,
+    data:stlBinary(o)}));
+  saveBlob(zip(files),"panel_stl.zip");
+  $("msg3").textContent="STL（ZIP）を保存しました / saved";
+};
+</script>
+</body>
+</html>

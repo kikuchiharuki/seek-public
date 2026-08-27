@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>品名記事欄 18バイト制限 入力デモ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', sans-serif;
+    background: #f0f2f5; padding: 40px 16px;
+  }
+  .container { max-width: 600px; margin: 0 auto; }
+  h1 { font-size: 18px; margin-bottom: 24px; }
+  .version {
+    background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    padding: 24px; margin-bottom: 20px;
+  }
+  .version h2 { font-size: 15px; margin-bottom: 4px; }
+  .version .desc { font-size: 12px; color: #666; margin-bottom: 12px; }
+  .version .recommend { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: #f97316; border-radius: 4px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; }
+  input[type="text"] {
+    width: 100%; padding: 10px 12px; border: 2px solid #d0d5dd; border-radius: 6px;
+    font-size: 16px; font-family: 'Courier New', monospace; outline: none; transition: border-color .15s, background .15s;
+  }
+  input:focus { border-color: #4a6cf7; }
+  .counter { font-size: 12px; color: #888; margin-top: 4px; text-align: right; }
+  .counter .over { color: #dc2626; font-weight: 700; }
+  .bar-wrap { height: 4px; background: #e5e7eb; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #4a6cf7; border-radius: 2px; transition: width .15s, background .15s; }
+  .bar-fill.warn { background: #f59e0b; }
+  .bar-fill.over { background: #dc2626; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>品名記事欄 18バイト制限 — 入力UIパターン比較</h1>
+
+  <!-- A: カウンター表示のみ -->
+  <div class="version">
+    <h2>A: バイト数カウンター</h2>
+    <div class="desc">入力は自由。残りバイト数をリアルタイム表示。超過すると赤文字で警告。</div>
+    <label>品名記事</label>
+    <input type="text" id="inputA" placeholder="例: 化粧品セット">
+    <div class="counter" id="counterA">0 / 18 バイト</div>
+  </div>
+
+  <!-- B: 超過で背景赤 -->
+  <div class="version">
+    <h2>B: 超過で薄赤 + カウンター</h2>
+    <div class="desc">超過すると入力欄が薄赤に。視覚的にすぐ気づける。</div>
+    <label>品名記事</label>
+    <input type="text" id="inputB" placeholder="例: 化粧品セット">
+    <div class="counter" id="counterB">0 / 18 バイト</div>
+  </div>
+
+  <!-- C: 入力制限（超過不可） -->
+  <div class="version">
+    <h2>C: 入力制限（超過不可）</h2>
+    <div class="desc">18バイトを超える文字は入力できない。確実だが、ペーストで切れる場合あり。</div>
+    <label>品名記事</label>
+    <input type="text" id="inputC" placeholder="例: 化粧品セット">
+    <div class="counter" id="counterC">0 / 18 バイト</div>
+  </div>
+
+  <!-- D: プログレスバー + 超過赤 (おすすめ) -->
+  <div class="version">
+    <h2>D: プログレスバー + 超過赤 <span class="recommend">おすすめ</span></h2>
+    <div class="desc">バーで残り容量が一目瞭然。超過すると赤背景。入力は自由なので修正しやすい。</div>
+    <label>品名記事</label>
+    <input type="text" id="inputD" placeholder="例: 化粧品セット">
+    <div class="bar-wrap"><div class="bar-fill" id="barD" style="width:0"></div></div>
+    <div class="counter" id="counterD">0 / 18 バイト</div>
+  </div>
+</div>
+
+<script>
+// Shift-JIS バイト数計算（全角=2, 半角=1）
+function sjisBytes(str) {
+  let b = 0;
+  for (const ch of str) {
+    const c = ch.charCodeAt(0);
+    b += (c <= 0x7F || (c >= 0xFF61 && c <= 0xFF9F)) ? 1 : 2;
+  }
+  return b;
+}
+
+const MAX = 18;
+
+// A: カウンターのみ
+document.getElementById('inputA').addEventListener('input', function() {
+  const b = sjisBytes(this.value);
+  const el = document.getElementById('counterA');
+  el.innerHTML = b > MAX
+    ? `<span class="over">${b} / ${MAX} バイト（${b - MAX} バイト超過）</span>`
+    : `${b} / ${MAX} バイト`;
+});
+
+// B: 超過で薄赤
+document.getElementById('inputB').addEventListener('input', function() {
+  const b = sjisBytes(this.value);
+  const el = document.getElementById('counterB');
+  if (b > MAX) {
+    this.style.background = '#fef2f2';
+    this.style.borderColor = '#fca5a5';
+    el.innerHTML = `<span class="over">${b} / ${MAX} バイト（${b - MAX} バイト超過）</span>`;
+  } else {
+    this.style.background = '';
+    this.style.borderColor = '';
+    el.textContent = `${b} / ${MAX} バイト`;
+  }
+});
+
+// C: 入力制限
+let prevC = '';
+document.getElementById('inputC').addEventListener('input', function() {
+  const b = sjisBytes(this.value);
+  if (b > MAX) {
+    this.value = prevC;
+  } else {
+    prevC = this.value;
+  }
+  const cur = sjisBytes(this.value);
+  document.getElementById('counterC').textContent = `${cur} / ${MAX} バイト`;
+});
+
+// D: プログレスバー + 超過赤
+document.getElementById('inputD').addEventListener('input', function() {
+  const b = sjisBytes(this.value);
+  const pct = Math.min(b / MAX * 100, 100);
+  const bar = document.getElementById('barD');
+  const el = document.getElementById('counterD');
+  bar.style.width = pct + '%';
+  bar.className = 'bar-fill' + (b > MAX ? ' over' : b >= MAX * 0.8 ? ' warn' : '');
+  if (b > MAX) {
+    this.style.background = '#fef2f2';
+    this.style.borderColor = '#fca5a5';
+    el.innerHTML = `<span class="over">${b} / ${MAX} バイト（${b - MAX} バイト超過）</span>`;
+  } else {
+    this.style.background = '';
+    this.style.borderColor = '';
+    el.textContent = `${b} / ${MAX} バイト（残り ${MAX - b}）`;
+  }
+});
+</script>
+</body>
+</html>
