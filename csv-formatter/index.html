@@ -201,6 +201,18 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 }
 .btn-orange:hover { background: #d35400; }
 .btn-fixed { text-align: center; box-sizing: border-box; }
+/* 変換結果ヘッダーの各アクションボタン（色で役割を区別）。
+   一度押したら .is-used が付いて白くなり、「もう押した」ことが一目で分かる。
+   動作自体は何度でも同じ（見た目だけのマーク）。 */
+.btn-excel { background: #1e6b45; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+.btn-mail  { background: linear-gradient(90deg, #69B6C9, #E9BE46); color: #1f2937; border: none; border-radius: 6px; cursor: pointer; }
+.btn-print { background: #fff262; color: #1f2937; border: none; border-radius: 6px; cursor: pointer; }
+.btn-excel:hover, .btn-mail:hover, .btn-print:hover { filter: brightness(0.93); }
+.preview-actions button.is-used {
+  background: #fff !important; background-image: none !important;
+  color: #333 !important; border: 1px solid #ddd !important; filter: none;
+}
+.preview-actions button.is-used:hover { background: #f5f5f5 !important; }
 /* 変換結果ヘッダーのボタン群はテキストが潰れない範囲でコンパクトに揃える */
 .preview-actions button { padding: 6px 14px; min-height: 44px; box-sizing: border-box; font-size: 13px; white-space: nowrap; font-weight: 600; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; }
 /* 「翌営業日で設定」系ボタン: 出荷日を設定(青)と区別できるよう緑系 */
@@ -669,10 +681,10 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
           </span>
           <button class="btn-green" id="btnNextBizShip">明日出荷で設定</button>
         </div>
-        <button class="btn-secondary btn-fixed" id="btnExcel">📥 Excel保存</button>
-        <button class="btn-secondary btn-fixed" id="btnMailText">✉ 承りメール文</button>
+        <button class="btn-excel btn-fixed" id="btnExcel">📥 Excel保存</button>
+        <button class="btn-mail btn-fixed" id="btnMailText">✉ 承りメール文</button>
         <button class="btn-orange btn-fixed" id="btnInvoiceCsv">🚚 福山通運ｴﾝﾄﾘｰ用<br>形式へ変換</button>
-        <button class="btn-secondary btn-fixed" id="btnPrint">🖨 印刷</button>
+        <button class="btn-print btn-fixed" id="btnPrint">🖨 印刷</button>
       </div>
     </div>
     <div class="print-only" id="printHeader"></div>
@@ -1562,10 +1574,19 @@ function shipDateMissing() {
 }
 const SHIP_DATE_MSG = '出荷日セルが空白の行があります。「出荷日を設定」ボタンを押してください';
 
+// 使用済みマーク: 一度実行したボタンを白くして「もう押した」ことを示す。
+// 動作は変えず見た目だけ。新しく変換したらリセットする。
+const USED_BTN_IDS = ['btnExcel', 'btnMailText', 'btnInvoiceCsv', 'btnPrint'];
+function markUsed(id) { document.getElementById(id).classList.add('is-used'); }
+function resetUsedButtons() {
+  USED_BTN_IDS.forEach(id => document.getElementById(id).classList.remove('is-used'));
+}
+
 // 印刷ボタン（A4横。出荷日+商品集計が表の上に印刷される）
 document.getElementById('btnPrint').addEventListener('click', () => {
   if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
   if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return; }
+  markUsed('btnPrint');
   updatePrintHeader();
   window.print();
 });
@@ -1885,6 +1906,7 @@ document.getElementById('btnExcel').addEventListener('click', async () => {
   const shipIso = document.getElementById('shipDate').value;
   if (!shipIso) { showToast('出荷日を設定してください（ファイル名に使います）', 'error'); return; }
   if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return; }
+  markUsed('btnExcel');
 
   const d = new Date(shipIso);
   const ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
@@ -2287,6 +2309,7 @@ document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
   document.getElementById('invoiceNotes').style.display = notes.length ? '' : 'none';
   document.getElementById('invoiceCount').textContent = `(${invoiceRows.length} 件 → ${invoiceFileName})`;
 
+  markUsed('btnInvoiceCsv');
   renderInvoiceTable();
   const sec = document.getElementById('invoiceSection');
   sec.classList.add('visible');
@@ -3122,6 +3145,7 @@ async function runConversion() {
   await holidaysReady;
   updateNextBizButton();  // プレビュー表示時に翌営業日ボタンのラベルを最新化
 
+  resetUsedButtons();  // 新しい変換結果なので「押した」マークは白紙に戻す
   const totalStats = { merged: 0, yupack: 0, storeAdded: 0, lineBreaks: 0, deliveryChanged: 0, zipFilled: 0 };
   processedFiles = [];
 
@@ -3589,6 +3613,7 @@ function escapeHtml(str) {
       return;
     }
     const lines = buildMailLines();
+    markUsed('btnMailText');
     plainTextCache = lines.join('\n');
     preview.innerHTML = renderMailHtml(lines);
     overlay.classList.add('open');
