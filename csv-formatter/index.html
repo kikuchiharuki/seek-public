@@ -209,9 +209,13 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .btn-excel { background: #1e6b45; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
 .btn-mail  { background: linear-gradient(172deg, #69B6C9 60%, #E9BE46 65%); color: #ffffff; border: none; border-radius: 6px; cursor: pointer; }
 .btn-print { background: #fff262; color: #1f2937; border: none; border-radius: 6px; cursor: pointer; }
-/* 承りメール文の封筒アイコン（塗り。文字色に追従するので白文字のまま揃う） */
-.mail-ico { display: inline-flex; align-items: center; gap: 5px; }
-.mail-ico svg { width: 15px; height: 15px; flex: none; }
+/* ボタン内アイコン（インラインSVGの塗り。currentColor なので文字色と必ず揃う） */
+.mail-ico, .btn-ico { display: inline-flex; align-items: center; gap: 5px; }
+.mail-ico svg, .btn-ico svg { width: 15px; height: 15px; flex: none; }
+/* アイコン内の「抜き」部分（印刷ボタンのチェック等）はボタン地色で塗る。
+   押した後(.is-used)は地色が白に変わるため CSS変数で追従させる。 */
+.btn-print { --btn-bg: #fff262; }
+.preview-actions button.is-used { --btn-bg: #fff; }
 .btn-excel:hover, .btn-mail:hover, .btn-print:hover { filter: brightness(0.93); }
 .preview-actions button.is-used {
   background: #fff !important; background-image: none !important;
@@ -686,10 +690,10 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
           </span>
           <button class="btn-green" id="btnNextBizShip">明日出荷で設定</button>
         </div>
-        <button class="btn-excel btn-fixed" id="btnExcel">📥 Excel保存</button>
+        <button class="btn-excel btn-fixed" id="btnExcel"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 2h13l5 5v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM7 3.5v6h9v-6zm5 9.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4z"/></svg>Excel保存</span></button>
         <button class="btn-mail btn-fixed" id="btnMailText"><span class="mail-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v.5l-10 6.6L2 6.5V6a2 2 0 0 1 2-2z"/><path d="M22 8.9V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.9l10 6.6z"/></svg>承りメール文</span></button>
-        <button class="btn-orange btn-fixed" id="btnInvoiceCsv">福山通運ｴﾝﾄﾘｰ用<br>形式へ変換 🚚</button>
-        <button class="btn-print btn-fixed" id="btnPrint">🖨 印刷</button>
+        <button class="btn-orange btn-fixed" id="btnInvoiceCsv"><span>福山通運ｴﾝﾄﾘｰ用</span><span class="btn-ico">形式へ変換<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 7l10-4 10 4-10 4z"/><path d="M2 9.2l9 3.6V21l-9-3.6zM22 9.2l-9 3.6V21l9-3.6z"/></svg></span></button>
+        <button class="btn-print btn-fixed" id="btnPrint"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 2h10v5H7z"/><path d="M3 8.5h18a2 2 0 0 1 2 2V16h-5v-3H5v3H1v-5.5a2 2 0 0 1 2-2z"/><path d="M6.5 14.5h11V22h-11z"/><path d="M9 18.2l1.6-1.5 1.5 1.5 3.2-3.2 1.6 1.6-4.8 4.8z" fill="var(--btn-bg, #fff262)"/></svg>印刷</span></button>
       </div>
     </div>
     <div class="print-only" id="printHeader"></div>
