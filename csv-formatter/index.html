@@ -385,6 +385,8 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .preview-section.visible { display: block; }
 /* 送り状CSVプレビューだけ大枠に背景色をつけて、変換結果テーブルと見分けやすくする */
 #invoiceSection { background: #ffdec2; }
+/* セルは背景色を敷いていないので大枠の色が透ける。表の中だけ白に戻す */
+#invoiceSection .data-table td { background: #fff; }
 .preview-section h2 { font-size: 16px; margin-bottom: 12px; }
 
 .table-wrapper { overflow-x: auto; max-height: 500px; overflow-y: auto; }
