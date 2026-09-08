@@ -202,7 +202,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .btn-orange:hover { background: #d35400; }
-.btn-fixed { text-align: center; box-sizing: border-box; }
+.btn-fixed { text-align: center; box-sizing: border-box; flex: 0 0 190px; }  /* 4つのボタンを同じ幅で揃える */
 /* 変換結果ヘッダーの各アクションボタン（色で役割を区別）。
    一度押したら .is-used が付いて白くなり、「もう押した」ことが一目で分かる。
    動作自体は何度でも同じ（見た目だけのマーク）。 */
@@ -688,7 +688,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         </div>
         <button class="btn-excel btn-fixed" id="btnExcel">📥 Excel保存</button>
         <button class="btn-mail btn-fixed" id="btnMailText"><span class="mail-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v.5l-10 6.6L2 6.5V6a2 2 0 0 1 2-2z"/><path d="M22 8.9V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.9l10 6.6z"/></svg>承りメール文</span></button>
-        <button class="btn-orange btn-fixed" id="btnInvoiceCsv">🚚 福山通運ｴﾝﾄﾘｰ用<br>形式へ変換</button>
+        <button class="btn-orange btn-fixed" id="btnInvoiceCsv">福山通運ｴﾝﾄﾘｰ用<br>形式へ変換 🚚</button>
         <button class="btn-print btn-fixed" id="btnPrint">🖨 印刷</button>
       </div>
     </div>
