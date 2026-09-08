@@ -12,7 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.2.0/encoding.min.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; background: #f5f7fa; color: #333; }
+body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; background: #f0f6ff; color: #333; }
 
 .app-header {
   background: #2c3e50; color: #fff; padding: 12px 24px;
@@ -383,6 +383,8 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 .preview-section.visible { display: block; }
+/* 送り状CSVプレビューだけ大枠に背景色をつけて、変換結果テーブルと見分けやすくする */
+#invoiceSection { background: #ffdec2; }
 .preview-section h2 { font-size: 16px; margin-bottom: 12px; }
 
 .table-wrapper { overflow-x: auto; max-height: 500px; overflow-y: auto; }
