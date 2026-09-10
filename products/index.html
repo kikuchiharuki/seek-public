@@ -16,9 +16,13 @@ h1{font-size:20px;font-weight:800;color:var(--pri);letter-spacing:.06em}
 h1 small{display:block;font-size:12px;font-weight:400;color:var(--sub);margin-top:4px;letter-spacing:0}
 a.back{display:inline-block;margin-bottom:14px;font-size:13px;color:var(--pri2);text-decoration:none}
 a.back:hover{text-decoration:underline}
-select{width:100%;font-size:16px;font-family:inherit;padding:13px 14px;border:1.5px solid var(--bdr);border-radius:var(--rad);background:var(--card);color:var(--txt);box-shadow:var(--sh);-webkit-appearance:none;appearance:none;
- background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
- background-repeat:no-repeat;background-position:right 14px center;background-size:12px}
+.tools{display:flex;flex-direction:column;gap:10px}
+a.tool{display:block;background:var(--card);border-radius:var(--rad);padding:18px;box-shadow:var(--sh);text-decoration:none;color:var(--txt);transition:transform .12s,box-shadow .12s;border:1.5px solid transparent}
+a.tool:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.1);border-color:var(--pri2)}
+a.tool:active{transform:translateY(0)}
+.tool-name{font-size:16px;font-weight:700;color:var(--pri);margin-bottom:4px}
+.tool-desc{font-size:13px;color:var(--sub);line-height:1.5}
+.tool-arrow{float:right;margin-top:6px;color:#ccc;font-size:18px}
 .meta{margin:14px 0 4px;font-size:13px;color:var(--sub);line-height:1.6}
 .meta b{color:var(--txt);font-weight:700}
 h2{font-size:14px;font-weight:700;color:var(--pri);margin:26px 0 10px;padding-bottom:6px;border-bottom:1.5px solid var(--bdr)}
@@ -42,17 +46,20 @@ footer{text-align:center;margin-top:34px;font-size:11px;color:#bbb;line-height:1
 </head>
 <body>
 <div class="w">
- <a class="back" href="../index.html">‹ ツール一覧</a>
- <header><h1>製品画像<small>営業用の写真と3Dモデル</small></h1></header>
+ <a class="back" id="back" href="../index.html">‹ ツール一覧</a>
+ <header><h1 id="title">製品画像<small id="sub">営業用の写真と3Dモデル</small></h1></header>
 
- <select id="pick" aria-label="製品を選ぶ"></select>
- <div class="meta" id="meta"></div>
+ <div id="list" class="tools"></div>
 
- <h2>実写 <span id="c1"></span></h2>
- <div class="grid" id="photos"></div>
+ <div id="detail" hidden>
+  <div class="meta" id="meta"></div>
 
- <h2>3Dモデル <span>回して見る / iPhoneはARで実寸表示</span></h2>
- <div id="model3d"></div>
+  <h2>実写 <span id="c1"></span></h2>
+  <div class="grid" id="photos"></div>
+
+  <h2>3Dモデル <span>回して見る / iPhoneはARで実寸表示</span></h2>
+  <div id="model3d"></div>
+ </div>
 
  <footer>© シーク静岡工場<br>製品は各メーカー様のものです。取り扱いにご注意ください。</footer>
 </div>
@@ -79,8 +86,6 @@ const PRODUCTS = [
 ];
 
 const $ = s => document.querySelector(s);
-const pick = $("#pick");
-PRODUCTS.forEach((p, i) => pick.add(new Option(p.name, i)));
 
 function card(base, cap){
   const f = document.createElement("figure");
@@ -120,16 +125,49 @@ function show3d(p){
   }
 }
 
-function render(){
-  const p = PRODUCTS[pick.value];
-  $("#meta").innerHTML = `<b>${p.maker}</b><br>${p.spec}${p.note ? "<br>" + p.note : ""}`;
+// 一覧（製品名だけ）。クリックすると #id が付いて詳細になる
+function showList(){
+  const el = $("#list");
+  el.textContent = "";
+  PRODUCTS.forEach(p => {
+    const a = document.createElement("a");
+    a.className = "tool";
+    a.href = "#" + p.id;
+    a.innerHTML = `<span class="tool-arrow">›</span>
+      <div class="tool-name">${p.name}</div>
+      <div class="tool-desc">${p.maker}</div>`;
+    el.append(a);
+  });
+  $("#title").firstChild.textContent = "製品画像";
+  $("#sub").textContent = "営業用の写真と3Dモデル";
+  $("#back").href = "../index.html";
+  $("#back").textContent = "‹ ツール一覧";
+  $("#list").hidden = false;
+  $("#detail").hidden = true;
+  $("#model3d").textContent = "";      // 見えていない3Dは止めておく
+}
+
+function showDetail(p){
+  $("#title").firstChild.textContent = p.name;
+  $("#sub").textContent = p.maker;
+  $("#back").href = "#";
+  $("#back").textContent = "‹ 製品一覧";
+  $("#meta").innerHTML = `${p.spec}${p.note ? "<br>" + p.note : ""}`;
   fill($("#photos"), p.photos);
   $("#c1").textContent = p.photos.length + "点";
   show3d(p);
+  $("#list").hidden = true;
+  $("#detail").hidden = false;
 }
 
-pick.onchange = render;
-render();
+function route(){
+  const p = PRODUCTS.find(x => x.id === location.hash.slice(1));
+  p ? showDetail(p) : showList();
+  scrollTo(0, 0);
+}
+
+addEventListener("hashchange", route);
+route();
 
 $("#lb").onclick = () => $("#lb").classList.remove("on");
 addEventListener("keydown", e => { if (e.key === "Escape") $("#lb").classList.remove("on"); });
