@@ -1424,7 +1424,7 @@ let alritMailContext = null;
   });
   // opener に「受信準備OK」を通知（メール側はこれを待ってから送信する）
   try {
-    if (window.opener) window.opener.postMessage({ type: 'alrit-tool-ready' }, ALRIT_ORIGIN);
+    if (window.opener) window.opener.postMessage('alrit-tool-ready', ALRIT_ORIGIN);
   } catch (e) {}
 })();
 
