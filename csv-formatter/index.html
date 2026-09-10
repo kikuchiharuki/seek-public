@@ -1407,25 +1407,31 @@ let alritMailContext = null;
   } catch(e) { console.log('⚠️ Alrit連携: コンテキスト読取失敗', e); }
 })();
 
-// Alrit連携（横取り方式）: メール画面(opener)から添付ファイルの実体を postMessage で受け取り、
-// そのまま読み込む。DLフォルダを経由しないので30秒待ちや手動ドロップが不要。
+// Alrit連携: メール画面から添付ファイルの実体を URL hash(#d=) で受け取りそのまま読み込む。
+// DLフォルダ経由の待ち・手動ドロップ不要。postMessage 不使用（メール画面側の
+// window message リスナと衝突しないため）。
 (() => {
-  if (!new URLSearchParams(location.search).has('fromAlrit')) return;
-  const ALRIT_ORIGIN = 'https://fifth.alrit-cloud.com';
-  window.addEventListener('message', ev => {
-    if (ev.origin !== ALRIT_ORIGIN) return;
-    const d = ev.data;
-    if (!d || d.type !== 'alrit-files' || !Array.isArray(d.files)) return;
-    const fileObjs = d.files
-      .map(f => new File([f.buf], f.name, { type: f.type || 'application/octet-stream' }))
-      .filter(f => /\.(csv|xlsx|xls)$/i.test(f.name));
-    console.log('📦 Alrit連携: 添付', fileObjs.length, '件を受信', fileObjs.map(f => f.name));
-    if (fileObjs.length) handleFiles(fileObjs);
-  });
-  // opener に「受信準備OK」を通知（メール側はこれを待ってから送信する）
-  try {
-    if (window.opener) window.opener.postMessage('alrit-tool-ready', ALRIT_ORIGIN);
-  } catch (e) {}
+  const m = location.hash.match(/[#&]d=([^&]*)/);
+  if (!m) return;
+  let payload;
+  try { payload = JSON.parse(decodeURIComponent(m[1])); }
+  catch (e) { console.warn('⚠️ Alrit連携: hash解析失敗', e); return; }
+  history.replaceState(null, '', location.pathname + location.search); // 履歴からペイロード除去
+  if (!payload || !Array.isArray(payload.files)) return;
+  const b64ToU8 = b64 => {
+    const s = atob(b64);
+    const u = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u;
+  };
+  const fileObjs = payload.files
+    .map(f => { try { return new File([b64ToU8(f.b64)], f.name, { type: '' }); } catch (e) { console.warn('File化失敗', f && f.name, e); return null; } })
+    .filter(f => f && /\.(csv|xlsx|xls)$/i.test(f.name));
+  console.log('📦 Alrit連携: 添付', fileObjs.length, '件を受信', fileObjs.map(f => f.name));
+  if (!fileObjs.length) return;
+  const run = () => handleFiles(fileObjs);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
 })();
 
 // ============================================================
