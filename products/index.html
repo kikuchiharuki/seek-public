@@ -32,8 +32,6 @@ figcaption a:hover{text-decoration:underline}
 .model{background:var(--card);border-radius:var(--rad);box-shadow:var(--sh);overflow:hidden}
 .model model-viewer{width:100%;height:340px;background:#fafafa;--poster-color:transparent}
 .model .note{font-size:12px;color:var(--sub);padding:10px 12px;line-height:1.5}
-button.load3d{width:100%;padding:16px;font-size:14px;font-family:inherit;font-weight:700;color:var(--pri);background:var(--card);border:1.5px dashed var(--bdr);border-radius:var(--rad);cursor:pointer}
-button.load3d:hover{border-color:var(--pri2)}
 #lb{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:50;padding:12px}
 #lb.on{display:flex}
 #lb img{max-width:100%;max-height:100%;object-fit:contain}
@@ -53,9 +51,6 @@ footer{text-align:center;margin-top:34px;font-size:11px;color:#bbb;line-height:1
  <h2>実写 <span id="c1"></span></h2>
  <div class="grid" id="photos"></div>
 
- <h2>3Dレンダー <span id="c2"></span></h2>
- <div class="grid" id="renders"></div>
-
  <h2>3Dモデル <span>回して見る / iPhoneはARで実寸表示</span></h2>
  <div id="model3d"></div>
 
@@ -69,7 +64,7 @@ footer{text-align:center;margin-top:34px;font-size:11px;color:#bbb;line-height:1
 const PRODUCTS = [
  {
   id: "koukin-kukan",
-  name: "特殊蒸発防止剤 Koukin-Kukan",
+  name: "特殊蒸発防止剤",
   maker: "ピュアライフホールディングス株式会社",
   spec: "1L ボトル / 1ケース10本入（ディスポカップ1個付）",
   note: "ケース外寸 約 477 × 209 × 260 mm",
@@ -78,11 +73,6 @@ const PRODUCTS = [
    ["koukin-case-open",    "ケース（開・中身）"],
    ["koukin-bottle-front", "ボトル 正面"],
    ["koukin-bottle-back",  "ボトル 裏面"]
-  ],
-  renders: [
-   ["koukin-3d-case",    "ケース（出荷姿勢）"],
-   ["koukin-3d-upright", "ケース（立て）"],
-   ["koukin-3d-both",    "ケースとボトル"]
   ],
   model: "img/koukin-case.glb"
  }
@@ -112,38 +102,29 @@ function fill(el, list){
 let viewerLoaded = false;
 function show3d(p){
   const box = $("#model3d");
-  box.textContent = "";
   if (!p.model){ box.innerHTML = '<div class="model"><p class="note">この製品はまだ3Dモデルがありません。</p></div>'; return; }
-  const btn = document.createElement("button");
-  btn.className = "load3d";
-  btn.textContent = "3Dモデルを読み込む（約2.7MB）";
-  // 3MB近いので、開いた人だけが読み込むようにボタン越しにする
-  btn.onclick = () => {
-    box.innerHTML = `<div class="model">
-      <model-viewer src="${p.model}" alt="${p.name}"
-        camera-controls touch-action="pan-y" ar ar-modes="webxr scene-viewer quick-look"
-        shadow-intensity="1" exposure="0.9"
-        camera-orbit="35deg 68deg 1.6m" min-camera-orbit="auto auto 0.6m"></model-viewer>
-      <p class="note">ドラッグで回転、ピンチで拡大。iPhone / Android では右下のARボタンで実寸のまま床に置けます。</p>
-    </div>`;
-    if (!viewerLoaded){
-      const s = document.createElement("script");
-      s.type = "module";
-      s.src = "https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js";
-      document.head.append(s);
-      viewerLoaded = true;
-    }
-  };
-  box.append(btn);
+  // 開いたら自動で表示する。モデルは軽く保つこと（数MBを超えるとスマホの回線でつらい）
+  box.innerHTML = `<div class="model">
+    <model-viewer src="${p.model}" alt="${p.name}" loading="eager" reveal="auto"
+      camera-controls touch-action="pan-y" ar ar-modes="webxr scene-viewer quick-look"
+      shadow-intensity="1" exposure="0.9"
+      camera-orbit="218deg 68deg 1.5m" min-camera-orbit="auto auto 0.6m"></model-viewer>
+    <p class="note">ドラッグで回転、ピンチで拡大。iPhone / Android では右下のARボタンで実寸のまま床に置けます。</p>
+  </div>`;
+  if (!viewerLoaded){
+    const s = document.createElement("script");
+    s.type = "module";
+    s.src = "https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js";
+    document.head.append(s);
+    viewerLoaded = true;
+  }
 }
 
 function render(){
   const p = PRODUCTS[pick.value];
   $("#meta").innerHTML = `<b>${p.maker}</b><br>${p.spec}${p.note ? "<br>" + p.note : ""}`;
   fill($("#photos"), p.photos);
-  fill($("#renders"), p.renders);
   $("#c1").textContent = p.photos.length + "点";
-  $("#c2").textContent = p.renders.length + "点";
   show3d(p);
 }
 
