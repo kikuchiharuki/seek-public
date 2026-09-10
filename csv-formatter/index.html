@@ -1407,6 +1407,27 @@ let alritMailContext = null;
   } catch(e) { console.log('⚠️ Alrit連携: コンテキスト読取失敗', e); }
 })();
 
+// Alrit連携（横取り方式）: メール画面(opener)から添付ファイルの実体を postMessage で受け取り、
+// そのまま読み込む。DLフォルダを経由しないので30秒待ちや手動ドロップが不要。
+(() => {
+  if (!new URLSearchParams(location.search).has('fromAlrit')) return;
+  const ALRIT_ORIGIN = 'https://fifth.alrit-cloud.com';
+  window.addEventListener('message', ev => {
+    if (ev.origin !== ALRIT_ORIGIN) return;
+    const d = ev.data;
+    if (!d || d.type !== 'alrit-files' || !Array.isArray(d.files)) return;
+    const fileObjs = d.files
+      .map(f => new File([f.buf], f.name, { type: f.type || 'application/octet-stream' }))
+      .filter(f => /\.(csv|xlsx|xls)$/i.test(f.name));
+    console.log('📦 Alrit連携: 添付', fileObjs.length, '件を受信', fileObjs.map(f => f.name));
+    if (fileObjs.length) handleFiles(fileObjs);
+  });
+  // opener に「受信準備OK」を通知（メール側はこれを待ってから送信する）
+  try {
+    if (window.opener) window.opener.postMessage({ type: 'alrit-tool-ready' }, ALRIT_ORIGIN);
+  } catch (e) {}
+})();
+
 // ============================================================
 // DOM
 // ============================================================
