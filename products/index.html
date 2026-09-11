@@ -35,6 +35,13 @@ figcaption a{color:var(--pri2);text-decoration:none;font-size:11px}
 figcaption a:hover{text-decoration:underline}
 .model{background:var(--card);border-radius:var(--rad);box-shadow:var(--sh);overflow:hidden}
 .model model-viewer{width:100%;height:340px;background:#fafafa;--poster-color:transparent}
+.model model-viewer .dot{display:none}
+.model model-viewer .dim{position:absolute;transform:translate(-50%,-50%);pointer-events:none;border:0;border-radius:4px;padding:3px 7px;background:#fff;color:var(--txt);font:700 12px/1 -apple-system,sans-serif;box-shadow:0 1px 3px rgba(0,0,0,.25);white-space:nowrap;--min-hotspot-opacity:0}
+.model svg.dimlines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.model svg.dimlines line{stroke:#1e88e5;stroke-width:1.5;stroke-dasharray:3 2}
+.model :is(.dimtoggle,.arbtn){position:absolute;top:10px;left:10px;border:1px solid var(--bdr);border-radius:16px;background:rgba(255,255,255,.9);color:var(--txt);font-size:12px;padding:5px 11px;cursor:pointer}
+.model .arbtn{left:auto;right:10px}
+.model .hide,.model .nodims :is(.dim,.dimlines),.model .ar :is(.dim,.dimlines,.dimtoggle){display:none}
 .model .note{font-size:12px;color:var(--sub);padding:10px 12px;line-height:1.5}
 #lb{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:50;padding:12px}
 #lb.on{display:flex}
@@ -113,9 +120,10 @@ function show3d(p){
     <model-viewer src="${p.model}" alt="${p.name}" loading="eager" reveal="auto"
       camera-controls touch-action="pan-y" ar ar-modes="webxr scene-viewer quick-look"
       shadow-intensity="1" exposure="0.9"
-      camera-orbit="218deg 68deg 1.5m" min-camera-orbit="auto auto 0.6m"></model-viewer>
-    <p class="note">ドラッグで回転、ピンチで拡大。iPhone / Android では右下のARボタンで実寸のまま床に置けます。</p>
+      camera-orbit="218deg 68deg 1.5m" min-camera-orbit="auto auto 0.6m">${dimsMarkup()}</model-viewer>
+    <p class="note">ドラッグで回転、ピンチで拡大。iPhone / Android では右上の「ARで見る」で実寸のまま床に置けます。</p>
   </div>`;
+  addDims(box.querySelector("model-viewer"));
   if (!viewerLoaded){
     const s = document.createElement("script");
     s.type = "module";
@@ -123,6 +131,66 @@ function show3d(p){
     document.head.append(s);
     viewerLoaded = true;
   }
+}
+
+// 寸法線（modelviewer.dev の Annotations「Show Dimensions」と同じ作り）。
+// 外接箱の角に見えない点、辺の中ほどに寸法ラベルを置き、点どうしを SVG の線で結ぶ。
+// 値は getDimensions() から取るのでモデルを差し替えても直さなくてよい（GLBはメートル単位）
+const DIMS = [ // [始点の角, 終点の角, ラベルの位置, ラベルの向き, 軸]  ±1 は外接箱の端
+  [[ 1,-1, 1], [ 1,-1,-1], [ 1.05,-1.1, 0 ], " 1 0 0", "z"],
+  [[ 1,-1,-1], [-1,-1,-1], [ 0  ,-1.1,-1.1], " 0 0 -1", "x"],   // 長辺は底の辺。見えている側の面だけ出る
+  [[ 1,-1, 1], [-1,-1, 1], [ 0  ,-1.1, 1.1], " 0 0 1", "x"],
+  [[-1,-1,-1], [-1,-1, 1], [-1.05,-1.1, 0 ], "-1 0 0", "z"]
+];
+// 高さは手前の角だと箱の真ん中に来て読みにくいので、画面でいちばん左に見える縦の辺に付け直す
+const VERTS = [[1,1],[1,-1],[-1,-1],[-1,1]].map(([x, z]) => [[x,-1,z], [x,1,z]]);
+const cornerName = v => "hotspot-dot" + v.join("_");
+const corners = [...new Set(DIMS.flatMap(d => [d[0], d[1]]).concat(VERTS.flat()).map(v => v.join()))].map(k => k.split(",").map(Number));
+
+function dimsMarkup(){
+  return corners.map(v => `<button slot="${cornerName(v)}" class="dot" data-position="0 0 0"></button>`).join("")
+    + DIMS.map((d, i) => `<button slot="hotspot-dim${i}" class="dim" data-position="0 0 0" data-normal="${d[3].trim()}"></button>`).join("")
+    + `<span class="dim dim-h"></span>`
+    + `<svg class="dimlines">${DIMS.map(() => "<line></line>").join("")}<line></line></svg>`
+    + `<button type="button" class="dimtoggle">寸法を隠す</button>`
+    + `<button slot="ar-button" class="arbtn">ARで見る</button>`;   // 既定の右下ボタンは底辺の寸法とかぶるので右上へ
+}
+
+function addDims(mv){
+  const lines = mv.querySelectorAll("svg.dimlines line"), hLine = lines[DIMS.length], hLabel = mv.querySelector(".dim-h");
+  const at = (c, h, f) => ["x", "y", "z"].map((a, i) => c[a] + h[a] * f[i]).join(" ");
+  const pos = v => mv.queryHotspot(cornerName(v))?.canvasPosition;
+  const setLine = (el, a, b) => { el.setAttribute("x1", a.x); el.setAttribute("y1", a.y); el.setAttribute("x2", b.x); el.setAttribute("y2", b.y); };
+  const draw = () => {
+    DIMS.forEach((d, i) => {
+      const a = pos(d[0]), b = pos(d[1]);
+      if (!a || !b) return;
+      setLine(lines[i], a, b);
+      lines[i].classList.toggle("hide", !mv.queryHotspot("hotspot-dim" + i)?.facingCamera);   // 裏側に回った辺は消す
+    });
+    const edges = VERTS.map(e => e.map(pos));
+    if (edges.some(e => !e[0] || !e[1])) return;
+    const [bot, top] = edges.reduce((m, e) => e[0].x + e[1].x < m[0].x + m[1].x ? e : m);
+    setLine(hLine, bot, top);
+    hLabel.style.left = Math.max((bot.x + top.x) / 2, hLabel.offsetWidth / 2 + 4) + "px";   // 画面の左端で切れないように
+    hLabel.style.top = (bot.y + top.y) / 2 + "px";
+  };
+  mv.addEventListener("load", () => {
+    const c = mv.getBoundingBoxCenter(), size = mv.getDimensions();
+    const h = {x: size.x / 2, y: size.y / 2, z: size.z / 2};
+    corners.forEach(v => mv.updateHotspot({name: cornerName(v), position: at(c, h, v)}));
+    DIMS.forEach((d, i) => {
+      mv.updateHotspot({name: "hotspot-dim" + i, position: at(c, h, d[2])});
+      mv.querySelector(`[slot="hotspot-dim${i}"]`).textContent = Math.round(size[d[4]] * 1000) + " mm";
+    });
+    hLabel.textContent = Math.round(size.y * 1000) + " mm";
+    requestAnimationFrame(draw);   // updateHotspot は次の描画で反映される
+    mv.addEventListener("camera-change", draw);
+  });
+  const btn = mv.querySelector(".dimtoggle");
+  btn.onclick = () => { btn.textContent = mv.classList.toggle("nodims") ? "寸法を表示" : "寸法を隠す"; };
+  // WebXR の AR 中は画面に貼り付いた線が浮くので隠す（Quick Look / Scene Viewer は別アプリなので関係なし）
+  mv.addEventListener("ar-status", e => mv.classList.toggle("ar", e.detail.status === "session-started"));
 }
 
 // 一覧（製品名だけ）。クリックすると #id が付いて詳細になる
