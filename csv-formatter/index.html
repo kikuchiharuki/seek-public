@@ -186,6 +186,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .mapping-actions {
   margin-top: 16px; display: flex; gap: 12px; align-items: center;
 }
+#btnInvoiceDownload:disabled { background: #bbb; color: #fff; cursor: default; }
 .btn-primary {
   background: #3498db; color: #fff; border: none; padding: 10px 28px;
   border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
@@ -2410,6 +2411,7 @@ async function buildInvoicePreview() {
   document.getElementById('invoiceCount').textContent = `(${invoiceRows.length} 件 → ${invoiceFileName})`;
 
   markUsed('btnInvoiceCsv');
+  setInvoiceDownloaded(false); // プレビューを作り直したら再度ダウンロードできるように戻す
   renderInvoiceTable();
   const sec = document.getElementById('invoiceSection');
   sec.classList.add('visible');
@@ -2419,6 +2421,14 @@ async function buildInvoicePreview() {
 document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
   await buildInvoicePreview();
 });
+
+// CSVダウンロード済み表示: 済んだらグレーアウトして二重ダウンロードを防ぐ
+const INVOICE_DL_LABEL = '📥 福山通運CSVエントリー用のCSVをダウンロード';
+function setInvoiceDownloaded(done) {
+  const b = document.getElementById('btnInvoiceDownload');
+  b.disabled = done;
+  b.textContent = done ? '✓ CSVダウンロード済み' : INVOICE_DL_LABEL;
+}
 
 // 必須項目が空白の行を列挙（例: "3行目: 電話番号・郵便番号"）
 function invoiceMissingList() {
@@ -2533,6 +2543,7 @@ function downloadInvoiceCsv() {
   a.click();
   URL.revokeObjectURL(a.href);
   showToast(`送り状CSV保存: ${invoiceFileName}（${invoiceRows.length}件）`, 'success');
+  setInvoiceDownloaded(true);
   return true;
 }
 document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
