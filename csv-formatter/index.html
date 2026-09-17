@@ -3847,11 +3847,11 @@ if (alritReply) {
   });
 
   // ─── 一気通貫ボタン（デバッグ/お試し機能）───
-  // 福山通運変換→CSV保存→メール作成→Excel保存→印刷を順に実行する「再開可能」なボタン。
+  // 福山通運変換→CSV保存→Excel保存→メール作成→印刷を順に実行する「再開可能」なボタン。
   // 途中のステップが赤いセル等で止まったら、そこまでの完了分は oneShotDone に記録して
   // 抜け、ユーザーが該当箇所を直してもう一度押すと続きのステップだけを実行する
   // （完了済みステップは再実行しない）。
-  // メール作成は福山通運の後なので、ポップアップブロックされたら「メール作成」で止まる
+  // メール作成は福山通運・Excel保存ダイアログの後なので、ポップアップを常に許可していないとブロックされる。ブロックされたら「メール作成」で止まる
   // （このサイトのポップアップを常に許可にするか、もう一度押せば続きから開ける）。
   const oneShotBtn = document.createElement('button');
   oneShotBtn.className = 'btn-oneshot btn-fixed';
@@ -3867,8 +3867,8 @@ if (alritReply) {
   const oneShotSteps = [
     ['invoice', '福山通運変換', () => buildInvoicePreview()],
     ['csv', 'CSV保存', () => downloadInvoiceCsv()],
-    ['mail', 'メール作成', () => openAlritReply()],
     ['excel', 'Excel保存', () => saveShipmentExcel()],
+    ['mail', 'メール作成', () => openAlritReply()],
     ['print', '印刷', () => printShipment()],
   ];
 
@@ -3897,7 +3897,7 @@ if (alritReply) {
         oneShotDone.add(key);
       }
       oneShotBtn.disabled = true; // 全ステップ完了。一度きりの使用
-      showToast('⚡ 一気通貫: 福山通運CSV保存・メール作成・Excel保存・印刷まで完了');
+      showToast('⚡ 一気通貫: 福山通運CSV保存・Excel保存・メール作成・印刷まで完了');
     } finally {
       oneShotBusy = false;
     }
