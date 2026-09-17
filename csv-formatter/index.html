@@ -238,6 +238,21 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 }
 .btn-green:hover { background: #219150; }
 
+/* 一気通貫ボタン（デバッグ/お試し機能）: 虹色の回転ボーダーで「特別扱い」を示す */
+@property --oneshot-spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes oneshot-spin { to { --oneshot-spin: 360deg; } }
+.btn-oneshot {
+  padding: 2px !important; border: none; border-radius: 8px; cursor: pointer;
+  background: conic-gradient(from var(--oneshot-spin), #ff004c, #ff8a00, #ffe000, #38e54d, #00b3ff, #4d5bff, #b14dff, #ff004c);
+  animation: oneshot-spin 3s linear infinite; flex: 0 0 128px;
+}
+.btn-oneshot > span {
+  display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;
+  min-height: 40px; border-radius: 6px; background: #2c3e50; color: #fff; font-weight: 700;
+}
+.btn-oneshot:disabled { cursor: default; animation: none; background: #bbb; }
+.btn-oneshot:disabled > span { background: #e5e5e5; color: #999; }
+
 .mapping-status { font-size: 13px; color: #444; margin-left: auto; }
 
 /* 変換結果のヘッダーは少し小さめ */
@@ -1631,12 +1646,17 @@ function resetUsedButtons() {
 }
 
 // 印刷ボタン（A4横。出荷日+商品集計が表の上に印刷される）
-document.getElementById('btnPrint').addEventListener('click', () => {
-  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
-  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return; }
+// 検証→markUsed→印刷までを行う。印刷できたらtrue、未変換/出荷日未設定ならfalse
+function printShipment() {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return false; }
+  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return false; }
   markUsed('btnPrint');
   updatePrintHeader();
   window.print();
+  return true;
+}
+document.getElementById('btnPrint').addEventListener('click', () => {
+  printShipment();
 });
 
 // 印刷時のみ、日付セルの西暦を省く（2026/6/15 → 6/15）。印刷後は元に戻す
@@ -1949,13 +1969,9 @@ window.addEventListener('afterprint', () => {
 
 // Excel保存ボタン
 // ファイル名: [YYYYMMDD出荷分商品名+商品名.xlsx]（日付は出荷日）
-document.getElementById('btnExcel').addEventListener('click', async () => {
-  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+// ワークブック生成部分のみを関数化（一気通貫ボタンでの添付生成と共用するため）
+function buildShipmentWorkbook() {
   const shipIso = document.getElementById('shipDate').value;
-  if (!shipIso) { showToast('出荷日を設定してください（ファイル名に使います）', 'error'); return; }
-  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return; }
-  markUsed('btnExcel');
-
   const d = new Date(shipIso);
   const ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
   const allRows = processedFiles.flatMap(pf => pf.rows);
@@ -2080,6 +2096,20 @@ document.getElementById('btnExcel').addEventListener('click', async () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '出荷データ');
 
+  return { wb, fileName };
+}
+
+// 検証→markUsed→ワークブック生成→保存まで行う。保存できたらtrue、
+// 未変換/出荷日未設定/キャンセル時はfalseを返す
+async function saveShipmentExcel() {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return false; }
+  const shipIso = document.getElementById('shipDate').value;
+  if (!shipIso) { showToast('出荷日を設定してください（ファイル名に使います）', 'error'); return false; }
+  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return false; }
+  markUsed('btnExcel');
+
+  const { wb, fileName } = buildShipmentWorkbook();
+
   // 保存先を「デスクトップ」起点にする。
   // Chrome/Edge は File System Access API の startIn:'desktop' でデスクトップを起点に保存ダイアログを開ける。
   // 非対応ブラウザ（Firefox/Safari）や拒否時は従来どおりブラウザの既定DLフォルダへ保存。
@@ -2098,14 +2128,19 @@ document.getElementById('btnExcel').addEventListener('click', async () => {
       await writable.write(buf);
       await writable.close();
       showToast(`保存: ${fileName}`, 'success');
-      return;
+      return true;
     } catch (err) {
-      if (err && err.name === 'AbortError') return;  // ユーザーがキャンセルした
+      if (err && err.name === 'AbortError') return false;  // ユーザーがキャンセルした
       // 非対応・拒否時は従来ダイアログへフォールバック
     }
   }
   XLSX.writeFile(wb, fileName);
   showToast(`保存: ${fileName}`, 'success');
+  return true;
+}
+
+document.getElementById('btnExcel').addEventListener('click', async () => {
+  await saveShipmentExcel();
 });
 
 // ============================================================
@@ -3723,11 +3758,13 @@ if (alritReply) {
   sendBtn.appendChild(icoClone);
   wrap.appendChild(sendBtn);
 
-  sendBtn.addEventListener('click', () => {
+  // 検証→URL組み立て→(可能なら)Excel添付→新規タブで開く、までを行う。
+  // 開けたらtrue、出荷日未設定ならfalse
+  function openAlritReply() {
     const shipDate = document.getElementById('shipDate').value;
     if (!shipDate) {
       showToast('出荷日を設定してから作成送信してください', 'error');
-      return;
+      return false;
     }
     const body = window._buildMailLines().join('\n');
 
@@ -3737,9 +3774,59 @@ if (alritReply) {
     params.set('acCc', CONFIG.alrit.replyCc);
     params.set('acBody', body);
 
-    window.open(CONFIG.alrit.baseUrl + '?' + params.toString(), '_blank');
+    let url = CONFIG.alrit.baseUrl + '?' + params.toString();
+
+    // Excel添付: 出荷日周りの検証(shipDateMissing)は送信自体をブロックしない。
+    // 添付できる状態のときだけURL hashにワークブックを載せる
+    if (!shipDateMissing()) {
+      try {
+        const { wb, fileName } = buildShipmentWorkbook();
+        const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        const b64 = btoa(binary);
+        url += '#x=' + encodeURIComponent(JSON.stringify({ name: fileName, b64 }));
+      } catch (err) {
+        console.warn('⚠️ Alrit連携: Excel添付の生成に失敗、添付なしで送信します', err);
+      }
+    }
+
+    window.open(url, '_blank');
     markUsed('btnMailSend');
     showToast('📧 Alritで全員へ返信を作成中…');
+    return true;
+  }
+
+  sendBtn.addEventListener('click', () => {
+    openAlritReply();
+  });
+
+  // ─── 一気通貫ボタン（デバッグ/お試し機能）───
+  // 作成送信→Excel保存→印刷を1クリックでまとめて実行する。
+  // window.open はユーザー操作の直後でないとポップアップブロックされるため、
+  // 必ず openAlritReply() を最初に呼ぶ（保存ダイアログのawaitでユーザー操作の
+  // 有効期限が切れる前に済ませる）
+  const oneShotBtn = document.createElement('button');
+  oneShotBtn.className = 'btn-oneshot btn-fixed';
+  oneShotBtn.id = 'btnOneShot';
+  oneShotBtn.innerHTML = '<span>⚡ 一気通貫</span>';
+  const printBtn = document.getElementById('btnPrint');
+  printBtn.parentNode.insertBefore(oneShotBtn, printBtn.nextSibling);
+
+  oneShotBtn.addEventListener('click', async () => {
+    if (!document.getElementById('shipDate').value) {
+      showToast('出荷日を設定してから一気通貫してください', 'error');
+      return;
+    }
+    oneShotBtn.disabled = true; // 一度きりの使用。resetUsedButtonsでも再有効化しない
+    openAlritReply();
+    await saveShipmentExcel();
+    printShipment();
+    showToast('⚡ 一気通貫: 送信・保存・印刷を実行しました');
   });
 }
 
