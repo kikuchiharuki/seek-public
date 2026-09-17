@@ -217,6 +217,13 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .btn-print { --btn-bg: #fff262; }
 .preview-actions button.is-used { --btn-bg: #fff; }
 .btn-excel:hover, .btn-mail:hover, .btn-print:hover { filter: brightness(0.93); }
+/* Alrit経由のときだけ: 承りメール文ボタン1個分(128×44)を右上がりの斜め線で上下に分割（白線=切り抜きの隙間） */
+.mail-split { position: relative; flex: 0 0 128px; width: 128px; height: 44px; border-radius: 6px; overflow: hidden; }
+.preview-actions .mail-split button { position: absolute; inset: 0; min-height: 0; height: 44px; width: 100%; padding: 0 8px; font-size: 12px; border: none; border-radius: 0; color: #fff; cursor: pointer; }
+.preview-actions .mail-split .mail-top { background: #69B6C9; justify-content: flex-start; padding-top: 3px; clip-path: polygon(0 0,100% 0,100% 17px,0 25px); }
+.preview-actions .mail-split .mail-bottom { background: #E9BE46; justify-content: flex-end; padding-bottom: 3px; clip-path: polygon(0 27px,100% 19px,100% 100%,0 100%); }
+.mail-split .mail-ico svg { width: 13px; height: 13px; }
+.mail-split button:hover { filter: brightness(0.93); }
 .preview-actions button.is-used {
   background: #fff !important; background-image: none !important;
   color: #333 !important; border: 1px solid #ddd !important; filter: none;
@@ -979,6 +986,7 @@ const CONFIG = {
     // 新規作成(autoCompose)フォールバック時に使う）
     ukeMailTo: 'cyumon@purelife-hd.com',
     ukeMailCc: 'seek-order@seek-inc.co.jp,chiba@seek-inc.co.jp',
+    replyCc: 'seek-order@seek-inc.co.jp', // 作成送信ボタンで返信に追加するCC
   },
 
   // ──────────────────────────────────────────────
@@ -1391,21 +1399,9 @@ let files = [];
 let activeMappingFile = 0;   // マッピングUIで編集中のファイル index
 let processedFiles = [];     // 変換結果: [{ name, rows }]
 
-// Alrit連携: ReadLine.page「出荷ツールで処理」から遷移してきた場合のメールコンテキスト
-let alritMailContext = null;
-(() => {
-  if (!new URLSearchParams(location.search).has('fromAlrit')) return;
-  try {
-    const raw = localStorage.getItem('alrit-shipment-mailContext');
-    if (!raw) return;
-    const ctx = JSON.parse(raw);
-    if (Date.now() - ctx.timestamp > 300000) { localStorage.removeItem('alrit-shipment-mailContext'); return; }
-    alritMailContext = ctx;
-    localStorage.removeItem('alrit-shipment-mailContext');
-    history.replaceState(null, '', location.pathname);
-    console.log('📦 Alrit連携: メールコンテキスト取得', alritMailContext);
-  } catch(e) { console.log('⚠️ Alrit連携: コンテキスト読取失敗', e); }
-})();
+// Alrit連携: 出荷依頼メールへの「全員へ返信」URL。hashペイロード(payload.reply)から受け取る
+// （旧localStorage方式は別オリジンのため常に取得失敗しており廃止）。無ければ null のまま。
+let alritReply = null;
 
 // Alrit連携: メール画面から添付ファイルの実体を URL hash(#d=) で受け取りそのまま読み込む。
 // DLフォルダ経由の待ち・手動ドロップ不要。postMessage 不使用（メール画面側の
@@ -1417,7 +1413,12 @@ let alritMailContext = null;
   try { payload = JSON.parse(decodeURIComponent(m[1])); }
   catch (e) { console.warn('⚠️ Alrit連携: hash解析失敗', e); return; }
   history.replaceState(null, '', location.pathname + location.search); // 履歴からペイロード除去
-  if (!payload || !Array.isArray(payload.files)) return;
+  if (!payload) return;
+  // 出荷依頼メールへの「全員へ返信」URL（新しいAlritユーザースクリプトのみ付与。無くても添付読込は継続）
+  if (payload.reply && typeof payload.reply.url === 'string' && payload.reply.url.startsWith('/smail/CreateReplyAllMail.page?')) {
+    alritReply = { url: payload.reply.url };
+  }
+  if (!Array.isArray(payload.files)) return;
   const b64ToU8 = b64 => {
     const s = atob(b64);
     const u = new Uint8Array(s.length);
@@ -1623,10 +1624,10 @@ const SHIP_DATE_MSG = '出荷日セルが空白の行があります。「出荷
 
 // 使用済みマーク: 一度実行したボタンを白くして「もう押した」ことを示す。
 // 動作は変えず見た目だけ。新しく変換したらリセットする。
-const USED_BTN_IDS = ['btnExcel', 'btnMailText', 'btnInvoiceCsv', 'btnPrint'];
-function markUsed(id) { document.getElementById(id).classList.add('is-used'); }
+const USED_BTN_IDS = ['btnExcel', 'btnMailText', 'btnMailSend', 'btnInvoiceCsv', 'btnPrint'];
+function markUsed(id) { document.getElementById(id)?.classList.add('is-used'); }
 function resetUsedButtons() {
-  USED_BTN_IDS.forEach(id => document.getElementById(id).classList.remove('is-used'));
+  USED_BTN_IDS.forEach(id => document.getElementById(id)?.classList.remove('is-used'));
 }
 
 // 印刷ボタン（A4横。出荷日+商品集計が表の上に印刷される）
@@ -3317,11 +3318,6 @@ async function runConversion() {
   showToast(msg, 'success');
 
   previewSection.scrollIntoView({ behavior: 'smooth' });
-
-  // Alrit連携: 出荷依頼メールから遷移してきた場合、承りメール返信を自動提案
-  if (alritMailContext) {
-    setTimeout(() => triggerAlritReply(), 1500);
-  }
 }
 
 // 商品別集計バーの表示（全ファイル合算）
@@ -3699,31 +3695,52 @@ function escapeHtml(str) {
 })();
 
 // ============================================================
-// Alrit連携: 承りメール自動返信（autoReply）
+// Alrit連携: 承りメール文ボタンの分割ボタン化＋作成送信（autoReply）
+//    hashペイロードに payload.reply（元メールへの全員へ返信URL）があるときだけ、
+//    「承りメール文」ボタンを上下2分割にし、下半分「作成送信」でAlrit側の
+//    全員へ返信画面をCC・本文入り(自動送信はしない)で新規タブに開く。
+//    無ければ従来通り単一の「承りメール文」ボタンのまま。
 // ============================================================
-function triggerAlritReply() {
-  if (!alritMailContext) return;
+if (alritReply) {
+  const oldBtn = document.getElementById('btnMailText');
+  const icoSpan = oldBtn.querySelector('.mail-ico');
+  icoSpan.lastChild.textContent = 'メール文'; // 「承りメール文」→「メール文」（テキストノードのみ書き換え）
+  oldBtn.classList.remove('btn-mail', 'btn-fixed');
+  oldBtn.classList.add('mail-top');
 
-  const shipDate = document.getElementById('shipDate').value;
-  if (!shipDate) {
-    showToast('出荷日が未設定のため承りメール送信をスキップしました', 'error');
-    return;
-  }
+  const wrap = document.createElement('div');
+  wrap.className = 'mail-split';
+  oldBtn.parentNode.insertBefore(wrap, oldBtn);
+  wrap.appendChild(oldBtn);
 
-  const lines = window._buildMailLines();
-  const body = lines.join('\n');
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'mail-bottom';
+  sendBtn.id = 'btnMailSend';
+  const icoClone = document.createElement('span');
+  icoClone.className = 'mail-ico';
+  icoClone.appendChild(icoSpan.querySelector('svg').cloneNode(true));
+  icoClone.appendChild(document.createTextNode('作成送信'));
+  sendBtn.appendChild(icoClone);
+  wrap.appendChild(sendBtn);
 
-  const params = new URLSearchParams();
-  params.set('autoReply', 'true');
-  params.set('acMailId', alritMailContext.mailId);
-  if (alritMailContext.accountId) params.set('acAccountId', alritMailContext.accountId);
-  if (alritMailContext.folderId)  params.set('acFolderId', alritMailContext.folderId);
-  params.set('acBody', body);
+  sendBtn.addEventListener('click', () => {
+    const shipDate = document.getElementById('shipDate').value;
+    if (!shipDate) {
+      showToast('出荷日を設定してから作成送信してください', 'error');
+      return;
+    }
+    const body = window._buildMailLines().join('\n');
 
-  const url = CONFIG.alrit.baseUrl + '?' + params.toString();
-  window.open(url, '_blank');
-  showToast('📧 Alritで承りメール（返信）を作成中…');
-  alritMailContext = null;
+    const params = new URLSearchParams();
+    params.set('autoReply', 'true');
+    params.set('acReplyUrl', alritReply.url);
+    params.set('acCc', CONFIG.alrit.replyCc);
+    params.set('acBody', body);
+
+    window.open(CONFIG.alrit.baseUrl + '?' + params.toString(), '_blank');
+    markUsed('btnMailSend');
+    showToast('📧 Alritで全員へ返信を作成中…');
+  });
 }
 
 // ============================================================
