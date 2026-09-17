@@ -2330,11 +2330,13 @@ function hideInvoiceSection() {
 }
 
 // 🚚 ボタン: 変換結果から送り状レコードを生成してプレビュー表示（この時点では保存しない）
-document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
-  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return; }
+// 検証→住所分割→invoiceRows組み立て→プレビュー表示までを行う。
+// プレビューを作れたらtrue、未変換/出荷日未設定/対象行なしならfalse
+async function buildInvoicePreview() {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return false; }
   const shipIso = document.getElementById('shipDate').value;
-  if (!shipIso) { showToast('出荷日を設定してください（出荷日付・ファイル名に使います）', 'error'); return; }
-  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return; }
+  if (!shipIso) { showToast('出荷日を設定してください（出荷日付・ファイル名に使います）', 'error'); return false; }
+  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return false; }
 
   const cfg = CONFIG.invoiceCsv;
   const shipDate = parseYmd(shipIso);
@@ -2343,7 +2345,7 @@ document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
 
   // ゆうパック等、福通以外で送る行は出力対象外
   const targetRows = allRows.filter(r => !cfg.excludeCarriers.includes((r.carrier || '').trim()));
-  if (!targetRows.length) { showToast('出力対象の行がありません（全行がゆうパック等の除外対象）', 'error'); return; }
+  if (!targetRows.length) { showToast('出力対象の行がありません（全行がゆうパック等の除外対象）', 'error'); return false; }
 
   // 住所分割（ExcelAPI）: proxyUrl 設定済みの場合のみ。失敗行は従来挙動にフォールバック
   const lkCfg = CONFIG.addressLookup;
@@ -2412,6 +2414,10 @@ document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
   const sec = document.getElementById('invoiceSection');
   sec.classList.add('visible');
   sec.scrollIntoView({ behavior: 'smooth' });
+  return true;
+}
+document.getElementById('btnInvoiceCsv').addEventListener('click', async () => {
+  await buildInvoicePreview();
 });
 
 // 必須項目が空白の行を列挙（例: "3行目: 電話番号・郵便番号"）
@@ -2494,8 +2500,10 @@ document.getElementById('invoiceTableWrapper').addEventListener('focusout', e =>
 
 // 📥 ダウンロード: プレビュー（手修正後）の内容をShift-JIS・CRLFのCSVで保存
 // 必須項目が空白の行があればエラーで止める（不完全なエントリーデータを作らせない）
-document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
-  if (!invoiceRows.length) { showToast('先に「🚚 送り状CSV」でプレビューを作成してください', 'error'); return; }
+// 検証→Shift-JIS・CRLFでCSVダウンロードまでを行う。保存できたらtrue、
+// 未プレビュー/赤いセルが残っている場合はfalse
+function downloadInvoiceCsv() {
+  if (!invoiceRows.length) { showToast('先に「🚚 送り状CSV」でプレビューを作成してください', 'error'); return false; }
   const missing = invoiceMissingList();
   const overLen = invoiceOverLengthList();
   if (missing.length || overLen.length) {
@@ -2503,7 +2511,7 @@ document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
     if (missing.length) msgs.push(`必須項目が空白 → ${missing.slice(0, 3).join(' ／ ')}${missing.length > 3 ? ' ほか' : ''}`);
     if (overLen.length) msgs.push(`文字数超過 → ${overLen.slice(0, 3).join(' ／ ')}${overLen.length > 3 ? ' ほか' : ''}`);
     showToast(`保存できません（赤いセルを修正してください）。${msgs.join('。')}`, 'error', true);
-    return;
+    return false;
   }
   const cfg = CONFIG.invoiceCsv;
   const lines = [];
@@ -2525,6 +2533,10 @@ document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(a.href);
   showToast(`送り状CSV保存: ${invoiceFileName}（${invoiceRows.length}件）`, 'success');
+  return true;
+}
+document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
+  downloadInvoiceCsv();
 });
 
 document.getElementById('btnInvoiceClose').addEventListener('click', hideInvoiceSection);
@@ -3559,6 +3571,31 @@ function renderDataRow(row, i, fi) {
   return html;
 }
 
+// メインテーブルの赤いセル（未入力・数量不正）を renderDataRow と同じ判定で列挙する。
+// 行番号は表示上の行番号（複数ファイル時はファイルごとに1始まり）に一致させる。
+// 例: ["3行目: 郵便番号・電話番号1"] / 複数ファイル時は "ファイル名 2行目: 数量"
+function mainTableErrorList() {
+  const errs = [];
+  const multi = processedFiles.length > 1;
+  for (const pf of processedFiles) {
+    pf.rows.forEach((row, i) => {
+      const bad = [];
+      ALL_COLUMNS.forEach(col => {
+        const val = row[col.key] || '';
+        if (CONFIG.emptyCheckColumns.includes(col.key) && val.trim() === '') {
+          bad.push(col.label);
+        } else if (col.key === 'quantity' && !parseFloat(val)) {
+          bad.push(col.label);
+        }
+      });
+      if (bad.length) {
+        errs.push(`${multi ? pf.name + ' ' : ''}${i + 1}行目: ${bad.join('・')}`);
+      }
+    });
+  }
+  return errs;
+}
+
 // 行削除（確認ダイアログつき。再変換すると元に戻る）
 // 右クリック時にセルへフォーカス + 全選択 → ブラウザ標準の右クリックメニュー
 // （コピー/貼り付け項目を確実に表示。preventDefault しないので OS の挙動はそのまま）
@@ -3806,10 +3843,13 @@ if (alritReply) {
   });
 
   // ─── 一気通貫ボタン（デバッグ/お試し機能）───
-  // 作成送信→Excel保存→印刷を1クリックでまとめて実行する。
+  // メール作成→Excel保存→印刷→福山通運変換→CSV保存を順に実行する「再開可能」なボタン。
+  // 途中のステップが赤いセル等で止まったら、そこまでの完了分は oneShotDone に記録して
+  // 抜け、ユーザーが該当箇所を直してもう一度押すと続きのステップだけを実行する
+  // （完了済みステップは再実行しない）。
   // window.open はユーザー操作の直後でないとポップアップブロックされるため、
-  // 必ず openAlritReply() を最初に呼ぶ（保存ダイアログのawaitでユーザー操作の
-  // 有効期限が切れる前に済ませる）
+  // 最初のクリックでは必ず openAlritReply()（'mail'）を他の await より先に呼ぶ
+  // （mainTableErrorList() は同期処理なので問題ない）。
   const oneShotBtn = document.createElement('button');
   oneShotBtn.className = 'btn-oneshot btn-fixed';
   oneShotBtn.id = 'btnOneShot';
@@ -3817,16 +3857,45 @@ if (alritReply) {
   const printBtn = document.getElementById('btnPrint');
   printBtn.parentNode.insertBefore(oneShotBtn, printBtn.nextSibling);
 
+  const oneShotDone = new Set();
+  let oneShotBusy = false;
+  const oneShotSteps = [
+    ['mail', 'メール作成', () => openAlritReply()],
+    ['excel', 'Excel保存', () => saveShipmentExcel()],
+    ['print', '印刷', () => printShipment()],
+    ['invoice', '福山通運変換', () => buildInvoicePreview()],
+    ['csv', 'CSV保存', () => downloadInvoiceCsv()],
+  ];
+
   oneShotBtn.addEventListener('click', async () => {
-    if (!document.getElementById('shipDate').value) {
-      showToast('出荷日を設定してから一気通貫してください', 'error');
-      return;
+    if (oneShotBusy) return;
+    if (!oneShotDone.size) {
+      if (!document.getElementById('shipDate').value) {
+        showToast('出荷日を設定してから一気通貫してください', 'error');
+        return;
+      }
+      const errs = mainTableErrorList();
+      if (errs.length) {
+        showToast(`一気通貫できません（赤いセルを修正してください）: ${errs.slice(0, 3).join(' ／ ')}${errs.length > 3 ? ' ほか' : ''}`, 'error', true);
+        return;
+      }
     }
-    oneShotBtn.disabled = true; // 一度きりの使用。resetUsedButtonsでも再有効化しない
-    openAlritReply();
-    await saveShipmentExcel();
-    printShipment();
-    showToast('⚡ 一気通貫: 送信・保存・印刷を実行しました');
+    oneShotBusy = true;
+    try {
+      for (const [key, label, fn] of oneShotSteps) {
+        if (oneShotDone.has(key)) continue;
+        const ok = await fn();
+        if (!ok) {
+          showToast('⚡ 一気通貫: 「' + label + '」で止まりました。修正してもう一度押すと続きから実行します', 'error', true);
+          return;
+        }
+        oneShotDone.add(key);
+      }
+      oneShotBtn.disabled = true; // 全ステップ完了。一度きりの使用
+      showToast('⚡ 一気通貫: メール作成・Excel保存・印刷・福山通運CSV保存まで完了');
+    } finally {
+      oneShotBusy = false;
+    }
   });
 }
 
