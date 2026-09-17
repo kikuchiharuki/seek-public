@@ -3832,7 +3832,11 @@ if (alritReply) {
       }
     }
 
-    window.open(url, '_blank');
+    // 一気通貫で前の工程(福山通運変換の住所API待ち等)を挟むとクリック直後でなくなりポップアップブロックされることがある
+    if (!window.open(url, '_blank')) {
+      showToast('Alritのタブがポップアップブロックされました。このサイトのポップアップを「常に許可」にしてください', 'error', true);
+      return false;
+    }
     markUsed('btnMailSend');
     showToast('📧 Alritで全員へ返信を作成中…');
     return true;
@@ -3843,13 +3847,12 @@ if (alritReply) {
   });
 
   // ─── 一気通貫ボタン（デバッグ/お試し機能）───
-  // メール作成→Excel保存→印刷→福山通運変換→CSV保存を順に実行する「再開可能」なボタン。
+  // 福山通運変換→CSV保存→メール作成→Excel保存→印刷を順に実行する「再開可能」なボタン。
   // 途中のステップが赤いセル等で止まったら、そこまでの完了分は oneShotDone に記録して
   // 抜け、ユーザーが該当箇所を直してもう一度押すと続きのステップだけを実行する
   // （完了済みステップは再実行しない）。
-  // window.open はユーザー操作の直後でないとポップアップブロックされるため、
-  // 最初のクリックでは必ず openAlritReply()（'mail'）を他の await より先に呼ぶ
-  // （mainTableErrorList() は同期処理なので問題ない）。
+  // メール作成は福山通運の後なので、ポップアップブロックされたら「メール作成」で止まる
+  // （このサイトのポップアップを常に許可にするか、もう一度押せば続きから開ける）。
   const oneShotBtn = document.createElement('button');
   oneShotBtn.className = 'btn-oneshot btn-fixed';
   oneShotBtn.id = 'btnOneShot';
@@ -3859,12 +3862,14 @@ if (alritReply) {
 
   const oneShotDone = new Set();
   let oneShotBusy = false;
+  // エラーで止まりやすい福山通運(必須空白・文字数超過)を先に済ませ、通ってからメール・Excel・印刷へ進む。
+  // ※前の工程を待つ間にクリック直後の扱いが切れるため、Excelは保存ダイアログが出ず既定のDLフォルダに保存されることがある
   const oneShotSteps = [
+    ['invoice', '福山通運変換', () => buildInvoicePreview()],
+    ['csv', 'CSV保存', () => downloadInvoiceCsv()],
     ['mail', 'メール作成', () => openAlritReply()],
     ['excel', 'Excel保存', () => saveShipmentExcel()],
     ['print', '印刷', () => printShipment()],
-    ['invoice', '福山通運変換', () => buildInvoicePreview()],
-    ['csv', 'CSV保存', () => downloadInvoiceCsv()],
   ];
 
   oneShotBtn.addEventListener('click', async () => {
@@ -3892,7 +3897,7 @@ if (alritReply) {
         oneShotDone.add(key);
       }
       oneShotBtn.disabled = true; // 全ステップ完了。一度きりの使用
-      showToast('⚡ 一気通貫: メール作成・Excel保存・印刷・福山通運CSV保存まで完了');
+      showToast('⚡ 一気通貫: 福山通運CSV保存・メール作成・Excel保存・印刷まで完了');
     } finally {
       oneShotBusy = false;
     }
