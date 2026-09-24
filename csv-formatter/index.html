@@ -253,6 +253,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 }
 .btn-oneshot:disabled { cursor: default; animation: none; background: #bbb; }
 .btn-oneshot:disabled > span { background: #e5e5e5; color: #999; }
+.btn-oneshot[hidden] { display: none; }
 
 .mapping-status { font-size: 13px; color: #444; margin-left: auto; }
 
@@ -775,10 +776,19 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
       <div class="cfg-tab active" data-tab="cfgProduct">製品マスタ</div>
       <div class="cfg-tab" data-tab="cfgRules">変換ルール</div>
       <div class="cfg-tab" data-tab="cfgInvoice">送り状CSV設定</div>
+      <div class="cfg-tab" data-tab="cfgDev">開発者モード</div>
     </div>
     <div class="cfg-panel active" id="cfgProduct"></div>
     <div class="cfg-panel" id="cfgRules"></div>
     <div class="cfg-panel" id="cfgInvoice"></div>
+    <div class="cfg-panel" id="cfgDev">
+      <h3>開発者モード</h3>
+      <p class="cfg-note">お試し中の機能を表示します。ブラウザ(localStorage)に保存され、次回以降も維持されます。</p>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
+        <input type="checkbox" id="devModeToggle">
+        開発者モードをオンにする（⚡ 一気通貫ボタンを表示）
+      </label>
+    </div>
   </div>
 </div>
 
@@ -3868,6 +3878,8 @@ if (alritReply) {
   oneShotBtn.className = 'btn-oneshot btn-fixed';
   oneShotBtn.id = 'btnOneShot';
   oneShotBtn.innerHTML = '<span>⚡ 一気通貫</span>';
+  oneShotBtn.hidden = !isDevMode();
+  document.addEventListener('devmodechange', e => { oneShotBtn.hidden = !e.detail; });
   const printBtn = document.getElementById('btnPrint');
   printBtn.parentNode.insertBefore(oneShotBtn, printBtn.nextSibling);
 
@@ -3914,6 +3926,22 @@ if (alritReply) {
     }
   });
 }
+
+// ============================================================
+// 開発者モード（お試し機能の表示切替。設定一覧の「開発者モード」タブから）
+// ============================================================
+function isDevMode() {
+  try { return localStorage.getItem('shipTool.devMode') === '1'; } catch (e) { return false; }
+}
+(() => {
+  const cb = document.getElementById('devModeToggle');
+  cb.checked = isDevMode();
+  cb.addEventListener('change', () => {
+    try { localStorage.setItem('shipTool.devMode', cb.checked ? '1' : '0'); } catch (e) {}
+    document.dispatchEvent(new CustomEvent('devmodechange', { detail: cb.checked }));
+    showToast(cb.checked ? '開発者モード: オン' : '開発者モード: オフ');
+  });
+})();
 
 // ============================================================
 // 設定ビューア（CONFIG をテーブル表示）
