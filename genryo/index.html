@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>原料マスタ（試作）</title>
+<script src="vendor/xlsx.bundle.js"></script>
+<style>
+  :root{ --line:#d5dde3; --head:#e7eff4; --accent:#1f6f8b; --warn:#b3261e; --caution:#a15c00; --soft:#f5f9fb; }
+  *{ box-sizing:border-box; }
+  body{ font-family:"Hiragino Sans","Yu Gothic",sans-serif; margin:0; color:#1b1b1b; background:#fff; font-size:14px; }
+  header{ background:var(--accent); color:#fff; padding:10px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  header h1{ font-size:16px; margin:0; }
+  header .status{ font-size:12px; opacity:.9; }
+  .grow{ flex:1; }
+  button,select,input,textarea{ font:inherit; font-size:14px; }
+  button,select{ padding:5px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  button.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.ghost{ background:transparent; color:#fff; border-color:rgba(255,255,255,.5); }
+  button:disabled{ opacity:.5; cursor:default; }
+  input[type=text],input[type=search],input[type=number],input[type=date],textarea{ padding:5px 8px; border:1px solid var(--line); border-radius:6px; }
+  nav{ display:flex; gap:4px; padding:8px 16px 0; border-bottom:1px solid var(--line); }
+  nav button{ border-radius:6px 6px 0 0; border-bottom:none; background:#eef4f7; }
+  nav button.active{ background:#fff; font-weight:700; color:var(--accent); position:relative; top:1px; }
+  main{ padding:14px 16px 60px; }
+  .toolbar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  .toolbar input[type=search]{ width:380px; max-width:100%; font-size:15px; }
+  .chip{ font-size:12px; padding:3px 10px; border-radius:14px; }
+  .chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  table{ border-collapse:collapse; width:100%; }
+  th,td{ border:1px solid var(--line); padding:4px 8px; text-align:left; vertical-align:top; }
+  th{ background:var(--head); position:sticky; top:0; font-weight:700; white-space:nowrap; }
+  td.n,th.n{ text-align:right; white-space:nowrap; }
+  tr.click{ cursor:pointer; } tr.click:hover td{ background:#eef6fa; }
+  tr.inactive td{ color:#999; }
+  .sub{ font-size:11px; color:#666; }
+  .muted{ color:#888; }
+  .hint{ font-size:12px; color:#555; margin:4px 0 10px; }
+  .tag{ display:inline-block; font-size:11px; padding:0 6px; border-radius:8px; margin:1px 2px 1px 0; white-space:nowrap; }
+  .tag.warn{ background:#fde7e5; color:var(--warn); }
+  .tag.caution{ background:#fff1dc; color:var(--caution); }
+  .tag.info{ background:#e6f0f5; color:#245; }
+  h2{ font-size:15px; margin:18px 0 8px; border-left:4px solid var(--accent); padding-left:8px; }
+  h2:first-child{ margin-top:4px; }
+  .step{ border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:12px; }
+  .step.off{ opacity:.45; pointer-events:none; }
+  .grid2{ display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:6px 18px; }
+  .maprow{ display:grid; grid-template-columns:170px 190px 1fr; gap:8px; align-items:center; padding:3px 0; border-bottom:1px dashed #e5eaee; }
+  .maprow select{ width:100%; }
+  .maprow .req{ color:var(--warn); }
+  .scroll{ overflow:auto; max-height:260px; border:1px solid var(--line); }
+  .scroll table th{ top:0; }
+  .scroll td{ white-space:nowrap; max-width:320px; overflow:hidden; text-overflow:ellipsis; }
+  .hdrrow td{ background:#fff7d6; font-weight:700; }
+  dialog{ border:none; border-radius:10px; padding:0; width:min(920px,96vw); max-height:92vh; box-shadow:0 12px 40px rgba(0,0,0,.3); }
+  dialog::backdrop{ background:rgba(20,30,40,.45); }
+  .dlg-head{ background:var(--accent); color:#fff; padding:10px 16px; display:flex; align-items:center; gap:10px; position:sticky; top:0; }
+  .dlg-body{ padding:12px 16px; }
+  .dlg-foot{ padding:10px 16px; border-top:1px solid var(--line); display:flex; gap:8px; justify-content:flex-end; position:sticky; bottom:0; background:#fff; }
+  .form{ display:grid; grid-template-columns:110px 1fr 110px 1fr; gap:6px 10px; align-items:center; }
+  .form label{ font-size:12px; color:#555; text-align:right; }
+  .form input,.form textarea{ width:100%; }
+  .form .wide{ grid-column:2 / 5; }
+  .big{ font-size:22px; font-weight:700; }
+  .ok{ color:#1b7a3a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>原料マスタ <span style="font-weight:400;font-size:12px;">試作</span></h1>
+  <span class="status" id="status">データ未読込</span>
+  <span class="grow"></span>
+  <button class="ghost" id="sampleBtn" onclick="Core.loadSample()" hidden>サンプルで見る</button>
+  <button class="ghost" onclick="Core.open()">原料データ.xlsx を開く</button>
+  <button class="primary" style="background:#fff;color:var(--accent)" onclick="Core.save()">保存</button>
+</header>
+<nav id="tabs"></nav>
+<main id="view"></main>
+<dialog id="dlg"></dialog>
+
+<!-- 本物の単価入りサンプル。公開リポジトリには置かない（.gitignore）。無くても動く -->
+<script src="seed-data.js" onerror="window.SEED=null"></script>
+<!-- モジュール: 1ファイル=1機能。追加するときはここに1行足して App.register する -->
+<script src="js/core.js"></script>
+<script src="js/materials.js"></script>
+<script src="js/import.js"></script>
+<script>App.start('materials');</script>
+</body>
+</html>

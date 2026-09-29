@@ -1,0 +1,145 @@
+/* dads.css — デザインの土台
+ * デジタル庁デザインシステム（DADS）の値をそのまま使う。
+ * 出典: @digital-go-jp/design-tokens 2.0.1 と design-system-example-components-html
+ *       MIT License / Copyright (c) 2023 デジタル庁
+ * 業務画面向けに変えた所には「★調整」と書く（理由は docs/デザイン.md）。
+ */
+:root{
+  /* キーカラー：DADS既定の青。会社の色に変えるときはこのブロックだけ差し替える */
+  --key-50:#e8f1fe; --key-100:#d9e6ff; --key-200:#c5d7fb; --key-300:#9db7f9;
+  --key-700:#264af4; --key-800:#0031d8; --key-900:#0017c1; --key-1000:#00118f; --key-1200:#000060;
+
+  --white:#fff; --black:#000;
+  --gray-50:#f2f2f2; --gray-100:#e6e6e6; --gray-200:#cccccc; --gray-300:#b3b3b3; --gray-420:#949494;
+  --gray-500:#7f7f7f; --gray-536:#767676; --gray-600:#666666; --gray-700:#4d4d4d; --gray-800:#333333; --gray-900:#1a1a1a;
+
+  --success-1:#259d63; --success-2:#197a4b;
+  --error-1:#ec0000;   --error-2:#ce0000;
+  --warn-y1:#b78f00;   --warn-y2:#927200;
+  --warn-o1:#fb5b01;   --warn-o2:#c74700;
+  --yellow-300:#ffd43d; --yellow-400:#ffc700;
+
+  --font-sans:"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;
+  --elev-1:0 2px 8px 1px rgba(0,0,0,.1),0 1px 5px 0 rgba(0,0,0,.3);
+  --elev-3:0 4px 16px 3px rgba(0,0,0,.1),0 1px 6px 0 rgba(0,0,0,.3);
+  --elev-8:0 14px 40px 7px rgba(0,0,0,.1),0 3px 16px 0 rgba(0,0,0,.3);
+}
+
+/* ---------- 基本 ---------- */
+*,*::before,*::after{ box-sizing:border-box; }
+html{ font-family:var(--font-sans); scrollbar-gutter:stable; }
+body{ margin:0; background:var(--white); color:var(--gray-800); font-size:16px; line-height:1.7; letter-spacing:.02em; }
+button,input,select,textarea{ font:inherit; letter-spacing:inherit; }
+:focus-visible{ outline:4px solid var(--black); outline-offset:2px; border-radius:4px; box-shadow:0 0 0 2px var(--yellow-300); }
+a:any-link{ color:var(--key-1000); text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
+a:hover{ color:var(--key-900); text-decoration-thickness:3px; }
+
+/* 文字スタイル（DADSの名前：std=標準 / dns=密 / oln=1行） */
+.t-h1{ font-size:28px; font-weight:700; line-height:1.5; color:var(--gray-900); margin:0; }      /* std-28B-150 */
+.t-h2{ font-size:20px; font-weight:700; line-height:1.5; color:var(--gray-900); margin:0; }      /* std-20B-150 */
+.t-h3{ font-size:17px; font-weight:700; line-height:1.7; color:var(--gray-900); margin:0; }      /* std-17B-170 */
+.t-dense{ font-size:14px; line-height:1.3; letter-spacing:0; }                                  /* dns-14N-130 */
+.t-sub{ color:var(--gray-536); }                                                                 /* 白地でAA(4.54:1) */
+.num{ font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+
+/* ---------- ボタン（DADS button：solid-fill / outline / text、lg md sm xs） ---------- */
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:4px; font-weight:700; font-size:16px; line-height:1;
+  text-decoration:none; text-underline-offset:3px; cursor:pointer; white-space:nowrap; }
+.btn[data-size="md"]{ min-width:96px; min-height:48px; border-radius:8px; padding:8px 16px; }
+.btn[data-size="sm"]{ min-width:80px; min-height:36px; border-radius:6px; padding:2px 12px; }
+.btn[data-size="xs"]{ min-width:72px; min-height:28px; border-radius:4px; padding:2px 8px; font-size:14px; }
+.btn[data-type="solid-fill"]{ border:4px double transparent; background:var(--key-900); color:var(--white); }
+.btn[data-type="solid-fill"]:hover{ background:var(--key-1000); text-decoration:underline; }
+.btn[data-type="solid-fill"]:active{ background:var(--key-1200); }
+.btn[data-type="outline"]{ border:1px solid currentColor; background:var(--white); color:var(--key-900); }
+.btn[data-type="outline"]:hover{ background:var(--key-200); color:var(--key-1000); text-decoration:underline; }
+.btn[data-type="outline"]:active{ background:var(--key-300); color:var(--key-1200); }
+.btn[data-type="text"]{ border:0; background:transparent; color:var(--key-900); text-decoration:underline; text-decoration-thickness:1px; }
+.btn[data-type="text"]:hover{ background:var(--key-50); color:var(--key-1000); text-decoration-thickness:3px; }
+.btn:disabled{ cursor:default; text-decoration:none; }
+.btn[data-type="solid-fill"]:disabled{ background:var(--gray-300); color:var(--gray-50); }
+.btn[data-type="outline"]:disabled,.btn[data-type="text"]:disabled{ background:var(--white); color:var(--gray-300); }
+
+/* 絞り込み用の切り替え（DADSのoutline xsボタン＋押下状態）★調整：DADSに同名部品が無いため */
+.toggle{ display:inline-flex; flex-wrap:wrap; gap:4px; }
+.toggle button{ min-height:32px; border:1px solid var(--gray-600); border-radius:6px; background:var(--white); color:var(--gray-800);
+  padding:2px 10px; font-size:14px; cursor:pointer; }
+.toggle button:hover{ border-color:var(--black); background:var(--gray-50); }
+.toggle button[aria-pressed="true"]{ border-color:var(--key-900); background:var(--key-900); color:var(--white); font-weight:700; }
+.toggle .count{ margin-left:6px; font-variant-numeric:tabular-nums; opacity:.85; }
+
+/* ---------- 入力（DADS input-text / select） ---------- */
+.input,.select{ border:1px solid var(--gray-600); border-radius:8px; background:var(--white); color:var(--gray-900); line-height:1; }
+.input{ padding:0 16px; height:48px; }
+.input[data-size="sm"],.select[data-size="sm"]{ height:40px; }
+.input:hover,.select:hover{ border-color:var(--black); }
+.input:read-only{ border-style:dashed; }
+.input[aria-invalid="true"]{ border-color:var(--error-1); }
+.select{ appearance:none; height:48px; padding:0 40px 0 16px;
+  background:var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 15.4 6 9.4 7.4 8l4.6 4.6L16.6 8 18 9.4z'/%3E%3C/svg%3E") no-repeat right 12px center/24px; }
+.search{ position:relative; display:inline-flex; }
+.search svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); width:24px; height:24px; fill:var(--gray-700); pointer-events:none; }
+.search .input{ padding-left:44px; }
+.label{ display:block; font-size:16px; font-weight:700; color:var(--gray-900); margin-bottom:8px; }
+
+/* ---------- 表（DADS table dense）★調整：14px・上下10px（DADS dense は16px・上下12px） ---------- */
+.table{ width:100%; border-collapse:collapse; font-size:14px; line-height:1.3; letter-spacing:0; }
+.table th,.table td{ padding:10px 12px; text-align:left; vertical-align:baseline; border-bottom:1px solid var(--gray-420); white-space:nowrap; }
+.table td.wrap{ white-space:normal; min-width:12em; }
+.table td.clip{ max-width:10em; overflow:hidden; text-overflow:ellipsis; }
+.table thead th{ position:sticky; top:0; z-index:1; background:var(--gray-100); color:var(--gray-900); font-weight:700;
+  border-bottom:1px solid var(--black); white-space:nowrap; }
+.table tbody tr:hover{ background:var(--key-50); cursor:pointer; }
+.table tbody tr[aria-selected="true"]{ background:var(--key-100); box-shadow:inset 4px 0 0 var(--key-900); }
+.table .sub{ display:block; margin-top:2px; font-size:12px; color:var(--gray-536); }
+
+/* ---------- ラベル（DADS chip-label filled-1）★調整：表の中で使うため14px・高さ24px ---------- */
+.chip{ display:inline-flex; align-items:center; min-height:24px; border:1px solid var(--_nt,var(--gray-700)); border-radius:6px;
+  background:var(--_bg,var(--gray-50)); color:var(--_tx,var(--gray-800)); padding:1px 7px; font-size:14px; line-height:1; white-space:nowrap; }
+.chips{ display:inline-flex; gap:4px; flex-wrap:wrap; }
+.chip[data-color="gray"]  { --_nt:#4d4d4d; --_bg:#f2f2f2; --_tx:#333333; }
+.chip[data-color="blue"]  { --_nt:#264af4; --_bg:#e8f1fe; --_tx:#0031d8; }
+.chip[data-color="cyan"]  { --_nt:#006f83; --_bg:#e9f7f9; --_tx:#006173; }
+.chip[data-color="green"] { --_nt:#197a4b; --_bg:#e6f5ec; --_tx:#115a36; }
+.chip[data-color="yellow"]{ --_nt:#806300; --_bg:#fbf5e0; --_tx:#6e5600; }
+.chip[data-color="orange"]{ --_nt:#ac3e00; --_bg:#ffeee2; --_tx:#8b3200; }
+.chip[data-color="red"]   { --_nt:#ce0000; --_bg:#fdeeee; --_tx:#a90000; }
+
+/* ---------- お知らせ（DADS notification-banner color-chip）★調整：業務画面用に余白を詰めた ---------- */
+.banner{ --_c:var(--key-900); --_chip:var(--key-900); display:grid; grid-template-columns:1fr auto; gap:4px 16px; align-items:center;
+  border:2px solid var(--_c); box-shadow:inset 8px 0 0 var(--_chip); background:var(--white); padding:12px 16px 12px 24px; }
+.banner[data-type="warning"]{ --_c:var(--warn-y2); --_chip:var(--yellow-400); }
+.banner[data-type="error"]  { --_c:var(--error-1); --_chip:var(--error-1); }
+.banner[data-type="success"]{ --_c:var(--success-2); --_chip:var(--success-2); }
+.banner__title{ font-size:16px; font-weight:700; color:var(--gray-900); }
+.banner__body{ grid-column:1; font-size:14px; }
+
+/* ---------- 説明リスト（DADS description-list） ---------- */
+.dl{ display:grid; grid-template-columns:8.5em 1fr; margin:0; font-size:14px; line-height:1.5; }
+.dl dt{ font-weight:700; color:var(--gray-900); padding:8px 0; border-bottom:1px solid var(--gray-100); }
+.dl dd{ margin:0; padding:8px 0; border-bottom:1px solid var(--gray-100); overflow-wrap:anywhere; }
+
+/* ---------- 画面の骨組み（アプリ共通） ---------- */
+.app{ display:grid; grid-template-columns:208px 1fr; grid-template-rows:56px 1fr; height:100vh; }
+.app-header{ grid-column:1 / 3; display:flex; align-items:center; gap:16px; padding:0 16px 0 20px; border-bottom:1px solid var(--gray-420); background:var(--white); }
+.app-header .brand{ font-size:17px; font-weight:700; color:var(--gray-900); }
+.app-header .brand small{ margin-left:8px; font-size:12px; font-weight:400; color:var(--gray-536); }
+.app-header .file{ font-size:14px; color:var(--gray-700); }
+.app-header .dirty{ color:var(--warn-o2); font-weight:700; }
+.app-nav{ border-right:1px solid var(--gray-420); background:var(--gray-50); padding:12px 0; overflow:auto; }
+.app-nav a{ display:flex; align-items:center; gap:10px; padding:10px 20px; color:var(--gray-800); text-decoration:none; font-size:16px; }
+.app-nav a:hover{ background:var(--gray-100); text-decoration:underline; }
+.app-nav a[aria-current="page"]{ background:var(--white); color:var(--key-900); font-weight:700; box-shadow:inset 4px 0 0 var(--key-900); }
+.app-nav svg{ width:20px; height:20px; fill:currentColor; flex-shrink:0; }
+.app-nav .group{ margin:16px 20px 4px; font-size:12px; font-weight:700; color:var(--gray-536); letter-spacing:.04em; }
+.app-main{ overflow:auto; }
+.page{ padding:24px 24px 48px; }
+.page-head{ display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+.page-head .grow{ flex:1; }
+.split{ display:grid; grid-template-columns:1fr 360px; height:100%; }
+.panel{ border-left:1px solid var(--gray-420); background:var(--white); overflow:auto; }
+.panel-head{ position:sticky; top:0; background:var(--white); padding:20px 24px 12px; border-bottom:1px solid var(--gray-200); z-index:1; }
+.panel-sec{ padding:16px 24px; border-bottom:1px solid var(--gray-100); }
+.stat{ font-size:32px; font-weight:700; line-height:1.2; color:var(--gray-900); font-variant-numeric:tabular-nums; }
+.stat small{ font-size:16px; font-weight:400; margin-left:4px; color:var(--gray-700); }
+.row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }

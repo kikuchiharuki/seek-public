@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>画面見本：品目 — 原料マスタ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="css/dads.css">
+<style>
+  .note{ background:var(--gray-900); color:var(--white); font-size:12px; padding:4px 20px; letter-spacing:.04em; }
+  .filters{ display:flex; gap:16px 24px; flex-wrap:wrap; align-items:center; margin:16px 0 12px; }
+  .filters .t-sub{ font-size:14px; margin-right:8px; }
+  .table-wrap{ border:1px solid var(--gray-420); border-radius:8px; overflow:auto; max-height:calc(100vh - 330px); }
+  .table-wrap .table tr:last-child td{ border-bottom:0; }
+  .low{ color:var(--error-2); font-weight:700; }
+  .soon{ color:var(--warn-o2); font-weight:700; }
+  .mini{ width:100%; border-collapse:collapse; font-size:14px; line-height:1.3; }
+  .mini th,.mini td{ padding:8px 0; border-bottom:1px solid var(--gray-100); text-align:left; }
+  .mini th{ font-weight:700; color:var(--gray-900); border-bottom:1px solid var(--gray-420); }
+  .mini tr.cur td{ font-weight:700; }
+</style>
+</head>
+<body>
+<div class="app" style="grid-template-rows:auto 56px 1fr">
+  <div class="note" style="grid-column:1/3">画面見本　在庫・期限・容器・資材の数値は見本用の仮の値</div>
+  <header class="app-header">
+    <span class="brand">原料マスタ<small>試作</small></span>
+    <span class="file">原料データ.xlsx　<span class="dirty">未保存の変更 1件</span></span>
+    <span style="flex:1"></span>
+    <button class="btn" data-type="solid-fill" data-size="sm">保存</button>
+  </header>
+  <nav class="app-nav" aria-label="メニュー">
+    <a href="#" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>品目</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M9 3h6v2h-1v4.6l5.5 9.2A2 2 0 0 1 17.8 22H6.2a2 2 0 0 1-1.7-3.2L10 9.6V5H9zm3 8.2L8.3 18h7.4z"/></svg>処方</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M3 21V10l5 3V10l5 3V4h8v17z"/></svg>製造</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4v10l-8 4-8-4zm8 2.2L6.5 6.6 12 4.2l5.5 2.4zM6 8.6v7.2l5 2.5v-7.2zm7 9.7 5-2.5V8.6l-5 2.5z"/></svg>在庫</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5zM8 12h10v2H8zm0 4h10v2H8z"/></svg>見積</a>
+    <div class="group">データ</div>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M11 4h2v9.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6zM4 19h16v2H4z"/></svg>取込</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M16 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm-8 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13zm8 0h-1a4.8 4.8 0 0 1 2 3.5V19h6v-2.5c0-2.3-4.7-3.5-7-3.5z"/></svg>取引先</a>
+  </nav>
+  <main class="app-main">
+    <div class="split">
+      <section class="page" style="overflow:auto">
+        <div class="page-head">
+          <div>
+            <h1 class="t-h1">品目</h1>
+            <div class="t-sub" id="count"></div>
+          </div>
+          <span class="grow"></span>
+          <button class="btn" data-type="outline" data-size="md">Excel・CSVから取込</button>
+          <button class="btn" data-type="solid-fill" data-size="md">品目を追加</button>
+        </div>
+
+        <div class="banner" data-type="warning">
+          <div class="banner__title">確認が必要な品目が 63件 あります</div>
+          <button class="btn" data-type="text" data-size="sm" style="grid-row:1/3;grid-column:2">確認する</button>
+          <div class="banner__body">単価が登録されていない 29件・単位がkgに換算できない単価 34件（/L・/缶など）</div>
+        </div>
+
+        <div class="filters">
+          <div class="search"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 14 15.5l.3.3v.8l5 5 1.5-1.5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+            <input class="input" data-size="sm" type="search" id="q" placeholder="コード・名称・表示名称・INCI・仕入先" style="width:340px"></div>
+          <div><span class="t-sub">区分</span><span class="toggle" id="kind"></span></div>
+          <div><span class="t-sub">状態</span><span class="toggle" id="state"></span></div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>コード</th><th>名称</th><th>区分</th><th class="num">在庫</th><th>近い期限</th><th class="num">単価</th><th>仕入先</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+      <aside class="panel" id="panel" aria-label="品目の詳細"></aside>
+    </div>
+  </main>
+</div>
+
+<script src="seed-data.js" onerror="window.SEED=null"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const toDate = v => {
+  if (typeof v === 'number' && v > 20000) { const d = new Date(Date.UTC(1899, 11, 30) + v * 864e5); return d.toISOString().slice(0, 10); }
+  const m = String(v || '').normalize('NFKC').match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/); return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : '';
+};
+const yen = n => n == null ? '' : Math.round(n).toLocaleString();
+
+// 見本データ：原料は同梱サンプル（本物の原料マスタ）から、フコイダン保湿ローションの原料を中心に拾う。在庫・期限は仮の値
+const PICK = ['0000','0001','0036','0074','0080','0144','0232','0238','0267','0517','0612','0896','0897','1039','0004','0007'];
+const seedRows = window.SEED ? SEED.masterRows.slice(1) : [];
+const ITEMS = PICK.map((c, i) => {
+  const r = seedRows.find(r => String(r[0]) === c);
+  if (!r) return null;
+  const price = typeof r[4] === 'number' ? r[4] : null;
+  return { code: c, kind: '原料', name: String(r[1]), disp: String(r[2] || ''), inci: String(r[10] || ''), maker: String(r[3] || ''),
+    supplier: String(r[8] || ''), pack: String(r[6] || ''), price, unit: 'kg', date: toDate(r[9]),
+    count: c !== '0000', expiry: c !== '0000',
+    stock: c === '0000' ? null : [42.5, 3.2, 12, 0.4, 1.8, 7.5, 36, 0.9, 2.2, 5, 1.1, 0, 4.5, 2.6, 16, 12][i],
+    next: c === '0000' ? '' : ['2027-03-31','2026-11-30','2027-06-30','2026-10-15','2027-01-31','2027-08-31','2027-02-28','2026-10-31','2027-05-31','2027-04-30','2026-12-31','','2027-07-31','2026-11-15','2027-09-30','2027-03-15'][i],
+    reorder: [0, 5, 5, 1, 1, 5, 20, 1, 1, 2, 1, 1, 2, 2, 10, 5][i] };
+}).filter(Boolean).concat([
+  { code: 'Y0001', kind: '容器', name: 'PETボトル 200mL 透明', disp: '', supplier: '（見本）', pack: '300本', price: 38, unit: '個', count: true, expiry: false, stock: 1240, next: '', reorder: 500 },
+  { code: 'Y0002', kind: '容器', name: 'ポンプキャップ 24mm 白', disp: '', supplier: '（見本）', pack: '500個', price: 26, unit: '個', count: true, expiry: false, stock: 310, next: '', reorder: 500 },
+  { code: 'S0001', kind: '資材', name: '化粧箱 200mL用', disp: '', supplier: '（見本）', pack: '200枚', price: 22, unit: '個', count: true, expiry: false, stock: 800, next: '', reorder: 300 },
+  { code: 'S0002', kind: '資材', name: 'カートン 40入', disp: '', supplier: '（見本）', pack: '50枚', price: 120, unit: '個', count: true, expiry: false, stock: 64, next: '', reorder: 30 },
+]);
+const TODAY = '2026-09-25';
+const soon = d => d && d <= '2026-11-30';
+const flags = it => ({
+  low: it.count && it.stock != null && it.stock <= it.reorder,
+  soon: it.expiry && soon(it.next),
+  noPrice: it.price == null,
+});
+let kind = 'すべて', state = null, q = '', cur = (ITEMS.find(i => i.code === '0232') || ITEMS[0])?.code;
+
+function drawFilters() {
+  const kinds = ['すべて', '原料', '容器', '資材'];
+  $('kind').innerHTML = kinds.map(k => `<button aria-pressed="${k === kind}" data-k="${k}">${k}<span class="count">${ITEMS.filter(i => k === 'すべて' || i.kind === k).length}</span></button>`).join('');
+  const states = [['low', '在庫少'], ['soon', '期限間近'], ['noPrice', '単価未登録']];
+  $('state').innerHTML = states.map(([k, l]) => `<button aria-pressed="${k === state}" data-s="${k}">${l}<span class="count">${ITEMS.filter(i => flags(i)[k]).length}</span></button>`).join('');
+  $('kind').onclick = e => { const b = e.target.closest('button'); if (b) { kind = b.dataset.k; draw(); } };
+  $('state').onclick = e => { const b = e.target.closest('button'); if (b) { state = state === b.dataset.s ? null : b.dataset.s; draw(); } };
+}
+function draw() {
+  drawFilters();
+  const n = s => String(s).normalize('NFKC').toLowerCase();
+  const hit = ITEMS.filter(i => (kind === 'すべて' || i.kind === kind) && (!state || flags(i)[state])
+    && (!q || [i.code, i.name, i.disp, i.inci, i.supplier].some(v => n(v || '').includes(n(q)))));
+  $('count').textContent = `原料・容器・資材 ${hit.length}件（見本）`;
+  const kc = { 原料: 'blue', 容器: 'cyan', 資材: 'gray' };
+  $('rows').innerHTML = hit.map(i => {
+    const f = flags(i);
+    return `<tr aria-selected="${i.code === cur}" data-c="${i.code}">
+      <td class="num" style="text-align:left">${i.code}</td>
+      <td class="wrap">${esc(i.name)}${i.disp ? `<span class="sub">${esc(i.disp)}</span>` : ''}</td>
+      <td><span class="chip" data-color="${kc[i.kind]}">${i.kind}</span></td>
+      <td class="num ${f.low ? 'low' : ''}">${i.count ? `${i.stock.toLocaleString()} ${i.unit}` : '<span class="t-sub">数えない</span>'}</td>
+      <td class="num ${f.soon ? 'soon' : ''}" style="text-align:left">${i.expiry ? (i.next || '—') : '<span class="t-sub">なし</span>'}</td>
+      <td class="num">${i.price != null ? `${yen(i.price)}<span class="t-sub"> /${i.unit}</span>` : '<span class="chip" data-color="yellow">未登録</span>'}</td>
+      <td class="clip" title="${esc(i.supplier)}">${esc(i.supplier)}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="t-sub">該当する品目はありません</td></tr>';
+  $('rows').onclick = e => { const tr = e.target.closest('tr[data-c]'); if (tr) { cur = tr.dataset.c; draw(); } };
+  drawPanel();
+}
+function drawPanel() {
+  const i = ITEMS.find(x => x.code === cur);
+  if (!i) { $('panel').innerHTML = ''; return; }
+  const f = flags(i);
+  const hist = i.price == null ? [] : [[i.date || '（日付不明）', i.price, i.kind === '原料' ? '原料マスタより' : '見本']];
+  const line = window.SEED && SEED.formula.lines.find(l => l.code === i.code);
+  $('panel').innerHTML = `
+    <div class="panel-head">
+      <div class="row"><span class="t-sub">${i.code}</span><span class="chip" data-color="${{ 原料: 'blue', 容器: 'cyan', 資材: 'gray' }[i.kind]}">${i.kind}</span>
+        <span style="flex:1"></span><button class="btn" data-type="text" data-size="xs">編集</button></div>
+      <h2 class="t-h2" style="margin-top:4px">${esc(i.name)}</h2>
+    </div>
+    <div class="panel-sec">
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <div><div class="t-sub" style="font-size:14px">在庫</div>
+          <div class="stat ${f.low ? 'low' : ''}">${i.count ? i.stock.toLocaleString() + `<small>${i.unit}</small>` : '<small style="margin:0">在庫を数えない品目</small>'}</div></div>
+        ${i.expiry ? `<div style="text-align:right"><div class="t-sub" style="font-size:14px">近い期限</div><div class="t-h3">${i.next || '—'}</div></div>` : ''}
+      </div>
+      ${i.count ? `<div class="row" style="margin-top:12px">
+        <button class="btn" data-type="solid-fill" data-size="sm">入荷を登録</button>
+        <button class="btn" data-type="outline" data-size="sm">棚卸（実数を入れる）</button></div>` : ''}
+    </div>
+    <div class="panel-sec">
+      <h3 class="t-h3" style="margin-bottom:4px">基本情報</h3>
+      <dl class="dl">
+        ${i.disp ? `<dt>表示名称</dt><dd>${esc(i.disp)}</dd>` : ''}
+        ${i.inci ? `<dt>INCI名</dt><dd>${esc(i.inci)}</dd>` : ''}
+        ${i.maker ? `<dt>メーカー</dt><dd>${esc(i.maker)}</dd>` : ''}
+        <dt>仕入先</dt><dd>${esc(i.supplier) || '—'}</dd>
+        <dt>入目</dt><dd>${esc(i.pack) || '—'}</dd>
+        <dt>在庫を数える</dt><dd>${i.count ? 'する' : 'しない'}</dd>
+        <dt>期限を記録する</dt><dd>${i.expiry ? 'する' : 'しない'}</dd>
+      </dl>
+    </div>
+    <div class="panel-sec">
+      <div class="row" style="justify-content:space-between"><h3 class="t-h3">単価の履歴</h3><button class="btn" data-type="text" data-size="xs">単価を追加</button></div>
+      ${hist.length ? `<table class="mini"><thead><tr><th>適用日</th><th class="num">単価（円/${i.unit}）</th><th>メモ</th></tr></thead><tbody>
+        ${hist.map((h, k) => `<tr class="${k ? '' : 'cur'}"><td>${h[0]}</td><td class="num">${yen(h[1])}</td><td class="t-sub">${h[2]}</td></tr>`).join('')}</tbody></table>`
+        : '<p class="t-sub" style="font-size:14px;margin:8px 0 0">単価が登録されていません</p>'}
+    </div>
+    ${i.kind === '原料' ? `<div class="panel-sec">
+      <h3 class="t-h3" style="margin-bottom:4px">この原料を使う処方</h3>
+      ${line ? `<table class="mini"><tbody><tr><td><a href="#">${esc(SEED.formula.product)}</a> <span class="t-sub">版1</span></td><td class="num">${line.pct}%</td></tr></tbody></table>`
+        : '<p class="t-sub" style="font-size:14px;margin:8px 0 0">使っている処方はありません</p>'}
+    </div>` : ''}`;
+}
+$('q').oninput = e => { q = e.target.value; draw(); };
+if (!ITEMS.length) document.querySelector('.page').insertAdjacentHTML('beforeend', '<p class="t-sub">seed-data.js が無いため見本データを表示できません（tools/build_seed.py で作成）</p>');
+draw();
+</script>
+</body>
+</html>
