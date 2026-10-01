@@ -272,6 +272,10 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 /* 編集可能セル */
 .data-table td[contenteditable]:hover { box-shadow: inset 0 0 0 1px #3498db55; cursor: text; }
+.data-table td.carrier-toggle { cursor: pointer; white-space: nowrap; user-select: none; }
+.data-table td.carrier-toggle::after { content: ' ▾'; color: #888; font-size: 11px; font-weight: normal; }
+.data-table td.carrier-toggle:hover { box-shadow: inset 0 0 0 1px #3498db; }
+@media print { .data-table td.carrier-toggle::after { content: none; } }
 .data-table td[contenteditable]:focus {
   outline: 2px solid #3498db; outline-offset: -2px; background: #fffdf0 !important;
 }
@@ -288,7 +292,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
     background: #fff !important; background-color: #fff !important; }
   .app-header, .drop-zone, .file-info, .raw-section, .carrier-holiday-bar,
   .preview-header, .toast, #invoiceSection, .del-col, .mail-overlay,
-  #applyPop { display: none !important; }
+  #applyPop, #yupackMaybeNote { display: none !important; }
   .container { max-width: none; padding: 0 !important; margin: 0 !important; }
   .preview-section { box-shadow: none !important; border: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; background: none !important; }
   .print-only { display: block !important; margin: 0 !important; padding: 0 !important; }
@@ -721,10 +725,11 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         </div>
         <button class="btn-excel btn-fixed" id="btnExcel"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 2h13l5 5v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM7 3.5v6h9v-6zm5 9.5a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4z"/></svg>Excel保存</span></button>
         <button class="btn-mail btn-fixed" id="btnMailText"><span class="mail-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v.5l-10 6.6L2 6.5V6a2 2 0 0 1 2-2z"/><path d="M22 8.9V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.9l10 6.6z"/></svg>承りメール文</span></button>
-        <button class="btn-orange btn-fixed" id="btnInvoiceCsv"><span>福山通運ｴﾝﾄﾘｰ用</span><span class="btn-ico">形式へ変換<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 7l10-4 10 4-10 4z"/><path d="M2 9.2l9 3.6V21l-9-3.6zM22 9.2l-9 3.6V21l9-3.6z"/></svg></span></button>
         <button class="btn-print btn-fixed" id="btnPrint"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 2h10v5H7z"/><path d="M3 8.5h18a2 2 0 0 1 2 2V16h-5v-3H5v3H1v-5.5a2 2 0 0 1 2-2z"/><path d="M6.5 14.5h11V22h-11z"/><path d="M9 18.2l1.6-1.5 1.5 1.5 3.2-3.2 1.6 1.6-4.8 4.8z" fill="var(--btn-bg, #fff262)"/></svg>印刷</span></button>
+        <button class="btn-orange btn-fixed" id="btnInvoiceCsv"><span>福山通運ｴﾝﾄﾘｰ用</span><span class="btn-ico">形式へ変換<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 7l10-4 10 4-10 4z"/><path d="M2 9.2l9 3.6V21l-9-3.6zM22 9.2l-9 3.6V21l9-3.6z"/></svg></span></button>
       </div>
     </div>
+    <div id="yupackMaybeNote" style="color:#ff0000;font-weight:bold;margin:6px 0;"></div>
     <div class="print-only" id="printHeader"></div>
     <div class="print-only" id="printSummary"></div>
     <div class="table-wrapper" id="tableWrapper"></div>
@@ -858,6 +863,7 @@ const CONFIG = {
     requestDate:  ['配送依頼日', '建物管理配送依頼日'],
     deliveryDate: ['指定納期'],
     companyName:  ['販売先会社名', '業者名'],
+    contactPerson: ['窓口担当'],  // ゆうパック候補判定用（出力列ではない）
     phone1:       ['電話番号1'],
     phone2:       ['電話番号2'],
     contactPhone: ['担当者連絡先番号', '担当者連絡先'],
@@ -913,6 +919,15 @@ const CONFIG = {
   // ⑥ 運送会社の自動判定ルール
   //    checkFields のいずれかに keywords のいずれかが含まれたら carrier を設定
   // ──────────────────────────────────────────────
+  // ゆうパック候補（個人宛らしい行）の警告。運送会社は自動設定せず、ボタン群の下に赤字で出して会社名セルを薄ピンクにするだけ。
+  //   会社名に corpWords が無く、かつ「窓口担当と同じ名前（空白・様は無視）」または「漢字の姓＋空白＋名」の形のとき候補とする。
+  //   全部カタカナの名前は屋号とみなし候補にしない。
+  yupackMaybe: {
+    corpWords: /㈱|㈲|株式会社|有限会社|合同会社|[(（][株有][)）]|営業所|支店|店$|センター|事業所|工場/,
+    nameShape: /^[一-龥々ヶ]{1,4}[ 　]+[一-龥々ヶぁ-んァ-ヴー]{1,5}(様)?$/,
+    cellColor: '#ffe4ec',
+  },
+  defaultCarrier: '福通',  // carrierRules に該当しない行の運送会社。画面のセルをクリックするとゆうパックと切り替わる
   carrierRules: [
     {
       carrier: 'ゆうパック',
@@ -3096,7 +3111,7 @@ function processData(rows) {
 
   // --- 1. 運送会社の自動判定（CONFIG.carrierRules）---
   rows.forEach(r => {
-    r.carrier = '';
+    r.carrier = CONFIG.defaultCarrier;
     r.duplicate = '';
     for (const rule of CONFIG.carrierRules) {
       const hit = rule.checkFields.some(field =>
@@ -3108,6 +3123,11 @@ function processData(rows) {
         break;
       }
     }
+    // ゆうパック候補（個人宛らしい）: 警告表示のみ
+    const Y = CONFIG.yupackMaybe, name = (r.companyName || '').trim();
+    const bare = v => (v || '').replace(/[\s　]/g, '').replace(/様$/, '');
+    r.yupackMaybe = r.carrier !== 'ゆうパック' && !!name && !Y.corpWords.test(name) && !/^[ァ-ヴー・]+$/.test(bare(name)) &&
+      ((!!bare(r.contactPerson) && bare(r.contactPerson) === bare(name)) || Y.nameShape.test(name));
   });
 
   // --- 2. 重複注文の統合（CONFIG.duplicateMergeKeys が全一致 → 数量合算）---
@@ -3171,7 +3191,7 @@ function applyShipDateToRows(shipDateIso) {
     for (const r of pf.rows) {
       r.shipDate = shipLabel;
       if (!CONFIG.leadTime.enabled) continue;
-      if (CONFIG.leadTime.skipIfCarrierSet && r.carrier) continue;  // skipIfCarrierSet=true のときだけ運送会社確定行をスキップ（現在はfalse＝ゆうパックも対象）
+      if (CONFIG.leadTime.skipIfCarrierSet && r.carrier !== CONFIG.defaultCarrier) continue;  // skipIfCarrierSet=true のときだけ運送会社確定行をスキップ（現在はfalse＝ゆうパックも対象）
       const baseStr = r.deliveryChanged ? r.deliveryDateOrig : r.deliveryDate;
       const due = parseYmd(baseStr);
       const lt = findLeadTime(r.prefecture, r.address);
@@ -3425,6 +3445,8 @@ function buildMappedData(f) {
       }
     });
 
+    mapped.contactPerson = f.mapping.contactPerson !== undefined ? String(row[f.mapping.contactPerson] ?? '').trim() : '';
+
     // 電話番号統合: CONFIG.phonePriority の順でデータが入っている最初のものを採用
     mapped.phone1 = '';
     for (const phoneKey of CONFIG.phonePriority) {
@@ -3477,6 +3499,9 @@ function buildMappedData(f) {
 
 // 変換結果テーブル（複数ファイルはVBA版同様、ファイル名行で区切る）
 function renderPreviewTable(fileResults) {
+  document.getElementById('yupackMaybeNote').innerHTML = fileResults.flatMap(fr => fr.rows)
+    .filter(r => r.yupackMaybe && (r.carrier || '').trim() !== 'ゆうパック')
+    .map(r => `ゆうパックの可能性あり[${escapeHtml(r.companyName)}]`).join('<br>');
   const allCount = fileResults.reduce((s, fr) => s + fr.rows.length, 0);
   if (allCount === 0) {
     tableWrapper.innerHTML = '<p style="padding:20px;color:#999;">データがありません</p>';
@@ -3579,11 +3604,19 @@ function renderDataRow(row, i, fi) {
       cls = 'keep-color';
     }
 
+    // ゆうパック候補（個人宛らしい）の会社名セル → 薄ピンク
+    if (col.key === 'companyName' && row.yupackMaybe && !isYupack) style += `background:${CONFIG.yupackMaybe.cellColor};`;
+
     // 会社名の改行を <br> で表示
     const display = col.key === 'companyName'
       ? escapeHtml(val).replace(/\n/g, '<br>')
       : escapeHtml(val);
 
+    // 運送会社セルはクリックで 福通⇄ゆうパック を切り替える（直接入力はしない）
+    if (col.key === 'carrier') {
+      html += `<td class="${cls} carrier-toggle" style="${style}" title="クリックで福通⇄ゆうパックを切替" data-f="${fi}" data-r="${i}">${display}</td>`;
+      return;
+    }
     // セルは直接編集可能（focusoutで行データに書き戻す）
     html += `<td class="${cls}" style="${style}"${title} contenteditable="true" data-f="${fi}" data-r="${i}" data-k="${col.key}">${display}</td>`;
   });
@@ -3632,6 +3665,17 @@ tableWrapper.addEventListener('contextmenu', e => {
     sel.removeAllRanges();
     sel.addRange(range);
   }
+});
+
+// 運送会社セルのクリックで 福通⇄ゆうパック を切替（確認なし。もう一度押せば戻る）
+tableWrapper.addEventListener('click', e => {
+  const td = e.target.closest ? e.target.closest('td.carrier-toggle') : null;
+  const row = td && processedFiles[+td.dataset.f]?.rows[+td.dataset.r];
+  if (!row) return;
+  const toYupack = (row.carrier || '').trim() !== 'ゆうパック';
+  row.carrier = toYupack ? 'ゆうパック' : CONFIG.defaultCarrier;
+  renderPreviewTable(processedFiles);
+  if (lastStats) { lastStats.yupack += toYupack ? 1 : -1; renderSummaryBar(processedFiles.flatMap(p => p.rows), lastStats); }
 });
 
 tableWrapper.addEventListener('click', e => {
