@@ -1161,6 +1161,9 @@ const CONFIG = {
     //                  2 = 2ケースずつ1梱包にまとめる
     //                      （例: 数量7 →「2ケース1梱包」個数3 の1件 + 端数1ケース 個数1 の1件 の計2件）
     //                  3にすれば3ケースずつ。まとめた行の品名記事2は「まとめ梱包の品名記事2」になる
+    // 「ゆうパック」= ゆうパックCSV用のルール（ゆうプリクラウド用ユーザースクリプトの品名プリセットと同じ内容）。
+    //   取扱注意: 'こわれもの' 'なまもの' 'ビン類' '逆さま厳禁' '下積厳禁' のうち付けるもの。
+    //   「ゆうパック」が無い製品は、品名記事1〜3をそのまま品名1〜3に使い、記事は空欄。
     productMaster: [
       {
         製品名: ['ニオイしま栓！'],
@@ -1172,6 +1175,12 @@ const CONFIG = {
         まとめ梱包: 2,
         まとめ梱包の品名記事2: '2ケース1梱包',
         保険金額: '5',
+        ゆうパック: {
+          品名1: 'ニオイしま栓！', 品名2: '', 品名3: '',
+          まとめ梱包の品名2: '２ケース１梱包',
+          記事1: '蒸発防止剤・航空機搭載可能◯', 記事2: '安全データシート付き',
+          取扱注意: [],
+        },
       },
       {
         製品名: ['ジェット＆ディフューザー'],
@@ -1183,6 +1192,13 @@ const CONFIG = {
         まとめ梱包: 1,
         まとめ梱包の品名記事2: '',
         保険金額: '5',
+        ゆうパック: {
+          品名1: '抗菌フレグランスジェット  30入', 品名2: 'ruum リードディフューザー 30入',
+          品名3: 'リードスティック 30包 ・完了チラシ 30枚',
+          まとめ梱包の品名2: '',
+          記事1: '【航空機搭載不可】香水', 記事2: '',   // 取扱注意を付ける製品は記事2を使えない（ゆうプリクラウドの仕様）
+          取扱注意: ['こわれもの', 'ビン類', '逆さま厳禁'],
+        },
       },
       {
         // ※ジェット＆ビーズは受領した表に無かったため品名記事1を旧仕様例から、
@@ -2679,6 +2695,9 @@ function buildYupackRecords(r, shipDate) {
   const srcRule = CONFIG.fileSourceRules.find(rule => rule.source === r._fileSource);
   const shipperCode = (srcRule?.invoiceOverrides?.['荷送人コード']) || (master ? master.荷送人コード : '');
   const sh = CONFIG.yupackCsv.shippers[shipperCode] || {};
+  // 品名・記事・取扱注意: マスタの「ゆうパック」ルール優先。無ければ福山通運の品名記事を流用
+  const yp = master?.ゆうパック;
+  const notice = Object.fromEntries((yp?.取扱注意 || []).map(n => [n + '区分', '01']));  // 01=あり
   const make = (qty, item2) => ({
     ...CONFIG.yupackCsv.fixedValues,
     'ご依頼主郵便番号': sh.郵便番号 || '',
@@ -2694,9 +2713,12 @@ function buildYupackRecords(r, shipDate) {
     'お届け先氏名1': nameLines[0] || '',
     'お届け先氏名2': nameLines.slice(1).join(' '),
     'お届け先電話番号': r.phone1 || '',
-    '品名1': master ? master.品名記事1 : (r.product || ''),
+    '品名1': yp ? yp.品名1 : master ? master.品名記事1 : (r.product || ''),
     '品名2': item2 || '',
-    '品名3': master ? master.品名記事3 : '',
+    '品名3': yp ? yp.品名3 : master ? master.品名記事3 : '',
+    '記事1': yp?.記事1 || '',
+    '記事2': yp?.記事2 || '',
+    ...notice,
     '個口数': String(qty),
     '配達希望日': fmtInvoiceDate(r.deliveryDate),
     '発送予定日': fmtInvoiceDate(shipDate),
@@ -2704,12 +2726,13 @@ function buildYupackRecords(r, shipDate) {
 
   const qty = parseInt(r.quantity, 10) || 0;
   const unit = (master && parseInt(master.まとめ梱包, 10)) || 1;  // 1=まとめない
+  const item2 = yp ? yp.品名2 : master ? master.品名記事2 : '';
   if (unit >= 2 && qty >= unit) {
-    const recs = [make(Math.floor(qty / unit), master.まとめ梱包の品名記事2)];
-    if (qty % unit) recs.push(make(qty % unit, master.品名記事2));
+    const recs = [make(Math.floor(qty / unit), yp ? yp.まとめ梱包の品名2 : master.まとめ梱包の品名記事2)];
+    if (qty % unit) recs.push(make(qty % unit, item2));
     return recs;
   }
-  return [make(qty || r.quantity || '', master ? master.品名記事2 : '')];
+  return [make(qty || r.quantity || '', item2)];
 }
 
 function buildYupackPreview() {
@@ -4282,6 +4305,20 @@ function isDevMode() {
     });
     h += '</tbody></table>';
     h += '<p class="cfg-note">「まとめ梱包」は数値そのまま（マスタの値）: <b>1</b>=まとめない（1行=送り状1件）／<b>2以上</b>=そのケース数ずつ1梱包にまとめます（例: まとめ梱包2で数量7 → 個数3の「2ケース1梱包」1件＋端数1ケースの個数1が1件）。まとめた行の品名記事2は「まとめ梱包の品名記事2」列の値に差し替わります。</p>';
+
+    // ゆうパック用ルール
+    h += '<h3>ゆうパック用ルール（品名・記事・取扱注意）</h3>';
+    h += '<p class="cfg-note">ゆうパックCSV生成時に使用。登録の無い製品は上の品名記事1〜3を品名1〜3に流用し、記事は空欄になります。</p>';
+    h += '<table class="cfg-table"><thead><tr><th>製品名</th><th>品名1</th><th>品名2</th><th>品名3</th><th>まとめ梱包の品名2</th><th>記事1</th><th>記事2</th><th>取扱注意</th></tr></thead><tbody>';
+    pm.forEach(p => {
+      const y = p.ゆうパック;
+      h += `<tr><td>${tags(p.製品名)}</td>`;
+      h += y
+        ? [y.品名1, y.品名2, y.品名3, y.まとめ梱包の品名2, y.記事1, y.記事2].map(v => `<td>${esc(v)}</td>`).join('') + `<td>${tags(y.取扱注意, 'orange')}</td>`
+        : '<td colspan="7" style="color:#888">未登録（福山通運の品名記事を流用）</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
 
     // 製品ルール（会社名変換）
     if (CONFIG.productRules.length) {
