@@ -2637,13 +2637,15 @@ function hideYupackSection() {
   yupackRows = [];
 }
 
-function buildYupackRecord(r, shipDate) {
+// 福山通運と同じまとめ梱包ルール（製品マスタの「まとめ梱包」）で分割する。
+// 例: まとめ梱包2で数量3 → 個口数1の「2ケース1梱包」1件＋端数1ケースの個口数1が1件
+function buildYupackRecords(r, shipDate) {
   const master = findProductMaster(r.product);
   const nameLines = (r.companyName || '').split('\n').map(s => s.trim()).filter(Boolean);
   // 住所は福山通運側で分割済み(_addrParts)ならそれを流用、無ければ市区町村リストで分割
   const parts = r._addrParts;
   const s = parts ? null : splitByCityList(r.prefecture, r.address);
-  return {
+  const make = (qty, item2) => ({
     'お届け先郵便番号': r.postalCode || '',
     'お届け先住所1': parts ? (parts[0] || '') + (parts[1] || '') : (r.prefecture || '') + (s ? s.city : ''),
     'お届け先住所2': parts ? (parts[2] || '') + (parts[3] || '') : (s ? s.rest : (r.address || '')),
@@ -2652,10 +2654,21 @@ function buildYupackRecord(r, shipDate) {
     'お届け先氏名2': nameLines.slice(1).join(' '),
     'お届け先電話番号': r.phone1 || '',
     '品名1': master ? master.品名記事1 : (r.product || ''),
-    '個口数': String(r.quantity ?? ''),
+    '品名2': item2 || '',
+    '品名3': master ? master.品名記事3 : '',
+    '個口数': String(qty),
     '配達希望日': fmtInvoiceDate(r.deliveryDate),
     '発送予定日': fmtInvoiceDate(shipDate),
-  };
+  });
+
+  const qty = parseInt(r.quantity, 10) || 0;
+  const unit = (master && parseInt(master.まとめ梱包, 10)) || 1;  // 1=まとめない
+  if (unit >= 2 && qty >= unit) {
+    const recs = [make(Math.floor(qty / unit), master.まとめ梱包の品名記事2)];
+    if (qty % unit) recs.push(make(qty % unit, master.品名記事2));
+    return recs;
+  }
+  return [make(qty || r.quantity || '', master ? master.品名記事2 : '')];
 }
 
 function buildYupackPreview() {
@@ -2670,13 +2683,14 @@ function buildYupackPreview() {
   const targetRows = allRows.filter(r => cfg.carriers.includes((r.carrier || '').trim()));
   if (!targetRows.length) { showToast('ゆうパックで送る行がありません', 'error'); return false; }
 
-  yupackRows = targetRows.map(r => buildYupackRecord(r, shipDate));
+  yupackRows = targetRows.flatMap(r => buildYupackRecords(r, shipDate));
   yupackFileName = cfg.filenamePattern
     .replace('{M}', shipDate.getMonth() + 1)
     .replace('{D}', shipDate.getDate());
 
   document.getElementById('yupackNotes').textContent =
-    `※ 開発中: 列はゆうプリクラウド標準取込フィルタ準拠。空欄の列は未対応 ／ ゆうパック以外 ${allRows.length - targetRows.length}件は出力対象外`;
+    `※ 開発中: 列はゆうプリクラウド標準取込フィルタ準拠。空欄の列は未対応 ／ ゆうパック以外 ${allRows.length - targetRows.length}件は出力対象外`
+    + (yupackRows.length > targetRows.length ? ` ／ まとめ梱包ルールで ${yupackRows.length - targetRows.length}件 分割` : '');
   document.getElementById('yupackCount').textContent = `(${yupackRows.length} 件 → ${yupackFileName})`;
   renderYupackTable();
   const sec = document.getElementById('yupackSection');
