@@ -772,6 +772,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
       </h2>
       <div class="preview-actions">
         <button class="btn-primary" id="btnYupackDownload">📥 ゆうパックエントリー用のCSVをダウンロード</button>
+        <button class="btn-primary" id="btnYupackSend">📤 ゆうプリクラウドへ送信</button>
         <button class="btn-secondary" id="btnYupackClose">✖ 閉じる</button>
       </div>
     </div>
@@ -2822,27 +2823,47 @@ document.getElementById('yupackTableWrapper').addEventListener('focusout', e => 
   updateYupackNotes();
 });
 
-function downloadYupackCsv() {
-  if (!yupackRows.length) return false;
+function buildYupackBlob() {
   const cfg = CONFIG.yupackCsv;
   const lines = [];
   if (cfg.includeHeader) lines.push(cfg.columns.join(','));
   for (const rec of yupackRows) lines.push(cfg.columns.map(c => csvField(rec[c])).join(','));
   const csvText = lines.join('\r\n') + '\r\n';
-  let blob;
   if (cfg.encoding === 'SJIS' && typeof Encoding !== 'undefined') {
     const sjis = Encoding.convert(Encoding.stringToCode(csvText), { to: 'SJIS', from: 'UNICODE' });
-    blob = new Blob([new Uint8Array(sjis)], { type: 'text/csv' });
-  } else {
-    blob = new Blob([(cfg.encoding === 'UTF8BOM' ? '\ufeff' : '') + csvText], { type: 'text/csv;charset=utf-8' });
+    return new Blob([new Uint8Array(sjis)], { type: 'text/csv' });
   }
+  return new Blob([(cfg.encoding === 'UTF8BOM' ? '\ufeff' : '') + csvText], { type: 'text/csv;charset=utf-8' });
+}
+
+function downloadYupackCsv() {
+  if (!yupackRows.length) return false;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(buildYupackBlob());
   a.download = yupackFileName;
   a.click();
   URL.revokeObjectURL(a.href);
   showToast(`ゆうパックCSV保存: ${yupackFileName}（${yupackRows.length}件）`, 'success');
   return true;
+}
+
+// ゆうプリクラウドへ送信: JP Business ToolBox のSSO入口を別タブで開き、
+// Tampermonkey（yupri-cloud.user.js）からの「準備OK」を待ってCSVを渡す。
+// 一括アップロード画面へのセットは向こうのスクリプトがやる。
+const YUPRI_ORIGIN = 'https://btoolboxprintservice.jp';
+let yupackSend = null; // { win, file } 送信待ち
+window.addEventListener('message', e => {
+  if (!yupackSend || e.source !== yupackSend.win || e.origin !== YUPRI_ORIGIN) return;
+  if (!e.data || e.data.type !== 'yupri-ready') return;
+  yupackSend.win.postMessage({ type: 'yupack-csv', file: yupackSend.file }, YUPRI_ORIGIN);
+  yupackSend = null;
+  showToast('ゆうプリクラウドへCSVを渡しました。内容を確認してアップロードを押してください', 'success');
+});
+function sendYupackToCloud() {
+  if (!yupackRows.length) return;
+  const win = window.open('https://auth.btoolboxprintservice.jp/sso');
+  if (!win) { showToast('ポップアップがブロックされました', 'error'); return; }
+  yupackSend = { win, file: new File([buildYupackBlob()], yupackFileName, { type: 'text/csv' }) };
 }
 
 {
@@ -2851,6 +2872,7 @@ function downloadYupackCsv() {
   document.addEventListener('devmodechange', e => { yupackBtn.hidden = !e.detail; });
   yupackBtn.addEventListener('click', buildYupackPreview);
   document.getElementById('btnYupackDownload').addEventListener('click', downloadYupackCsv);
+  document.getElementById('btnYupackSend').addEventListener('click', sendYupackToCloud);
   document.getElementById('btnYupackClose').addEventListener('click', hideYupackSection);
 }
 
