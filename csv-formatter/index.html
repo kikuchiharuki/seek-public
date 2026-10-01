@@ -649,7 +649,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.0</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.1</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -3615,7 +3615,7 @@ function renderDataRow(row, i, fi) {
 
     // 運送会社セルはクリックで 福通⇄ゆうパック を切り替える（直接入力はしない）
     if (col.key === 'carrier') {
-      html += `<td class="${cls} carrier-toggle" style="${style}" title="クリックで福通⇄ゆうパックを切替" data-f="${fi}" data-r="${i}">${display}</td>`;
+      html += `<td class="${cls} carrier-toggle" style="${style}" title="クリックで福通⇄ゆうパックを切替（確認あり）" data-f="${fi}" data-r="${i}">${display}</td>`;
       return;
     }
     // セルは直接編集可能（focusoutで行データに書き戻す）
@@ -3668,13 +3668,15 @@ tableWrapper.addEventListener('contextmenu', e => {
   }
 });
 
-// 運送会社セルのクリックで 福通⇄ゆうパック を切替（確認なし。もう一度押せば戻る）
+// 運送会社セルのクリックで 福通⇄ゆうパック を切替（確認ダイアログつき）
 tableWrapper.addEventListener('click', e => {
   const td = e.target.closest ? e.target.closest('td.carrier-toggle') : null;
   const row = td && processedFiles[+td.dataset.f]?.rows[+td.dataset.r];
   if (!row) return;
   const toYupack = (row.carrier || '').trim() !== 'ゆうパック';
-  row.carrier = toYupack ? 'ゆうパック' : CONFIG.defaultCarrier;
+  const next = toYupack ? 'ゆうパック' : CONFIG.defaultCarrier;
+  if (!confirm(`${next}に変更しますか？\n\n${(row.companyName || '').split('\n').join(' ').trim()}`)) return;
+  row.carrier = next;
   renderPreviewTable(processedFiles);
   if (lastStats) { lastStats.yupack += toYupack ? 1 : -1; renderSummaryBar(processedFiles.flatMap(p => p.rows), lastStats); }
 });
