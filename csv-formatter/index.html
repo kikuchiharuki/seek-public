@@ -203,6 +203,9 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .btn-orange:hover { background: #d35400; }
+.btn-yupack { background: #c0392b; }
+.btn-yupack:hover { background: #a93226; }
+.btn-yupack[hidden] { display: none; }
 .btn-fixed { text-align: center; box-sizing: border-box; flex: 0 0 128px; }  /* 4つのボタンを同じ幅で揃える（一番広い「福山通運ｴﾝﾄﾘｰ用」に合わせた最小幅） */
 /* 変換結果ヘッダーの各アクションボタン（色で役割を区別）。
    一度押したら .is-used が付いて白くなり、「もう押した」ことが一目で分かる。
@@ -291,7 +294,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   html, body { -webkit-print-color-adjust: economy !important; print-color-adjust: economy !important;
     background: #fff !important; background-color: #fff !important; }
   .app-header, .drop-zone, .file-info, .raw-section, .carrier-holiday-bar,
-  .preview-header, .toast, #invoiceSection, .del-col, .mail-overlay,
+  .preview-header, .toast, #invoiceSection, #yupackSection, .del-col, .mail-overlay,
   #applyPop, #yupackMaybeNote { display: none !important; }
   .container { max-width: none; padding: 0 !important; margin: 0 !important; }
   .preview-section { box-shadow: none !important; border: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; background: none !important; }
@@ -416,6 +419,9 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 /* セルは背景色を敷いていないので大枠の色が透ける。表の中だけ白に戻す */
 #invoiceSection .data-table td { background: #fff; }
 #invoiceSection .data-table tr:hover td { background: #f5f8ff; }
+#yupackSection { background: #ffd6d6; }
+#yupackSection .data-table td { background: #fff; }
+#yupackSection .data-table tr:hover td { background: #f5f8ff; }
 .preview-section h2 { font-size: 16px; margin-bottom: 12px; }
 
 .table-wrapper { overflow-x: auto; max-height: 500px; overflow-y: auto; }
@@ -728,6 +734,8 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         <button class="btn-mail btn-fixed" id="btnMailText"><span class="mail-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v.5l-10 6.6L2 6.5V6a2 2 0 0 1 2-2z"/><path d="M22 8.9V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.9l10 6.6z"/></svg>承りメール文</span></button>
         <button class="btn-print btn-fixed" id="btnPrint"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 2h10v5H7z"/><path d="M3 8.5h18a2 2 0 0 1 2 2V16h-5v-3H5v3H1v-5.5a2 2 0 0 1 2-2z"/><path d="M6.5 14.5h11V22h-11z"/><path d="M9 18.2l1.6-1.5 1.5 1.5 3.2-3.2 1.6 1.6-4.8 4.8z" fill="var(--btn-bg, #fff262)"/></svg>印刷</span></button>
         <button class="btn-orange btn-fixed" id="btnInvoiceCsv"><span>福山通運ｴﾝﾄﾘｰ用</span><span class="btn-ico">形式へ変換<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 7l10-4 10 4-10 4z"/><path d="M2 9.2l9 3.6V21l-9-3.6zM22 9.2l-9 3.6V21l9-3.6z"/></svg></span></button>
+        <!-- 開発者モードのときだけ表示（設定一覧→開発者モード） -->
+        <button class="btn-orange btn-yupack btn-fixed" id="btnYupackCsv" hidden><span>ゆうﾊﾟｯｸｴﾝﾄﾘｰ用</span><span class="btn-ico">形式へ変換<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 7l10-4 10 4-10 4z"/><path d="M2 9.2l9 3.6V21l-9-3.6zM22 9.2l-9 3.6V21l9-3.6z"/></svg></span></button>
       </div>
     </div>
     <div id="yupackMaybeNote" style="color:#ff0000;font-weight:bold;margin:6px 0;"></div>
@@ -754,6 +762,21 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
       通常は両方とも空欄のまま
     </div>
     <div class="table-wrapper" id="invoiceTableWrapper"></div>
+  </div>
+
+  <!-- ゆうパックCSVプレビュー（開発者モード・列定義は仮） -->
+  <div class="preview-section" id="yupackSection">
+    <div class="preview-header">
+      <h2>📮 ゆうパック用 CSVプレビュー <span id="yupackCount" style="font-size:13px;color:#444;font-weight:normal;"></span>
+        <span class="edit-hint">※ セルはクリックして直接修正できます。修正してから下のボタンで保存</span>
+      </h2>
+      <div class="preview-actions">
+        <button class="btn-primary" id="btnYupackDownload">📥 ゆうパックエントリー用のCSVをダウンロード</button>
+        <button class="btn-secondary" id="btnYupackClose">✖ 閉じる</button>
+      </div>
+    </div>
+    <div id="yupackNotes" style="font-size:13px;color:#444;margin-bottom:8px;"></div>
+    <div class="table-wrapper" id="yupackTableWrapper"></div>
   </div>
 </div>
 
@@ -792,7 +815,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
       <p class="cfg-note">お試し中の機能を表示します。ブラウザ(localStorage)に保存され、次回以降も維持されます。</p>
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
         <input type="checkbox" id="devModeToggle">
-        開発者モードをオンにする（⚡ 一気通貫ボタンを表示）
+        開発者モードをオンにする（⚡ 一気通貫・ゆうﾊﾟｯｸｴﾝﾄﾘｰ用形式へ変換 ボタンを表示）
       </label>
     </div>
   </div>
@@ -1037,6 +1060,20 @@ const CONFIG = {
   //    マスタ（荷送人・品名記事・固定値）はここで管理する。
   //    旧Excel運用のマスタCSV（製品と荷送人マスタ.csv 等）に相当。
   // ──────────────────────────────────────────────
+  // ── ゆうパック用CSV（開発者モード・作りかけ）──
+  //    ★ 列名・並び・固定値はすべて仮。取込ソフトの仕様が決まったらここを差し替える
+  yupackCsv: {
+    filenamePattern: '{M}月{D}日出荷ゆうパックデータ.csv',
+    includeHeader: true,
+    encoding: 'SJIS',
+    carriers: ['ゆうパック'],   // この運送会社の行だけを出力（福山通運CSVの除外対象と対）
+    columns: [
+      'お届け先郵便番号', 'お届け先住所1', 'お届け先住所2', 'お届け先住所3',
+      'お届け先名称1', 'お届け先名称2', 'お届け先電話番号',
+      '品名', '個数', '配達希望日', '発送予定日',
+    ],
+  },
+
   invoiceCsv: {
     // 出力ファイル名（{M}=月, {D}=日。日付は出荷日）
     filenamePattern: '{M}月{D}日出荷CSVエントリーデータ.csv',
@@ -2354,6 +2391,7 @@ let invoiceFileName = '';
 function hideInvoiceSection() {
   document.getElementById('invoiceSection').classList.remove('visible');
   invoiceRows = [];
+  hideYupackSection();
 }
 
 // 🚚 ボタン: 変換結果から送り状レコードを生成してプレビュー表示（この時点では保存しない）
@@ -2577,6 +2615,122 @@ document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
 });
 
 document.getElementById('btnInvoiceClose').addEventListener('click', hideInvoiceSection);
+
+// ============================================================
+// ゆうパック用CSV（開発者モード・作りかけ）
+//   福山通運CSVと同じ流れ（変換→編集できるプレビュー→CSV保存）。
+//   列定義は CONFIG.yupackCsv（仮）。必須チェック・文字数制限・住所API分割は列が決まってから足す。
+// ============================================================
+let yupackRows = [];
+let yupackFileName = '';
+
+function hideYupackSection() {
+  document.getElementById('yupackSection').classList.remove('visible');
+  yupackRows = [];
+}
+
+function buildYupackRecord(r, shipDate) {
+  const master = findProductMaster(r.product);
+  const nameLines = (r.companyName || '').split('\n').map(s => s.trim()).filter(Boolean);
+  // 住所は福山通運側で分割済み(_addrParts)ならそれを流用、無ければ市区町村リストで分割
+  const parts = r._addrParts;
+  const s = parts ? null : splitByCityList(r.prefecture, r.address);
+  return {
+    'お届け先郵便番号': r.postalCode || '',
+    'お届け先住所1': parts ? (parts[0] || '') + (parts[1] || '') : (r.prefecture || '') + (s ? s.city : ''),
+    'お届け先住所2': parts ? (parts[2] || '') + (parts[3] || '') : (s ? s.rest : (r.address || '')),
+    'お届け先住所3': r.building || '',
+    'お届け先名称1': nameLines[0] || '',
+    'お届け先名称2': nameLines.slice(1).join(' '),
+    'お届け先電話番号': r.phone1 || '',
+    '品名': master ? master.品名記事1 : (r.product || ''),
+    '個数': String(r.quantity ?? ''),
+    '配達希望日': fmtInvoiceDate(r.deliveryDate),
+    '発送予定日': fmtInvoiceDate(shipDate),
+  };
+}
+
+function buildYupackPreview() {
+  if (!processedFiles.length) { showToast('先に「⚡ 変換する」を実行してください', 'error'); return false; }
+  const shipIso = document.getElementById('shipDate').value;
+  if (!shipIso) { showToast('出荷日を設定してください（発送予定日・ファイル名に使います）', 'error'); return false; }
+  if (shipDateMissing()) { showToast(SHIP_DATE_MSG, 'error'); return false; }
+
+  const cfg = CONFIG.yupackCsv;
+  const shipDate = parseYmd(shipIso);
+  const allRows = processedFiles.flatMap(pf => pf.rows);
+  const targetRows = allRows.filter(r => cfg.carriers.includes((r.carrier || '').trim()));
+  if (!targetRows.length) { showToast('ゆうパックで送る行がありません', 'error'); return false; }
+
+  yupackRows = targetRows.map(r => buildYupackRecord(r, shipDate));
+  yupackFileName = cfg.filenamePattern
+    .replace('{M}', shipDate.getMonth() + 1)
+    .replace('{D}', shipDate.getDate());
+
+  document.getElementById('yupackNotes').textContent =
+    `※ 開発中: 列名・並びは仮です ／ ゆうパック以外 ${allRows.length - targetRows.length}件は出力対象外`;
+  document.getElementById('yupackCount').textContent = `(${yupackRows.length} 件 → ${yupackFileName})`;
+  renderYupackTable();
+  const sec = document.getElementById('yupackSection');
+  sec.classList.add('visible');
+  sec.scrollIntoView({ behavior: 'smooth' });
+  return true;
+}
+
+function renderYupackTable() {
+  const cols = CONFIG.yupackCsv.columns;
+  let html = '<table class="data-table"><thead><tr><th>#</th>';
+  cols.forEach(c => { html += `<th>${escapeHtml(c)}</th>`; });
+  html += '</tr></thead><tbody>';
+  yupackRows.forEach((rec, i) => {
+    html += `<tr><td style="color:#999;">${i + 1}</td>`;
+    cols.forEach(c => {
+      html += `<td contenteditable="true" data-i="${i}" data-col="${escapeHtml(c)}">${escapeHtml(String(rec[c] ?? ''))}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('yupackTableWrapper').innerHTML = html;
+}
+
+document.getElementById('yupackTableWrapper').addEventListener('focusout', e => {
+  const td = e.target.closest ? e.target.closest('td[data-col]') : null;
+  const rec = td && yupackRows[+td.dataset.i];
+  if (!rec) return;
+  rec[td.dataset.col] = td.innerText.replace(/\u00a0/g, ' ').replace(/\n+/g, ' ').trim();
+});
+
+function downloadYupackCsv() {
+  if (!yupackRows.length) return false;
+  const cfg = CONFIG.yupackCsv;
+  const lines = [];
+  if (cfg.includeHeader) lines.push(cfg.columns.join(','));
+  for (const rec of yupackRows) lines.push(cfg.columns.map(c => csvField(rec[c])).join(','));
+  const csvText = lines.join('\r\n') + '\r\n';
+  let blob;
+  if (cfg.encoding === 'SJIS' && typeof Encoding !== 'undefined') {
+    const sjis = Encoding.convert(Encoding.stringToCode(csvText), { to: 'SJIS', from: 'UNICODE' });
+    blob = new Blob([new Uint8Array(sjis)], { type: 'text/csv' });
+  } else {
+    blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = yupackFileName;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast(`ゆうパックCSV保存: ${yupackFileName}（${yupackRows.length}件）`, 'success');
+  return true;
+}
+
+{
+  const yupackBtn = document.getElementById('btnYupackCsv');
+  yupackBtn.hidden = !isDevMode();
+  document.addEventListener('devmodechange', e => { yupackBtn.hidden = !e.detail; });
+  yupackBtn.addEventListener('click', buildYupackPreview);
+  document.getElementById('btnYupackDownload').addEventListener('click', downloadYupackCsv);
+  document.getElementById('btnYupackClose').addEventListener('click', hideYupackSection);
+}
 
 // 変換結果セルの直接編集（focusoutで行データに書き戻す）
 tableWrapper.addEventListener('focusout', e => {
