@@ -655,7 +655,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.1</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.2</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -2861,7 +2861,7 @@ window.addEventListener('message', e => {
 });
 function sendYupackToCloud() {
   if (!yupackRows.length) return;
-  const win = window.open('https://auth.btoolboxprintservice.jp/sso');
+  const win = window.open('https://auth.btoolboxprintservice.jp/sso', 'yupackSend'); // 名前はTM側（jp-toolbox-autofill）がログイン後の転送の目印に使う
   if (!win) { showToast('ポップアップがブロックされました', 'error'); return; }
   yupackSend = { win, file: new File([buildYupackBlob()], yupackFileName, { type: 'text/csv' }) };
 }
