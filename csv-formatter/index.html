@@ -1065,12 +1065,13 @@ const CONFIG = {
   yupackCsv: {
     filenamePattern: '{M}月{D}日出荷ゆうパックデータ.csv',
     includeHeader: true,
-    encoding: 'SJIS',
+    encoding: 'UTF8BOM',        // ゆうプリクラウド推奨はUTF-8（SJISでエラー時はBOM付きUTF-8を使えとの記載）
     carriers: ['ゆうパック'],   // この運送会社の行だけを出力（福山通運CSVの除外対象と対）
-    // 出力列 = ゆうプリクラウド「標準取込フィルタ」サンプルCSVのヘッダー49列そのまま（順番・名称とも）
+    // 出力列 = ゆうプリクラウド配布「サンプル取込フィルタ用CSV.csv」のヘッダー49列そのまま（順番・名称とも）
+    //   仕様は同梱「取込フィルタの設定項目.pdf」（付録Ⅰ 送り状データレイアウト）
     columns: [
-      '送り状種別', '荷物商品名', 'セキュリティサービス', '個口数', 'お客様管理番号(受注番号等)',
-      '備考(自由記述)', '代金引換金額(税込)', '代金引換消費税額', '品名1', '品名2',
+      '送り状種別', '荷物商品名', 'セキュリティサービス', '個口数', 'お客さま管理番号（受注番号等）',
+      '備考（自由記述）', '代金引換金額（税込）', '代金引換消費税額', '品名1', '品名2',
       '品名3', '損害要償額', 'サイズ', '厚さ', 'サイズ/厚さ',
       '記事1', '記事2', 'こわれもの区分', 'なまもの区分', 'ビン類区分',
       '逆さま厳禁区分', '下積厳禁区分', '自由記述1', '自由記述2', 'お届け先郵便番号',
@@ -1080,6 +1081,24 @@ const CONFIG = {
       'ご依頼主住所3', 'ご依頼主氏名1', 'ご依頼主氏名2', 'ご依頼主氏名3', 'ご依頼主電話番号',
       '発送予定日', '発送予定時刻', '配達希望日', '配達希望時間帯',
     ],
+    // 必須項目（PDFで「○」。空白だとプレビューで赤表示。★開発中は保存を止めない）
+    requiredColumns: [
+      '送り状種別', '荷物商品名', '個口数', '品名1',
+      'お届け先郵便番号', 'お届け先住所1', 'お届け先氏名1',
+      'ご依頼主郵便番号', 'ご依頼主住所1', 'ご依頼主氏名1',
+    ],
+    // 合計文字数の上限（PDFより: 住所1〜3の合計75、氏名1〜3の合計50）
+    sumLimits: [
+      { label: 'お届け先住所', cols: ['お届け先住所1', 'お届け先住所2', 'お届け先住所3'], max: 75 },
+      { label: 'お届け先氏名', cols: ['お届け先氏名1', 'お届け先氏名2', 'お届け先氏名3'], max: 50 },
+    ],
+    // 固定値（全行共通）。★仮: ラベル用紙・商品・ご依頼主は未確定
+    fixedValues: {
+      '送り状種別': '0',      // 0=シート式ラベル(ユ00783) ※未設定時の既定と同じ。4=サーマル式(ユ00572) 5=ハイブリッド(ユ00555)
+      '荷物商品名': '101',    // 101=元払ゆうパック
+      'ご依頼主郵便番号': '', 'ご依頼主住所1': '', 'ご依頼主住所2': '', 'ご依頼主住所3': '',
+      'ご依頼主氏名1': '', 'ご依頼主氏名2': '', 'ご依頼主電話番号': '',
+    },
   },
 
   invoiceCsv: {
@@ -2646,6 +2665,7 @@ function buildYupackRecords(r, shipDate) {
   const parts = r._addrParts;
   const s = parts ? null : splitByCityList(r.prefecture, r.address);
   const make = (qty, item2) => ({
+    ...CONFIG.yupackCsv.fixedValues,
     'お届け先郵便番号': r.postalCode || '',
     'お届け先住所1': parts ? (parts[0] || '') + (parts[1] || '') : (r.prefecture || '') + (s ? s.city : ''),
     'お届け先住所2': parts ? (parts[2] || '') + (parts[3] || '') : (s ? s.rest : (r.address || '')),
@@ -2688,15 +2708,37 @@ function buildYupackPreview() {
     .replace('{M}', shipDate.getMonth() + 1)
     .replace('{D}', shipDate.getDate());
 
-  document.getElementById('yupackNotes').textContent =
-    `※ 開発中: 列はゆうプリクラウド標準取込フィルタ準拠。空欄の列は未対応 ／ ゆうパック以外 ${allRows.length - targetRows.length}件は出力対象外`
-    + (yupackRows.length > targetRows.length ? ` ／ まとめ梱包ルールで ${yupackRows.length - targetRows.length}件 分割` : '');
+  updateYupackNotes(
+    `※ 開発中: 列はゆうプリクラウドのサンプル取込フィルタ準拠 ／ ゆうパック以外 ${allRows.length - targetRows.length}件は出力対象外`
+    + (yupackRows.length > targetRows.length ? ` ／ まとめ梱包ルールで ${yupackRows.length - targetRows.length}件 分割` : ''));
   document.getElementById('yupackCount').textContent = `(${yupackRows.length} 件 → ${yupackFileName})`;
   renderYupackTable();
   const sec = document.getElementById('yupackSection');
   sec.classList.add('visible');
   sec.scrollIntoView({ behavior: 'smooth' });
   return true;
+}
+
+// 必須項目が空白なら赤
+function yupackCellAttr(col, val) {
+  return CONFIG.yupackCsv.requiredColumns.includes(col) && !String(val).trim()
+    ? ` style="background:${CONFIG.colors.emptyCell};" title="必須項目です"` : '';
+}
+
+// 注記: 必須空白・合計文字数超過（開発中は警告のみで保存は止めない）
+function updateYupackNotes(base) {
+  const cfg = CONFIG.yupackCsv;
+  const el = document.getElementById('yupackNotes');
+  if (base !== undefined) el.dataset.base = base;
+  const warns = [];
+  const missCols = [...new Set(yupackRows.flatMap(rec => cfg.requiredColumns.filter(c => !String(rec[c] ?? '').trim())))];
+  if (missCols.length) warns.push(`⚠ 必須項目が空白（赤いセル）: ${missCols.join('・')}`);
+  yupackRows.forEach((rec, i) => cfg.sumLimits.forEach(l => {
+    const n = l.cols.reduce((a, c) => a + [...String(rec[c] ?? '')].length, 0);
+    if (n > l.max) warns.push(`⚠ ${i + 1}行目: ${l.label}の合計 ${n}文字 > 上限${l.max}文字`);
+  }));
+  el.innerHTML = escapeHtml(el.dataset.base || '')
+    + (warns.length ? `<br><span style="color:#e74c3c;font-weight:700;">${warns.map(escapeHtml).join(' ／ ')}</span>` : '');
 }
 
 function renderYupackTable() {
@@ -2707,7 +2749,8 @@ function renderYupackTable() {
   yupackRows.forEach((rec, i) => {
     html += `<tr><td style="color:#999;">${i + 1}</td>`;
     cols.forEach(c => {
-      html += `<td contenteditable="true" data-i="${i}" data-col="${escapeHtml(c)}">${escapeHtml(String(rec[c] ?? ''))}</td>`;
+      const v = String(rec[c] ?? '');
+      html += `<td${yupackCellAttr(c, v)} contenteditable="true" data-i="${i}" data-col="${escapeHtml(c)}">${escapeHtml(v)}</td>`;
     });
     html += '</tr>';
   });
@@ -2720,6 +2763,9 @@ document.getElementById('yupackTableWrapper').addEventListener('focusout', e => 
   const rec = td && yupackRows[+td.dataset.i];
   if (!rec) return;
   rec[td.dataset.col] = td.innerText.replace(/\u00a0/g, ' ').replace(/\n+/g, ' ').trim();
+  const empty = CONFIG.yupackCsv.requiredColumns.includes(td.dataset.col) && !rec[td.dataset.col];
+  td.style.background = empty ? CONFIG.colors.emptyCell : '';
+  updateYupackNotes();
 });
 
 function downloadYupackCsv() {
@@ -2734,7 +2780,7 @@ function downloadYupackCsv() {
     const sjis = Encoding.convert(Encoding.stringToCode(csvText), { to: 'SJIS', from: 'UNICODE' });
     blob = new Blob([new Uint8Array(sjis)], { type: 'text/csv' });
   } else {
-    blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
+    blob = new Blob([(cfg.encoding === 'UTF8BOM' ? '\ufeff' : '') + csvText], { type: 'text/csv;charset=utf-8' });
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
