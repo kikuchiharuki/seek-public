@@ -1061,16 +1061,24 @@ const CONFIG = {
   //    旧Excel運用のマスタCSV（製品と荷送人マスタ.csv 等）に相当。
   // ──────────────────────────────────────────────
   // ── ゆうパック用CSV（開発者モード・作りかけ）──
-  //    ★ 列名・並び・固定値はすべて仮。取込ソフトの仕様が決まったらここを差し替える
+  //    列はゆうプリクラウド標準取込フィルタ準拠。★ 値の埋め方（送り状種別・ご依頼主・各区分のコード等）は未定
   yupackCsv: {
     filenamePattern: '{M}月{D}日出荷ゆうパックデータ.csv',
     includeHeader: true,
     encoding: 'SJIS',
     carriers: ['ゆうパック'],   // この運送会社の行だけを出力（福山通運CSVの除外対象と対）
+    // 出力列 = ゆうプリクラウド「標準取込フィルタ」サンプルCSVのヘッダー49列そのまま（順番・名称とも）
     columns: [
-      'お届け先郵便番号', 'お届け先住所1', 'お届け先住所2', 'お届け先住所3',
-      'お届け先名称1', 'お届け先名称2', 'お届け先電話番号',
-      '品名', '個数', '配達希望日', '発送予定日',
+      '送り状種別', '荷物商品名', 'セキュリティサービス', '個口数', 'お客様管理番号(受注番号等)',
+      '備考(自由記述)', '代金引換金額(税込)', '代金引換消費税額', '品名1', '品名2',
+      '品名3', '損害要償額', 'サイズ', '厚さ', 'サイズ/厚さ',
+      '記事1', '記事2', 'こわれもの区分', 'なまもの区分', 'ビン類区分',
+      '逆さま厳禁区分', '下積厳禁区分', '自由記述1', '自由記述2', 'お届け先郵便番号',
+      'お届け先住所1', 'お届け先住所2', 'お届け先住所3', 'お届け先氏名1', 'お届け先氏名2',
+      'お届け先氏名3', 'お届け先電話番号', 'お届け先メールアドレス', '指定場所ダイレクト', '指定場所ダイレクト第一希望場所',
+      '指定場所ダイレクト第二希望場所', 'チャイムの設定', 'ご依頼主郵便番号', 'ご依頼主住所1', 'ご依頼主住所2',
+      'ご依頼主住所3', 'ご依頼主氏名1', 'ご依頼主氏名2', 'ご依頼主氏名3', 'ご依頼主電話番号',
+      '発送予定日', '発送予定時刻', '配達希望日', '配達希望時間帯',
     ],
   },
 
@@ -2640,11 +2648,11 @@ function buildYupackRecord(r, shipDate) {
     'お届け先住所1': parts ? (parts[0] || '') + (parts[1] || '') : (r.prefecture || '') + (s ? s.city : ''),
     'お届け先住所2': parts ? (parts[2] || '') + (parts[3] || '') : (s ? s.rest : (r.address || '')),
     'お届け先住所3': r.building || '',
-    'お届け先名称1': nameLines[0] || '',
-    'お届け先名称2': nameLines.slice(1).join(' '),
+    'お届け先氏名1': nameLines[0] || '',
+    'お届け先氏名2': nameLines.slice(1).join(' '),
     'お届け先電話番号': r.phone1 || '',
-    '品名': master ? master.品名記事1 : (r.product || ''),
-    '個数': String(r.quantity ?? ''),
+    '品名1': master ? master.品名記事1 : (r.product || ''),
+    '個口数': String(r.quantity ?? ''),
     '配達希望日': fmtInvoiceDate(r.deliveryDate),
     '発送予定日': fmtInvoiceDate(shipDate),
   };
@@ -2668,7 +2676,7 @@ function buildYupackPreview() {
     .replace('{D}', shipDate.getDate());
 
   document.getElementById('yupackNotes').textContent =
-    `※ 開発中: 列名・並びは仮です ／ ゆうパック以外 ${allRows.length - targetRows.length}件は出力対象外`;
+    `※ 開発中: 列はゆうプリクラウド標準取込フィルタ準拠。空欄の列は未対応 ／ ゆうパック以外 ${allRows.length - targetRows.length}件は出力対象外`;
   document.getElementById('yupackCount').textContent = `(${yupackRows.length} 件 → ${yupackFileName})`;
   renderYupackTable();
   const sec = document.getElementById('yupackSection');
