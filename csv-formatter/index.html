@@ -655,7 +655,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.2</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.3</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -2851,12 +2851,12 @@ function downloadYupackCsv() {
 // Tampermonkey（yupri-cloud.user.js）からの「準備OK」を待ってCSVを渡す。
 // 一括アップロード画面へのセットは向こうのスクリプトがやる。
 const YUPRI_ORIGIN = 'https://btoolboxprintservice.jp';
-let yupackSend = null; // { win, file } 送信待ち
+let yupackSend = null; // { win, file } 最後に送信したもの
 window.addEventListener('message', e => {
   if (!yupackSend || e.source !== yupackSend.win || e.origin !== YUPRI_ORIGIN) return;
   if (!e.data || e.data.type !== 'yupri-ready') return;
+  // 未ログインだと「準備OK」のあとログイン画面へ飛ばされ、戻ってきてもう一度合図が来る。来るたびに渡す
   yupackSend.win.postMessage({ type: 'yupack-csv', file: yupackSend.file }, YUPRI_ORIGIN);
-  yupackSend = null;
   showToast('ゆうプリクラウドへCSVを渡しました。内容を確認してアップロードを押してください', 'success');
 });
 function sendYupackToCloud() {
