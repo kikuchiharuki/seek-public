@@ -1063,7 +1063,7 @@ const CONFIG = {
   // ── ゆうパック用CSV（開発者モード・作りかけ）──
   //    列はゆうプリクラウド標準取込フィルタ準拠。★ 値の埋め方（送り状種別・ご依頼主・各区分のコード等）は未定
   yupackCsv: {
-    filenamePattern: '{M}月{D}日出荷ゆうパックデータ.csv',
+    filenamePattern: '【ゆうパック】{M}月{D}日出荷CSVエントリーデータ.csv',
     includeHeader: true,
     encoding: 'UTF8BOM',        // ゆうプリクラウド推奨はUTF-8（SJISでエラー時はBOM付きUTF-8を使えとの記載）
     carriers: ['ゆうパック'],   // この運送会社の行だけを出力（福山通運CSVの除外対象と対）
@@ -1115,7 +1115,7 @@ const CONFIG = {
 
   invoiceCsv: {
     // 出力ファイル名（{M}=月, {D}=日。日付は出荷日）
-    filenamePattern: '{M}月{D}日出荷CSVエントリーデータ.csv',
+    filenamePattern: '【福山通運】{M}月{D}日出荷CSVエントリーデータ.csv',
     includeHeader: true,        // 1行目に列名行を出すか（ソフト側の取込設定に合わせる）
     encoding: 'SJIS',           // 送り状ソフトはWindows用のためShift-JIS（UTF8も指定可）
     dateFormat: 'yyyymmdd',     // 配達指定日・出荷日付・登録日付は8桁数字（iS-2でyyyy/mm/ddはエラーになる）
