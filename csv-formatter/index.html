@@ -655,7 +655,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.3</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.4</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -734,8 +734,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
         <button class="btn-mail btn-fixed" id="btnMailText"><span class="mail-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v.5l-10 6.6L2 6.5V6a2 2 0 0 1 2-2z"/><path d="M22 8.9V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.9l10 6.6z"/></svg>承りメール文</span></button>
         <button class="btn-print btn-fixed" id="btnPrint"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 2h10v5H7z"/><path d="M3 8.5h18a2 2 0 0 1 2 2V16h-5v-3H5v3H1v-5.5a2 2 0 0 1 2-2z"/><path d="M6.5 14.5h11V22h-11z"/><path d="M9 18.2l1.6-1.5 1.5 1.5 3.2-3.2 1.6 1.6-4.8 4.8z" fill="var(--btn-bg, #fff262)"/></svg>印刷</span></button>
         <button class="btn-orange btn-fixed" id="btnInvoiceCsv"><span>福山通運ｴﾝﾄﾘｰ用</span><span class="btn-ico">形式へ変換<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 7l10-4 10 4-10 4z"/><path d="M2 9.2l9 3.6V21l-9-3.6zM22 9.2l-9 3.6V21l9-3.6z"/></svg></span></button>
-        <!-- 開発者モードのときだけ表示（設定一覧→開発者モード） -->
-        <button class="btn-orange btn-yupack btn-fixed" id="btnYupackCsv" hidden><span>ゆうﾊﾟｯｸｴﾝﾄﾘｰ用</span><span class="btn-ico">形式へ変換<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 7l10-4 10 4-10 4z"/><path d="M2 9.2l9 3.6V21l-9-3.6zM22 9.2l-9 3.6V21l9-3.6z"/></svg></span></button>
+        <button class="btn-orange btn-yupack btn-fixed" id="btnYupackCsv"><span>ゆうﾊﾟｯｸｴﾝﾄﾘｰ用</span><span class="btn-ico">形式へ変換<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 7l10-4 10 4-10 4z"/><path d="M2 9.2l9 3.6V21l-9-3.6zM22 9.2l-9 3.6V21l9-3.6z"/></svg></span></button>
       </div>
     </div>
     <div id="yupackMaybeNote" style="color:#ff0000;font-weight:bold;margin:6px 0;"></div>
@@ -764,7 +763,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
     <div class="table-wrapper" id="invoiceTableWrapper"></div>
   </div>
 
-  <!-- ゆうパックCSVプレビュー（開発者モード・列定義は仮） -->
+  <!-- ゆうパックCSVプレビュー -->
   <div class="preview-section" id="yupackSection">
     <div class="preview-header">
       <h2>📮 ゆうパック用 CSVプレビュー <span id="yupackCount" style="font-size:13px;color:#444;font-weight:normal;"></span>
@@ -816,7 +815,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
       <p class="cfg-note">お試し中の機能を表示します。ブラウザ(localStorage)に保存され、次回以降も維持されます。</p>
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
         <input type="checkbox" id="devModeToggle">
-        開発者モードをオンにする（⚡ 一気通貫・ゆうﾊﾟｯｸｴﾝﾄﾘｰ用形式へ変換 ボタンを表示）
+        開発者モードをオンにする（⚡ 一気通貫 ボタンを表示）
       </label>
     </div>
   </div>
@@ -1061,7 +1060,7 @@ const CONFIG = {
   //    マスタ（荷送人・品名記事・固定値）はここで管理する。
   //    旧Excel運用のマスタCSV（製品と荷送人マスタ.csv 等）に相当。
   // ──────────────────────────────────────────────
-  // ── ゆうパック用CSV（開発者モード・作りかけ）──
+  // ── ゆうパック用CSV ──
   //    列はゆうプリクラウド標準取込フィルタ準拠。★ 値の埋め方（送り状種別・ご依頼主・各区分のコード等）は未定
   yupackCsv: {
     filenamePattern: '【ゆうパック】{M}月{D}日出荷CSVエントリーデータ.csv',
@@ -2682,7 +2681,7 @@ document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
 document.getElementById('btnInvoiceClose').addEventListener('click', hideInvoiceSection);
 
 // ============================================================
-// ゆうパック用CSV（開発者モード・作りかけ）
+// ゆうパック用CSV
 //   福山通運CSVと同じ流れ（変換→編集できるプレビュー→CSV保存）。
 //   列定義は CONFIG.yupackCsv（仮）。必須チェック・文字数制限・住所API分割は列が決まってから足す。
 // ============================================================
@@ -2868,8 +2867,6 @@ function sendYupackToCloud() {
 
 {
   const yupackBtn = document.getElementById('btnYupackCsv');
-  yupackBtn.hidden = !isDevMode();
-  document.addEventListener('devmodechange', e => { yupackBtn.hidden = !e.detail; });
   yupackBtn.addEventListener('click', buildYupackPreview);
   document.getElementById('btnYupackDownload').addEventListener('click', downloadYupackCsv);
   document.getElementById('btnYupackSend').addEventListener('click', sendYupackToCloud);
