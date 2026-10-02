@@ -279,6 +279,16 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 .data-table td.carrier-toggle::after { content: ' ▾'; color: #888; font-size: 11px; font-weight: normal; }
 .data-table td.carrier-toggle:hover { box-shadow: inset 0 0 0 1px #3498db; }
 @media print { .data-table td.carrier-toggle::after { content: none; } }
+/* セルのすぐ下に出す確認の吹き出し（askNear） */
+.cell-ask {
+  position: fixed; z-index: 3000; background: #fff; border: 1px solid #3498db; border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25); padding: 10px 12px; font-size: 13px; max-width: 280px;
+}
+.cell-ask-msg { color: #2c3e50; margin-bottom: 8px; white-space: pre-wrap; }
+.cell-ask-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.cell-ask-btns button { padding: 6px 14px; border-radius: 4px; border: 1px solid #bbb; background: #fff; cursor: pointer; font-size: 13px; }
+.cell-ask-btns .cell-ask-ok { background: #3498db; border-color: #3498db; color: #fff; font-weight: 700; }
+@media print { .cell-ask { display: none !important; } }
 .data-table td[contenteditable]:focus {
   outline: 2px solid #3498db; outline-offset: -2px; background: #fffdf0 !important;
 }
@@ -655,7 +665,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.4</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.5</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -3963,14 +3973,55 @@ tableWrapper.addEventListener('contextmenu', e => {
   }
 });
 
-// 運送会社セルのクリックで 福通⇄ゆうパック を切替（確認ダイアログつき）
-tableWrapper.addEventListener('click', e => {
+// クリックしたセルのすぐ下に確認の吹き出しを出す（confirm() は画面上部に出て遠いため）。
+// OKでtrue、やめる/Esc/外側クリック/スクロールでfalse
+let closeCellAsk = null;
+function askNear(anchor, message, okLabel) {
+  if (closeCellAsk) closeCellAsk(false);
+  return new Promise(resolve => {
+    const box = document.createElement('div');
+    box.className = 'cell-ask';
+    box.innerHTML = '<div class="cell-ask-msg"></div><div class="cell-ask-btns">' +
+      '<button type="button" class="cell-ask-cancel">やめる</button><button type="button" class="cell-ask-ok"></button></div>';
+    box.querySelector('.cell-ask-msg').textContent = message;
+    const ok = box.querySelector('.cell-ask-ok');
+    ok.textContent = okLabel;
+    document.body.appendChild(box);
+    // セルの右端に揃えて直下へ。下に入らなければ上、左右は画面内に収める
+    const a = anchor.getBoundingClientRect();
+    const left = Math.max(8, Math.min(a.right - box.offsetWidth, innerWidth - box.offsetWidth - 8));
+    const top = a.bottom + 4 + box.offsetHeight <= innerHeight ? a.bottom + 4 : Math.max(8, a.top - box.offsetHeight - 4);
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+    const onKey = e => { if (e.key === 'Escape') done(false); };
+    const onDown = e => { if (!box.contains(e.target)) done(false); };
+    const onScroll = () => done(false);
+    function done(v) {
+      closeCellAsk = null;
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown, true);
+      window.removeEventListener('scroll', onScroll, true);
+      box.remove();
+      resolve(v);
+    }
+    closeCellAsk = done;
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown, true);
+    window.addEventListener('scroll', onScroll, true);
+    ok.addEventListener('click', () => done(true));
+    box.querySelector('.cell-ask-cancel').addEventListener('click', () => done(false));
+    ok.focus();
+  });
+}
+
+// 運送会社セルのクリックで 福通⇄ゆうパック を切替（セル直下の確認つき）
+tableWrapper.addEventListener('click', async e => {
   const td = e.target.closest ? e.target.closest('td.carrier-toggle') : null;
   const row = td && processedFiles[+td.dataset.f]?.rows[+td.dataset.r];
   if (!row) return;
   const toYupack = (row.carrier || '').trim() !== 'ゆうパック';
   const next = toYupack ? 'ゆうパック' : CONFIG.defaultCarrier;
-  if (!confirm(`${next}に変更しますか？\n\n${(row.companyName || '').split('\n').join(' ').trim()}`)) return;
+  if (!await askNear(td, `${next}に変更しますか？\n${(row.companyName || '').split('\n').join(' ').trim()}`, `${next}に変更`)) return;
   row.carrier = next;
   renderPreviewTable(processedFiles);
   if (lastStats) { lastStats.yupack += toYupack ? 1 : -1; renderSummaryBar(processedFiles.flatMap(p => p.rows), lastStats); }
