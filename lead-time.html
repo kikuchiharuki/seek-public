@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>福山通運 焼津支店発 リードタイム検索</title>
+<title>リードタイム検索（福山通運・ゆうパック）</title>
 <!-- ファビコン: 青地に白の「S」(Liberation Sans BoldのアウトラインをSVGパス化・画像ファイル不要) -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22%3E%3Crect%20width=%22100%22%20height=%22100%22%20fill=%22%231565C0%22/%3E%3Cg%20transform=%22translate(50%2050)%20scale(0.04276%20-0.04276)%20translate(-672.5%20-705.0)%22%3E%3Cpath%20d=%22M1286%20406Q1286%20199%201132.5%2089.5Q979%20-20%20682%20-20Q411%20-20%20257.0%2076.0Q103%20172%2059%20367L344%20414Q373%20302%20457.0%20251.5Q541%20201%20690%20201Q999%20201%20999%20389Q999%20449%20963.5%20488.0Q928%20527%20863.5%20553.0Q799%20579%20616%20616Q458%20653%20396.0%20675.5Q334%20698%20284.0%20728.5Q234%20759%20199.0%20802.0Q164%20845%20144.5%20903.0Q125%20961%20125%201036Q125%201227%20268.5%201328.5Q412%201430%20686%201430Q948%201430%201079.5%201348.0Q1211%201266%201249%201077L963%201038Q941%201129%20873.5%201175.0Q806%201221%20680%201221Q412%201221%20412%201053Q412%20998%20440.5%20963.0Q469%20928%20525.0%20903.5Q581%20879%20752%20842Q955%20799%201042.5%20762.5Q1130%20726%201181.0%20677.5Q1232%20629%201259.0%20561.5Q1286%20494%201286%20406Z%22%20fill=%22%23fff%22/%3E%3C/g%3E%3C/svg%3E">
 <style>
@@ -63,10 +63,11 @@ select{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 .ex b{color:var(--txt);font-weight:600}
 .fee{margin-top:6px;padding:7px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:5px;font-size:12px;color:#9a3412;line-height:1.5}
 .fee b{font-weight:700}
-.yp{margin-top:14px;padding-top:12px;border-top:1px dashed var(--bdr);text-align:center}
-.yp .rc-title{margin-bottom:6px}
-.yp .mr-date{font-size:28px}
-.yp .mr-dow{font-size:17px}
+/* ゆうパック: 色の変数だけ差し替えて福山通運と同じ部品を使う */
+.yp-card{--pri:#be185d;--pri2:#db2777;background:#fff5f9;border:1px solid #fbcfe8}
+.yp-card .tl-day.biz{background:#fff}
+.yp-card .tl-day.arr{background:#fce7f3}
+.yp-card .rn{color:var(--pri2);font-weight:500}
 .fee .fee-all{font-weight:700;color:#dc2626}
 .hb{display:inline-block;margin-left:3px;padding:0 5px;border-radius:3px;font-size:10px;font-weight:700;vertical-align:middle}
 .hb.h{background:#fee2e2;color:#dc2626}.hb.w{background:#fef3c7;color:#b45309}
@@ -75,7 +76,7 @@ select{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 </head>
 <body>
 <div class="w">
-<h1>福山通運 焼津支店発<small>リードタイム検索</small></h1>
+<h1>リードタイム検索<small>福山通運 焼津支店発 ／ ゆうパック 藤枝郵便局差出</small></h1>
 <div class="c">
  <div class="r"><div><label>出荷日</label><div class="date-wrap"><input type="date" id="sd"><span class="date-dow" id="dw"></span></div></div></div>
  <div class="r"><div><label>都道府県</label><select id="sp"><option value="">選択</option></select></div><div><label>市区郡</label><select id="sc"><option value="">―</option></select></div></div>
@@ -83,7 +84,7 @@ select{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 <div class="c hide" id="rc">
  <div class="ld" id="lm">祝日データ取得中...</div>
  <div class="hide" id="ri">
-  <div class="rc-title">シーク発送 最短到着（福山通運）</div>
+  <div class="rc-title">福山通運 最短到着</div>
   <div class="tl" id="timeline"></div>
   <div class="main-res">
    <div class="mr-date" id="ad"></div>
@@ -95,8 +96,19 @@ select{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
   <div class="alt hide" id="altInfo"></div>
   <div class="ex hide" id="ei"></div>
   <div class="fee hide" id="feeInfo"></div>
-  <div class="yp" id="yp"></div>
  </div>
+</div>
+<!-- ゆうパック: 福山通運と同じ見た目を薄ピンクのテーマで -->
+<div class="c yp-card hide" id="yc">
+ <div class="rc-title">ゆうパック 最短到着</div>
+ <div class="tl" id="ytl"></div>
+ <div class="main-res">
+  <div class="mr-date" id="yad"></div>
+  <div class="mr-dow" id="yaw"></div>
+  <div id="yat"></div>
+  <div class="mr-lt" id="yli"></div>
+ </div>
+ <div class="rn" id="yni">ゆうパックは土日祝も配達します</div>
 </div>
 </div>
 <script>
@@ -218,9 +230,34 @@ sp.addEventListener('change',()=>{
 });
 sc.addEventListener('change',calc);
 
+// タイムライン: 出荷日から着日まで1日ずつ
+function renderTL(tl,sv,ad){
+ tl.innerHTML='';
+ let cur=new Date(sv);const arrD=new Date(ad);
+ while(cur<=arrD){
+  const cs=fm(cur),d=document.createElement('div');
+  d.className='tl-day';
+  const isShip=cs===sv,isArr=cs===ad;
+  if(isShip)d.classList.add('ship');
+  else if(isArr)d.classList.add('arr');
+  else if(cs in H)d.classList.add('hol');
+  else if(we(cs))d.classList.add('off');
+  else d.classList.add('biz');
+  let tag='';
+  if(isShip)tag='<div class="tl-tag st">出荷</div>';
+  else if(isArr)tag='<div class="tl-tag at">着日</div>';
+  else if(cs in H)tag='<div class="tl-tag ht">祝</div>';
+  else if(we(cs))tag='<div class="tl-tag" style="color:#94a3b8">休</div>';
+  d.innerHTML='<div class="tl-md">'+(cur.getMonth()+1)+'/'+cur.getDate()+'</div><div class="tl-dw">'+dw(cs)+'</div>'+tag;
+  tl.appendChild(d);
+  cur.setDate(cur.getDate()+1);
+ }
+}
+
 function calc(){
  const pi=sp.value,ci=sc.value,sv=sd.value;
  const rc=$('rc'),ri=$('ri');
+ $('yc').classList.add('hide');
  if(!pi||!ci||!sv){rc.classList.add('hide');return}
  rc.classList.remove('hide');
  if(!HL){$('lm').classList.remove('hide');ri.classList.add('hide');return}
@@ -237,28 +274,8 @@ function calc(){
  if(!res){$('ad').textContent='エラー';return}
  const pl=pLT(lt);
 
- // タイムライン生成: 出荷日から着日まで
  const shipD=new Date(sv),arrD=new Date(res.date);
- const tl=$('timeline');tl.innerHTML='';
- let cur=new Date(shipD);
- while(cur<=arrD){
-  const cs=fm(cur),d=document.createElement('div');
-  d.className='tl-day';
-  const isShip=cs===sv,isArr=cs===res.date;
-  if(isShip)d.classList.add('ship');
-  else if(isArr)d.classList.add('arr');
-  else if(cs in H)d.classList.add('hol');
-  else if(we(cs))d.classList.add('off');
-  else d.classList.add('biz');
-  let tag='';
-  if(isShip)tag='<div class="tl-tag st">出荷</div>';
-  else if(isArr)tag='<div class="tl-tag at">着日</div>';
-  else if(cs in H)tag='<div class="tl-tag ht">祝</div>';
-  else if(we(cs))tag='<div class="tl-tag" style="color:#94a3b8">休</div>';
-  d.innerHTML='<div class="tl-md">'+(cur.getMonth()+1)+'/'+cur.getDate()+'</div><div class="tl-dw">'+dw(cs)+'</div>'+tag;
-  tl.appendChild(d);
-  cur.setDate(cur.getDate()+1);
- }
+ renderTL($('timeline'),sv,res.date);
 
  // メイン結果
  $('ad').textContent=(arrD.getMonth()+1)+'/'+arrD.getDate();
@@ -305,14 +322,16 @@ function calc(){
  }
 
  // ゆうパック（土日祝も配達するので着日の休日送りなし）
- const yr=YUPACK_LEADTIME.d.find(r=>r[0]==pi&&r[1]===ci),yl=yr&&pLT(yr[2]),yb=$('yp');
- if(!yl){yb.innerHTML='<div class="rc-title">ゆうパック</div><div class="mr-lt">データなし</div>';return}
+ const yr=YUPACK_LEADTIME.d.find(r=>r[0]==pi&&r[1]===ci),yl=yr&&pLT(yr[2]);
+ $('yc').classList.remove('hide');
+ if(!yl){$('ytl').innerHTML='';$('yad').textContent='データなし';$('yaw').textContent='';$('yat').innerHTML='';$('yli').textContent='';return}
  const yd=new Date(sv);yd.setDate(yd.getDate()+yl.d);const ys=fm(yd);
  const yt=yl.t==='AM'?['午前中','am']:yl.t==='PM'?['午後','pm']:['日中着','no'];
- yb.innerHTML='<div class="rc-title">ゆうパック（藤枝郵便局 午後差出）</div>'
-  +'<div class="mr-date">'+(yd.getMonth()+1)+'/'+yd.getDate()+'</div><div class="mr-dow">'+dw(ys)+'曜日</div>'
-  +'<span class="mr-time '+yt[1]+'">'+yt[0]+'</span>'
-  +'<div class="mr-lt">LT: '+yr[2]+'（出荷日+'+yl.d+'日・日本郵便のお届け日数 '+YUPACK_LEADTIME.at+'時点）</div>';
+ renderTL($('ytl'),sv,ys);
+ $('yad').textContent=(yd.getMonth()+1)+'/'+yd.getDate();
+ $('yaw').textContent=dw(ys)+'曜日';
+ $('yat').innerHTML='<span class="mr-time '+yt[1]+'">'+yt[0]+'</span>';
+ $('yli').textContent='LT: '+yr[2]+'（出荷日+'+yl.d+'日・午後差出・日本郵便 '+YUPACK_LEADTIME.at.replace(/-/g,'/')+'時点）';
 }
 
 init();
