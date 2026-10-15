@@ -75,6 +75,10 @@ def reps_for(pref, name):
                 rest = re.sub(r"区$", "", rest)  # 石狩市厚田区 → 町域「厚田〇〇」
                 hit += [t["postal"] for t in towns_of(pref, c) if rest and t["town"].startswith(rest)]
             hit = [min(hit)] if hit else []
+        if not hit and not nm.endswith("郡"):  # 合併で消えた旧町村名（牟礼町→高松市牟礼町）→ 町域名の頭で探す
+            base = re.sub(r"[町村]$", "", nm)
+            hit = [t["postal"] for c in cities.get(pref, {}) for t in towns_of(pref, c) if t["town"].startswith(nm) or (len(base) >= 2 and t["town"].startswith(base))]
+            hit = [min(hit)] if hit else []
         if not hit and head.endswith("市"):  # 区の再編で消えた旧区名（浜松市中区など）→ その市の今の区すべて
             hit = [z for c, z in C.items() if c.startswith(head)]
         out += hit
