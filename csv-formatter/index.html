@@ -3522,9 +3522,9 @@ function applyShipDateToRows(shipDateIso) {
 
 // 1行分の納期チェック（運送会社に応じたリードタイムで着日を出す）。納期を変更したらtrue。
 // 触るのは指定納期（deliveryDate）と黄色の印だけ。運送会社切替時もこれだけを呼ぶ
-// ゆうパックで航空機に載せられない製品の沖縄宛ては船便。実績(2026-09-29・10-07差出のジェット&ディフューザー)で差出日+5日に配達可能
-// shortcut: 実績2件・月火差出のみ。船の曜日で6日かかるなら6にする。沖縄以外（鹿児島の離島等）は未調査
-const YUPACK_SEA_DAYS = { '沖縄県': 5 };
+// ゆうパックで航空機に載せられない製品の沖縄宛ては船便。2026-07〜10のジェット&ディフューザー12件の追跡で、配達は差出日+5〜7日（多くは+6）
+// shortcut: お盆明け(8/17差出)は+7だった。沖縄以外（鹿児島の離島等）は未調査
+const YUPACK_SEA_DAYS = { '沖縄県': 6 };
 function seaLeadTime(lt, r) {
   const sea = YUPACK_SEA_DAYS[r.prefecture];
   if (!lt || !sea || !findProductMaster(r.product)?.航空機搭載不可?.length) return lt;
