@@ -1210,7 +1210,7 @@ const CONFIG = {
         まとめ梱包: 1,
         まとめ梱包の品名記事2: '',
         保険金額: '5',
-        航空機搭載不可: true,  // ゆうパック沖縄宛ては船便になる（下の YUPACK_SEA_DAYS）
+        航空機搭載不可: ['スプレー缶'],  // 理由: 'アルコール' / 'スプレー缶'。空でなければゆうパック沖縄宛ては船便（下の YUPACK_SEA_DAYS）
         ゆうパック: {
           品名1: '抗菌フレグランスジェット  30入', 品名2: 'ruum リードディフューザー 30入',
           品名3: 'リードスティック30包 チラシ30枚',
@@ -1242,7 +1242,7 @@ const CONFIG = {
         まとめ梱包: 1,
         まとめ梱包の品名記事2: '',
         保険金額: '5',
-        航空機搭載不可: true,
+        航空機搭載不可: ['要確認'],  // 送り状は【航空機搭載不可】香水のまま。アルコール度数が分かったら理由を入れる（24%以下ならこの行を消す）
         // 記事・取扱注意はジェット＆ディフューザーと同じ。品名は中身が違うのでこの製品のもの
         ゆうパック: {
           品名1: 'ruumﾘｰﾄﾞﾃﾞｨﾌｭｰｻﾞｰ', 品名2: '(本体100ml・ｽﾃｨｯｸ5本)×30個', 品名3: '',
@@ -3527,7 +3527,7 @@ function applyShipDateToRows(shipDateIso) {
 const YUPACK_SEA_DAYS = { '沖縄県': 5 };
 function seaLeadTime(lt, r) {
   const sea = YUPACK_SEA_DAYS[r.prefecture];
-  if (!lt || !sea || !findProductMaster(r.product)?.航空機搭載不可) return lt;
+  if (!lt || !sea || !findProductMaster(r.product)?.航空機搭載不可?.length) return lt;
   return parseInt(lt) >= sea ? lt : String(sea);
 }
 
