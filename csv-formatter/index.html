@@ -1210,6 +1210,7 @@ const CONFIG = {
         まとめ梱包: 1,
         まとめ梱包の品名記事2: '',
         保険金額: '5',
+        航空機搭載不可: true,  // ゆうパック沖縄宛ては船便になる（下の YUPACK_SEA_DAYS）
         ゆうパック: {
           品名1: '抗菌フレグランスジェット  30入', 品名2: 'ruum リードディフューザー 30入',
           品名3: 'リードスティック30包 チラシ30枚',
@@ -1241,6 +1242,7 @@ const CONFIG = {
         まとめ梱包: 1,
         まとめ梱包の品名記事2: '',
         保険金額: '5',
+        航空機搭載不可: true,
         // 記事・取扱注意はジェット＆ディフューザーと同じ。品名は中身が違うのでこの製品のもの
         ゆうパック: {
           品名1: 'ruumﾘｰﾄﾞﾃﾞｨﾌｭｰｻﾞｰ', 品名2: '(本体100ml・ｽﾃｨｯｸ5本)×30個', 品名3: '',
@@ -3520,13 +3522,23 @@ function applyShipDateToRows(shipDateIso) {
 
 // 1行分の納期チェック（運送会社に応じたリードタイムで着日を出す）。納期を変更したらtrue。
 // 触るのは指定納期（deliveryDate）と黄色の印だけ。運送会社切替時もこれだけを呼ぶ
+// ゆうパックで航空機に載せられない製品の沖縄宛ては船便。実績(2026-09-29・10-07差出のジェット&ディフューザー)で差出日+5日に配達可能
+// shortcut: 実績2件・月火差出のみ。船の曜日で6日かかるなら6にする。沖縄以外（鹿児島の離島等）は未調査
+const YUPACK_SEA_DAYS = { '沖縄県': 5 };
+function seaLeadTime(lt, r) {
+  const sea = YUPACK_SEA_DAYS[r.prefecture];
+  if (!lt || !sea || !findProductMaster(r.product)?.航空機搭載不可) return lt;
+  return parseInt(lt) >= sea ? lt : String(sea);
+}
+
 function recalcRowDelivery(r, shipDateIso) {
   if (!CONFIG.leadTime.enabled) return false;
   if (CONFIG.leadTime.skipIfCarrierSet && r.carrier !== CONFIG.defaultCarrier) return false;  // skipIfCarrierSet=true のときだけ運送会社確定行をスキップ（現在はfalse＝ゆうパックも対象）
   const baseStr = r.deliveryChanged ? r.deliveryDateOrig : r.deliveryDate;
   const due = parseYmd(baseStr);
   const yupack = (r.carrier || '').trim() === 'ゆうパック';
-  const lt = findLeadTime(r.prefecture, r.address, yupack ? YUPACK_LEADTIME : LEADTIME);
+  let lt = findLeadTime(r.prefecture, r.address, yupack ? YUPACK_LEADTIME : LEADTIME);
+  if (yupack) lt = seaLeadTime(lt, r);
   r.ltMissing = !lt;  // 住所から日数が引けない＝納期を確認できていない（画面で知らせる）
   const arrival = due && lt ? calcArrival(shipDateIso, lt, yupack) : null;
   if (arrival && arrival.getTime() > due.getTime()) {
