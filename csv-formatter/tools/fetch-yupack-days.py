@@ -111,3 +111,4 @@ for hp in html_paths:
     assert n == 1, "YUPACK_LEADTIME 行が見つからない: " + hp
     open(hp, "w", encoding="utf-8").write(s2)
 print("書き込み", len(rows), "件", file=sys.stderr)
+# 注意: 2026-10-24に沖縄県の島尻郡・八重山郡の町村別の行（"島尻郡八重瀬町"など）を手で足した。再生成すると消えるので足し直す
