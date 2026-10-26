@@ -74,11 +74,11 @@ Excel VBAマクロ（アドイン用.txt）の置き換え。**index.html 1フ�
 | ⑩ zipcode | 郵便番号自動取得のON/OFF・API | — |
 | ⑪ invoiceCsv | 送り状CSVの列・製品マスタ（荷送人コード/品名記事/まとめ梱包）・固定値 | **新製品の追加時**・品名記事や荷送人コードの修正時・送り状ソフトの取込仕様変更時 |
 
-※ リードタイムデータ本体は `LEADTIME` 定数（`~/seek-public/lead-time.html` 由来、約1500件）。
-データ更新時は lead-time.html の `const D=` 行をコピーして差し替える（手編集しない）。
-※ ゆうパックの日数は `YUPACK_LEADTIME` 定数（福通データと同じ市区町村の並び、藤枝郵便局に午後差出の値。ゆうパックは土日祝も配達するので着日の休日送りはしない）。
+※ リードタイムデータのマスタは `~/seek-public/leadtime-data.js`（2026-10-26〜。福山通運 `LEADTIME`・ゆうパック `YUPACK_LEADTIME`・ゆうパック航空機搭載不可の船便日数 `YUPACK_SEA_DAYS`）。
+出荷ツールとリードタイム検索（lead-time.html）はこのファイルを読むだけで、データを持たない。直すのも新機能で参照するのもこのファイル。
+※ ゆうパックの日数は藤枝郵便局に午後差出の値（福通データと同じ市区町村の並び。土日祝も配達するので着日の休日送りはしない）。
 再生成は `tools/` で（日本郵便「お届け日数を調べる」を市区町村ごとに引く。所要1時間ほど）:
-`/usr/bin/python3 tools/fetch-towns.py towns.json` → `/usr/bin/python3 tools/fetch-yupack-days.py towns.json days.json index.html ../lead-time.html`（lead-time.html のゆうパック欄も同時に更新）
+`/usr/bin/python3 tools/fetch-towns.py towns.json` → `/usr/bin/python3 tools/fetch-yupack-days.py towns.json days.json ../leadtime-data.js`
 （python.org版のpython3は証明書エラーになるので /usr/bin/python3 を使う。towns.json/days.json は作業用でコミットしない）
 
 ## 現在の設定内容（2026-06時点）

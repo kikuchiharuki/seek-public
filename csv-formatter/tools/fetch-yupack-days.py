@@ -1,7 +1,7 @@
 # ゆうパック日数データ作成 ステップ2: 福山通運データ(LEADTIME)と同じ市区町村ごとに、日本郵便「お届け日数を調べる」で日数を引き、
-# index.html の YUPACK_LEADTIME 行を差し替える
-# 使い方: /usr/bin/python3 fetch-yupack-days.py towns.json days.json csv-formatter/index.html lead-time.html
-#   書き込み先htmlは複数指定可（1つ目から福山通運データ LEADTIME を読む）。差出元を変えるときは環境変数 ORIGIN
+# リードタイムのマスタ seek-public/leadtime-data.js の YUPACK_LEADTIME 行を差し替える
+# 使い方: /usr/bin/python3 fetch-yupack-days.py towns.json days.json ../../leadtime-data.js
+#   同じファイルから福山通運データ LEADTIME を読む。差出元を変えるときは環境変数 ORIGIN
 #   towns.json = fetch-towns.py の出力 {"都道府県|市区町村": [郵便番号...]}
 #   days.json  = 問い合わせ結果のキャッシュ {郵便番号: [午前差出, 午後差出]}（途中再開可・再生成時は消してから）
 #   市区町村の代表 = その市区町村で一番小さい郵便番号。「〇〇郡」は配下の町村すべてを引いて一番遅い値（安全側）
@@ -29,10 +29,11 @@ def query(z):
         try:
             req = urllib.request.Request(URL % (ORIGIN, z), headers={"User-Agent": "Mozilla/5.0"})
             s = urllib.request.urlopen(req, timeout=30).read().decode()
-            i0 = s.find('youpack.php">ゆうパック<')
-            if i0 < 0: return None
-            vals = re.findall(r'<div class="data">\s*(.*?)\s*</div>', s[i0:i0 + 3000], re.S)[:2]
-            return [code(html.unescape(v)) or html.unescape(v) for v in vals]
+            # 2026-10にページが /send/domestic/date/index.php に変わった。「ゆうパック」の行の data セル（午前差出・午後差出）を読む
+            row = next((r for r in re.findall(r"<tr>(.*?)</tr>", s, re.S) if ">ゆうパック<" in r), None)
+            if row is None: return None
+            vals = [re.sub(r"\s+", "", html.unescape(re.sub("<[^>]+>", "", v))) for v in re.findall(r'<div class="data">(.*?)</div>', row, re.S)[:2]]
+            return [code(v) or v for v in vals]
         except Exception as e:
             print("retry", z, e, file=sys.stderr); time.sleep(5 * (i + 1))
     return None
@@ -88,6 +89,9 @@ targets = []  # [都道府県index, 市区町村名, [代表郵便番号...]]（
 for r in L["d"]:
     if len(r) > 3 and r[3]: continue
     targets.append([r[0], r[1], reps_for(L["p"][r[0]], r[1])])
+# 福山通運の表に無い・代表郵便番号が引けない市町村（2026-10-26追加）。[都道府県, 名前, [郵便番号...]]
+EXTRA = [["兵庫県", "宍粟市", ["6712500"]], ["北海道", "石狩郡", ["0610200", "0681100"]], ["和歌山県", "東牟婁郡串本町", ["6493500"]], ["和歌山県", "東牟婁郡古座川町", ["6494100"]], ["島根県", "美郷町", ["6960701"]], ["愛知県", "みよし市", ["4700200"]], ["福島県", "東白川郡", ["9635341", "9635661", "9635100", "9635505"]], ["高知県", "梼原町", ["7850600"]], ["高知県", "津野村", ["7850200"]], ["高知県", "津野町", ["7850200"]], ["鹿児島県", "曽於市", ["8994101"]]]
+targets += [[L["p"].index(p), nm, zs] for p, nm, zs in EXTRA]
 miss = [t[:2] for t in targets if not t[2]]
 print("市区町村", len(targets), "郵便番号の見つからない市区町村", len(miss), miss[:30], file=sys.stderr)
 
