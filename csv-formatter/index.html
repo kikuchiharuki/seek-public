@@ -3762,19 +3762,25 @@ function renderSummaryBar(rows, stats) {
   el.innerHTML = html;
 }
 
+// 空欄の代わりに「0」だけが入るファイルがある（例: ニオイしま栓！の建物名など）。数量以外は空欄扱い
+const cellText = (row, idx, key) => {
+  const v = String(row[idx] ?? '').trim();
+  return key !== 'quantity' && /^[0０]$/.test(v) ? '' : v;
+};
+
 function buildMappedData(f) {
   return f.rows.map(row => {
     const mapped = {};
     OUTPUT_COLUMNS.forEach(col => {
       const idx = f.mapping[col.key];
       if (idx !== undefined) {
-        mapped[col.key] = String(row[idx] ?? '').trim();
+        mapped[col.key] = cellText(row, idx, col.key);
       } else {
         mapped[col.key] = '';
       }
     });
 
-    mapped.contactPerson = f.mapping.contactPerson !== undefined ? String(row[f.mapping.contactPerson] ?? '').trim() : '';
+    mapped.contactPerson = f.mapping.contactPerson !== undefined ? cellText(row, f.mapping.contactPerson) : '';
 
     // 電話番号統合: CONFIG.phonePriority の順でデータが入っている最初のものを採用
     mapped.phone1 = '';
@@ -3791,9 +3797,9 @@ function buildMappedData(f) {
       const townIdx = f.mapping.town;
       const blockIdx = f.mapping.block;
       const parts = [];
-      if (cityIdx !== undefined) parts.push(String(row[cityIdx] ?? '').trim());
-      if (townIdx !== undefined) parts.push(String(row[townIdx] ?? '').trim());
-      if (blockIdx !== undefined) parts.push(String(row[blockIdx] ?? '').trim());
+      if (cityIdx !== undefined) parts.push(cellText(row, cityIdx));
+      if (townIdx !== undefined) parts.push(cellText(row, townIdx));
+      if (blockIdx !== undefined) parts.push(cellText(row, blockIdx));
       mapped.address = parts.join('').replace(/[\s　]/g, '');
     }
 
