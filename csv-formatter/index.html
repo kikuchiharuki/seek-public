@@ -670,7 +670,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.83</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.84</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -3772,9 +3772,12 @@ function renderSummaryBar(rows, stats) {
 }
 
 // 空欄の代わりに「0」だけが入るファイルがある（例: ニオイしま栓！の建物名など）。数量以外は空欄扱い
+// 住所系は「-」「ー」など横棒1文字だけのセルも空欄扱い
+const ADDRESS_KEYS = ['prefecture', 'city', 'town', 'block', 'building', 'address'];
 const cellText = (row, idx, key) => {
   const v = String(row[idx] ?? '').trim();
-  return key !== 'quantity' && /^[0０]$/.test(v) ? '' : v;
+  if (key !== 'quantity' && /^[0０]$/.test(v)) return '';
+  return ADDRESS_KEYS.includes(key) && /^[-－ー‐―—ｰ−]$/.test(v) ? '' : v;
 };
 
 function buildMappedData(f) {
@@ -3806,9 +3809,9 @@ function buildMappedData(f) {
       const townIdx = f.mapping.town;
       const blockIdx = f.mapping.block;
       const parts = [];
-      if (cityIdx !== undefined) parts.push(cellText(row, cityIdx));
-      if (townIdx !== undefined) parts.push(cellText(row, townIdx));
-      const block = blockIdx !== undefined ? cellText(row, blockIdx) : '';
+      if (cityIdx !== undefined) parts.push(cellText(row, cityIdx, 'city'));
+      if (townIdx !== undefined) parts.push(cellText(row, townIdx, 'town'));
+      const block = blockIdx !== undefined ? cellText(row, blockIdx, 'block') : '';
       if (block) parts.push(block);
       // 数字同士が直接つながると「61」+「1F」→「611F」のように番地が化けるので「-」を挟む
       mapped.address = parts.map(p => p.replace(/[\s　]/g, ''))
