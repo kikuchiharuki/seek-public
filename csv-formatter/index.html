@@ -670,7 +670,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.82</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.83</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -3813,8 +3813,9 @@ function buildMappedData(f) {
       // 数字同士が直接つながると「61」+「1F」→「611F」のように番地が化けるので「-」を挟む
       mapped.address = parts.map(p => p.replace(/[\s　]/g, ''))
         .reduce((acc, p) => acc + (/[0-9０-９]$/.test(acc) && /^[0-9０-９]/.test(p) ? (/[０-９]$/.test(acc) ? '－' : '-') : '') + p, '');
-      // 番地に数字・ハイフン・空白以外（1Ｆ・建物名など）があれば確認用に印を付ける
-      if (/[^0-9０-９\s　\-－−‐―ー─ｰ–]/.test(block)) mapped.blockWarn = block;
+      // 番地に数字・ハイフン・空白・番地用の漢字以外（1Ｆ・建物名など）があれば確認用に印を付ける
+      // 番地用: 丁目・番地・号・の/之・大字/小字・京都の通名（〇〇通上ル/下ル/東入/西入）・甲乙丙
+      if (/[^0-9０-９\s　\-－−‐―ー─ｰ–番地丁目通字号のノ之大小上下ル入東西南北甲乙丙]/.test(block)) mapped.blockWarn = block;
     }
 
     // 都道府県分割: 結合住所の先頭から47都道府県を検出して分離
