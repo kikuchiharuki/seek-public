@@ -322,7 +322,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
   /* 画面用の青い集計バーは印刷しない（印刷は上のprintSummaryを使う） */
   #summaryBar { display: none !important; }
   .summary-notes { display: none !important; }
-  .lt-missing { box-shadow: none !important; }
+  .lt-missing, .block-warn { box-shadow: none !important; }
   .table-wrapper { overflow: visible; max-height: none; }
   /* テーブルは画面と同じレイアウトのまま、印刷時にzoomで全列を1ページ幅に縮小する
      （Excelの「すべての列を1ページに印刷」と同じ。倍率はbeforeprintでJSが計算） */
@@ -394,6 +394,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 /* 日数データが見つからず納期を確認できなかったセル（画面のみ。印刷では消す） */
 .lt-missing { box-shadow: inset 0 0 0 2px #f39c12; }
+.block-warn { box-shadow: inset 0 0 0 2px #e74c3c; }
 
 /* ── 運送会社（福山通運）休業日バー ── */
 .carrier-holiday-bar {
@@ -669,7 +670,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.81</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.82</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -2901,6 +2902,12 @@ tableWrapper.addEventListener('focusout', e => {
   row[key] = val;
   // 住所・都道府県・建物名を手で直したら住所分割キャッシュを破棄（次の送り状CSV生成時に再分割）
   if (key === 'address' || key === 'prefecture' || key === 'building') delete row._addrParts;
+  // 住所を手で直したら番地の確認済みとして赤枠を消す
+  if (key === 'address' && row.blockWarn) {
+    delete row.blockWarn;
+    td.classList.remove('block-warn');
+    td.removeAttribute('title');
+  }
   // 納期を手で直したら「自動変更」扱いを解除（黄色を消す）
   if (key === 'deliveryDate') {
     row.deliveryChanged = false;
@@ -3755,6 +3762,8 @@ function renderSummaryBar(rows, stats) {
   if (stats.yupack > 0) notes.push(`ゆうパック: ${stats.yupack}件`);
   const ltMissing = rows.filter(r => r.ltMissing && r.shipDate).length;
   if (ltMissing) notes.push(`<span style="box-shadow:inset 0 0 0 2px #f39c12;padding:0 4px;">日数データなし（納期未確認・オレンジ枠）: ${ltMissing}件</span>`);
+  const blockWarn = rows.filter(r => r.blockWarn).length;
+  if (blockWarn) notes.push(`<span style="box-shadow:inset 0 0 0 2px #e74c3c;padding:0 4px;">番地に数字以外あり（要確認・赤枠）: ${blockWarn}件</span>`);
   if (stats.deliveryChanged > 0) notes.push(`<span style="background:${CONFIG.colors.deliveryChanged};padding:0 4px;">納期変更: ${stats.deliveryChanged}件</span>`);
   // 郵便番号取得◯件は表示しない（取得できなかった行は郵便番号セルが赤になる）
   // 注記行（ゆうパック件数など）は印刷時には出さない（.summary-notes を@media printで非表示）
@@ -3799,8 +3808,13 @@ function buildMappedData(f) {
       const parts = [];
       if (cityIdx !== undefined) parts.push(cellText(row, cityIdx));
       if (townIdx !== undefined) parts.push(cellText(row, townIdx));
-      if (blockIdx !== undefined) parts.push(cellText(row, blockIdx));
-      mapped.address = parts.join('').replace(/[\s　]/g, '');
+      const block = blockIdx !== undefined ? cellText(row, blockIdx) : '';
+      if (block) parts.push(block);
+      // 数字同士が直接つながると「61」+「1F」→「611F」のように番地が化けるので「-」を挟む
+      mapped.address = parts.map(p => p.replace(/[\s　]/g, ''))
+        .reduce((acc, p) => acc + (/[0-9０-９]$/.test(acc) && /^[0-9０-９]/.test(p) ? (/[０-９]$/.test(acc) ? '－' : '-') : '') + p, '');
+      // 番地に数字・ハイフン・空白以外（1Ｆ・建物名など）があれば確認用に印を付ける
+      if (/[^0-9０-９\s　\-－−‐―ー─ｰ–]/.test(block)) mapped.blockWarn = block;
     }
 
     // 都道府県分割: 結合住所の先頭から47都道府県を検出して分離
@@ -3934,6 +3948,12 @@ function renderDataRow(row, i, fi) {
     } else if (col.key === 'deliveryDate' && row.ltMissing && row.shipDate) {
       cls += ' lt-missing';
       title = ` title="${escapeHtml(row.carrier || '')}の日数データにこの住所が無いため、納期を確認できていません（手で確認してください）"`;
+    }
+
+    // 番地列に数字以外が入っていた行の住所セル → 赤枠（確認して必要なら手で直す）
+    if (col.key === 'address' && row.blockWarn) {
+      cls += ' block-warn';
+      title = ` title="元データの番地「${escapeHtml(row.blockWarn)}」に数字以外が入っています。建物名などが混ざっていないか確認してください"`;
     }
 
     // ゆうパックの運送会社セル → 赤太字（印刷時も黒文字化せず赤を維持）
