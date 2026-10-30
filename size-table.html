@@ -70,12 +70,12 @@ button:hover{border-color:var(--pri2)}
     <input type="text" id="title" value="サイズ表(単位cm)" aria-label="タイトル">
     <label>背景 <input type="color" id="titleBg" value="#009900"></label>
     <label>文字 <input type="color" id="titleFg" value="#ffffff"></label>
-    <label>枠の高さ <select id="titleH"><option value="">自動</option><option>24</option><option>28</option><option>32</option><option>36</option><option>40</option><option>48</option></select> px</label>
+    <label>枠の高さ <input type="number" id="titleH" min="0" step="2" placeholder="自動"> px</label>
    </div>
    <b>表</b>
    <div>
     <label>背景 <input type="color" id="tableBg" value="#ece9d8"></label>
-    <label>文字サイズ <select id="size"><option>1.5</option><option selected>2</option><option>2.5</option><option>3</option><option>3.5</option><option>4</option></select></label>
+    <label>文字サイズ <input type="number" id="size" min="1.4" max="4" step="0.2" value="2"></label>
     <label>余白 <input type="number" id="pad" min="0" max="20" value="5"> px</label>
    </div>
    <b>枠線</b>
@@ -106,7 +106,8 @@ let data = [
  ['袖丈','31','35.3','39','42.8','46.5','50.3'],
  ['背肩幅','28','30.5','32','33.5','35','36.5'],
 ];
-const FONT_PX = {'1.5':11.5,'2.5':14.5,'3.5':17}; // size1=10px,2=13px,3=16px,4=18px の中間
+const PX = [0,10,13,16,18]; // font size 1〜4 の実際の大きさ
+const fontPx = v => { const i = Math.min(3, Math.floor(v)); return +(PX[i] + (PX[i+1]-PX[i])*(v-i)).toFixed(1); };
 const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 function drawGrid(){
@@ -117,7 +118,7 @@ function drawGrid(){
 function makeCode(){
  const cols = Math.max(...data.map(r=>r.length));
  // font size は整数しか効かないので、半端な値は近い整数＋px指定で出す（px指定が消されても整数側で表示される）
- const v = $('size').value, sz = Number.isInteger(+v) ? `"${v}"` : `"${Math.round(+v)}" style="font-size:${FONT_PX[v]}px"`;
+ const v = Math.min(4, Math.max(1, +$('size').value || 2)), sz = Number.isInteger(v) ? `"${v}"` : `"${Math.round(v)}" style="font-size:${fontPx(v)}px"`;
  // frame="void" rules="all" で外枠なし・内側の罫線だけ
  const bd = $('border').checked ? ` border="1" frame="void" rules="all" cellspacing="0" bordercolor="${$('borderColor').value}"` : '';
  const p = Math.max(0, parseInt($('pad').value) || 0), pad = ` cellpadding="${p}"`;
