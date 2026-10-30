@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>サイズ表作成</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
+/* プレビューは出品先と同じ見え方にするため、リセットを掛けない（cellpaddingが効かなくなる） */
+:where(:not(#preview *)){box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#f5f4f0;--card:#fff;--pri:#2d5016;--pri2:#4a7c28;--sub:#888;--bdr:#e0ddd8;--rad:12px}
 body{font-family:-apple-system,"Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif;background:var(--bg);color:#1a1a1a;padding:20px 16px}
 h1{font-size:18px;color:var(--pri);margin-bottom:14px}
@@ -15,10 +16,16 @@ h1 a{font-size:12px;font-weight:400;color:var(--sub);margin-left:10px}
 section{background:var(--card);border-radius:var(--rad);padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);min-width:0}
 h2{font-size:14px;color:var(--pri);margin:0 0 8px}
 h2:not(:first-child){margin-top:18px}
-.opts{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:13px}
+.opts{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center;font-size:13px}
+.opts>b{font-size:12px;color:var(--sub);font-weight:600}
+.opts>div{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
 .opts label{display:flex;align-items:center;gap:6px}
-.opts input[type=text]{width:12em;padding:4px 6px;border:1px solid var(--bdr);border-radius:6px}
+.opts input[type=text],.opts input[type=number]{padding:4px 6px;border:1px solid var(--bdr);border-radius:6px}
+.opts input[type=text]{width:12em}
+.opts input[type=number]{width:4.5em}
+.opts input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--bdr);border-radius:6px;background:none;cursor:pointer}
 .opts select{padding:3px}
+.opts label:has(:disabled){opacity:.4}
 #grid{border-collapse:collapse;font-size:13px}
 #grid td{border:1px solid #bbb;min-width:48px;padding:4px 6px;outline:none}
 #grid td:focus{background:#fffbe0}
@@ -52,20 +59,30 @@ button:hover{border-color:var(--pri2)}
   </div>
   <div class="btns">
    <button data-act="addRow">＋行</button><button data-act="delRow">－行</button>
-   <button data-act="clear">中身を空にする</button>
+   <button data-act="clear" style="margin-left:auto">中身を空にする</button>
   </div>
   <p class="hint">セルを直接書き換えられます。Excelの範囲をコピーして左上のセルに貼り付けると、表ごと入ります。</p>
 
   <h2>見た目</h2>
   <div class="opts">
-   <label>タイトル <input type="text" id="title" value="サイズ表(単位cm)"></label>
-   <label>タイトル背景 <input type="color" id="titleBg" value="#009900"></label>
-   <label>タイトル文字 <input type="color" id="titleFg" value="#ffffff"></label>
-   <label>タイトルの高さ <input type="number" id="titleH" min="0" step="2" placeholder="自動" style="width:5em;padding:4px 6px;border:1px solid var(--bdr);border-radius:6px"> px</label>
-   <label>表の背景 <input type="color" id="tableBg" value="#ece9d8"></label>
-   <label>文字サイズ <select id="size"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
-   <label><input type="checkbox" id="border"> 枠線</label>
-   <label>枠線の色 <input type="color" id="borderColor" value="#999999"></label>
+   <b>タイトル</b>
+   <div>
+    <input type="text" id="title" value="サイズ表(単位cm)" aria-label="タイトル">
+    <label>背景 <input type="color" id="titleBg" value="#009900"></label>
+    <label>文字 <input type="color" id="titleFg" value="#ffffff"></label>
+    <label>高さ <input type="number" id="titleH" min="0" step="2" placeholder="自動"> px</label>
+   </div>
+   <b>表</b>
+   <div>
+    <label>背景 <input type="color" id="tableBg" value="#ece9d8"></label>
+    <label>文字サイズ <select id="size"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
+    <label>余白 <input type="number" id="pad" min="0" max="20" value="5"> px</label>
+   </div>
+   <b>枠線</b>
+   <div>
+    <label><input type="checkbox" id="border"> 内側に線を引く</label>
+    <label>色 <input type="color" id="borderColor" value="#999999" disabled></label>
+   </div>
   </div>
  </section>
  <section>
@@ -100,14 +117,15 @@ function makeCode(){
  const cols = Math.max(...data.map(r=>r.length));
  const sz = $('size').value;
  // frame="void" rules="all" で外枠なし・内側の罫線だけ
- const bd = $('border').checked ? ` border="1" frame="void" rules="all" cellspacing="0" cellpadding="3" bordercolor="${$('borderColor').value}"` : '';
+ const bd = $('border').checked ? ` border="1" frame="void" rules="all" cellspacing="0" bordercolor="${$('borderColor').value}"` : '';
+ const pad = ` cellpadding="${Math.max(0, parseInt($('pad').value) || 0)}"`;
  const ht = parseInt($('titleH').value) > 0 ? ` height="${parseInt($('titleH').value)}"` : '';
- let h = `<table width="100%" bgcolor="${$('tableBg').value}"${bd}><tbody>`;
+ let h = `<table width="100%" bgcolor="${$('tableBg').value}"${bd}${pad}><tbody>`;
  h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}"${ht} align="center" style="font-size:x-small"><font color="${$('titleFg').value}" size="-3">${esc($('title').value)}</font></th></tr>`;
  for (const r of data) h += '<tr>'+r.map(c=>`<td><font size="${sz}">${esc(c)}</font></td>`).join('')+'</tr>';
  return h + '</tbody></table>';
 }
-function update(){ const c = makeCode(); $('code').value = c; $('preview').innerHTML = c; }
+function update(){ $('borderColor').disabled = !$('border').checked; const c = makeCode(); $('code').value = c; $('preview').innerHTML = c; }
 
 grid.addEventListener('input', e => { const t=e.target; data[t.dataset.r][t.dataset.c] = t.innerText.trim(); update(); });
 grid.addEventListener('paste', e => {
@@ -134,7 +152,7 @@ document.querySelector('.cols').addEventListener('click', e => {
  if (a==='clear') data = data.map((r,i)=>r.map((c,j)=>i&&j?'':c)); // 見出しの行・列は残す
  drawGrid(); update();
 });
-['title','titleBg','titleFg','titleH','tableBg','size','border','borderColor'].forEach(id=>$(id).addEventListener('input', update));
+['title','titleBg','titleFg','titleH','tableBg','size','pad','border','borderColor'].forEach(id=>$(id).addEventListener('input', update));
 $('copy').addEventListener('click', async () => {
  try { await navigator.clipboard.writeText($('code').value); }
  catch { $('code').select(); document.execCommand('copy'); }
