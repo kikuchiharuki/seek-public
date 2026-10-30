@@ -83,11 +83,12 @@ function drawGrid(){
  grid.innerHTML = data.map((r,i)=>'<tr>'+r.map((c,j)=>`<td contenteditable data-r="${i}" data-c="${j}">${esc(c)}</td>`).join('')+'</tr>').join('');
 }
 // 出品先でCSSが消えることがあるため、元の出品と同じ bgcolor / font タグ形式で出す
+// th の font-size は、小さい文字が th の標準サイズの行の下側に寄るのを防ぐため（消されても見た目が少し下がるだけ）
 function makeCode(){
  const cols = Math.max(...data.map(r=>r.length));
  const sz = $('size').value;
  let h = `<table width="100%" bgcolor="${$('tableBg').value}"><tbody>`;
- h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}" align="center"><font color="${$('titleFg').value}" size="-3">${esc($('title').value)}</font></th></tr>`;
+ h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}" align="center" style="font-size:x-small"><font color="${$('titleFg').value}" size="-3">${esc($('title').value)}</font></th></tr>`;
  for (const r of data) h += '<tr>'+r.map(c=>`<td><font size="${sz}">${esc(c)}</font></td>`).join('')+'</tr>';
  return h + '</tbody></table>';
 }
@@ -115,7 +116,7 @@ document.querySelector('.btns').addEventListener('click', e => {
  if (a==='delRow' && data.length>1) data.pop();
  if (a==='addCol') data.forEach(r=>r.push(''));
  if (a==='delCol' && data[0].length>1) data.forEach(r=>r.pop());
- if (a==='clear') data = data.map(r=>r.map(()=>''));
+ if (a==='clear') data = data.map((r,i)=>r.map((c,j)=>i&&j?'':c)); // 見出しの行・列は残す
  drawGrid(); update();
 });
 ['title','titleBg','titleFg','tableBg','size'].forEach(id=>$(id).addEventListener('input', update));
