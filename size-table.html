@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>サイズ表作成</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f5f4f0;--card:#fff;--pri:#2d5016;--pri2:#4a7c28;--sub:#888;--bdr:#e0ddd8;--rad:12px}
+body{font-family:-apple-system,"Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif;background:var(--bg);color:#1a1a1a;padding:20px 16px}
+h1{font-size:18px;color:var(--pri);margin-bottom:14px}
+h1 a{font-size:12px;font-weight:400;color:var(--sub);margin-left:10px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;max-width:1300px}
+@media(max-width:860px){.cols{grid-template-columns:1fr}}
+section{background:var(--card);border-radius:var(--rad);padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);min-width:0}
+h2{font-size:14px;color:var(--pri);margin:0 0 8px}
+h2:not(:first-child){margin-top:18px}
+.opts{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:13px}
+.opts label{display:flex;align-items:center;gap:6px}
+.opts input[type=text]{width:12em;padding:4px 6px;border:1px solid var(--bdr);border-radius:6px}
+.opts select{padding:3px}
+#grid{border-collapse:collapse;font-size:13px}
+#grid td{border:1px solid #bbb;min-width:48px;padding:4px 6px;outline:none}
+#grid td:focus{background:#fffbe0}
+#grid tr:first-child td,#grid td:first-child{background:#f3f3f3}
+.gridwrap{overflow-x:auto}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+button{padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;background:#fff;cursor:pointer;font-size:12px}
+button:hover{border-color:var(--pri2)}
+#copy{background:var(--pri2);color:#fff;border-color:var(--pri2);font-size:13px;padding:6px 14px}
+.hint{font-size:12px;color:var(--sub);margin-top:6px}
+#preview{overflow-x:auto}
+#code{width:100%;height:340px;font-family:Menlo,Consolas,monospace;font-size:12px;padding:8px;border:1px solid var(--bdr);border-radius:6px;resize:vertical}
+.row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.row h2{margin:0}
+#msg{font-size:12px;color:var(--pri2);margin-left:8px}
+</style>
+</head>
+<body>
+<h1>サイズ表作成<a href="index.html">← ツール一覧</a></h1>
+<div class="cols">
+ <section>
+  <h2>表の中身</h2>
+  <div class="gridwrap"><table id="grid"></table></div>
+  <div class="btns">
+   <button data-act="addRow">＋行</button><button data-act="delRow">－行</button>
+   <button data-act="addCol">＋列</button><button data-act="delCol">－列</button>
+   <button data-act="clear">中身を空にする</button>
+  </div>
+  <p class="hint">セルを直接書き換えられます。Excelの範囲をコピーして左上のセルに貼り付けると、表ごと入ります。</p>
+
+  <h2>見た目</h2>
+  <div class="opts">
+   <label>タイトル <input type="text" id="title" value="サイズ表(単位cm)"></label>
+   <label>タイトル背景 <input type="color" id="titleBg" value="#009900"></label>
+   <label>タイトル文字 <input type="color" id="titleFg" value="#ffffff"></label>
+   <label>表の背景 <input type="color" id="tableBg" value="#ece9d8"></label>
+   <label>文字サイズ <select id="size"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
+  </div>
+
+  <h2>プレビュー</h2>
+  <div id="preview"></div>
+ </section>
+ <section>
+  <div class="row"><h2>コード</h2><div><span id="msg"></span> <button id="copy">コピー</button></div></div>
+  <textarea id="code" readonly></textarea>
+  <p class="hint">出品ページの説明欄（HTML可の欄）に貼り付けてください。</p>
+ </section>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const grid = $('grid');
+let data = [
+ ['参考寸法','90cm','100cm','110cm','120cm','130cm','140cm'],
+ ['着丈','40','45.5','48.5','52.5','56','60'],
+ ['胸囲','72','76','80','84','88','92'],
+ ['袖丈','31','35.3','39','42.8','46.5','50.3'],
+ ['背肩幅','28','30.5','32','33.5','35','36.5'],
+];
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function drawGrid(){
+ grid.innerHTML = data.map((r,i)=>'<tr>'+r.map((c,j)=>`<td contenteditable data-r="${i}" data-c="${j}">${esc(c)}</td>`).join('')+'</tr>').join('');
+}
+// 出品先でCSSが消えることがあるため、元の出品と同じ bgcolor / font タグ形式で出す
+function makeCode(){
+ const cols = Math.max(...data.map(r=>r.length));
+ const sz = $('size').value;
+ let h = `<table width="100%" bgcolor="${$('tableBg').value}"><tbody>`;
+ h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}" align="center"><font color="${$('titleFg').value}" size="-3">${esc($('title').value)}</font></th></tr>`;
+ for (const r of data) h += '<tr>'+r.map(c=>`<td><font size="${sz}">${esc(c)}</font></td>`).join('')+'</tr>';
+ return h + '</tbody></table>';
+}
+function update(){ const c = makeCode(); $('code').value = c; $('preview').innerHTML = c; }
+
+grid.addEventListener('input', e => { const t=e.target; data[t.dataset.r][t.dataset.c] = t.innerText.trim(); update(); });
+grid.addEventListener('paste', e => {
+ const txt = e.clipboardData.getData('text/plain');
+ if (!/[\t\n]/.test(txt.trim())) { e.preventDefault(); document.execCommand('insertText', false, txt.trim()); return; }
+ e.preventDefault();
+ const r0 = +e.target.dataset.r, c0 = +e.target.dataset.c;
+ txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n').forEach((line,i)=>{
+  line.split('\t').forEach((v,j)=>{
+   const r=r0+i, c=c0+j;
+   while (data.length<=r) data.push(Array(data[0].length).fill(''));
+   if (c>=data[0].length) data.forEach(row=>{ while(row.length<=c) row.push(''); });
+   data[r][c] = v.trim();
+  });
+ });
+ drawGrid(); update();
+});
+document.querySelector('.btns').addEventListener('click', e => {
+ const a = e.target.dataset.act; if (!a) return;
+ if (a==='addRow') data.push(Array(data[0].length).fill(''));
+ if (a==='delRow' && data.length>1) data.pop();
+ if (a==='addCol') data.forEach(r=>r.push(''));
+ if (a==='delCol' && data[0].length>1) data.forEach(r=>r.pop());
+ if (a==='clear') data = data.map(r=>r.map(()=>''));
+ drawGrid(); update();
+});
+['title','titleBg','titleFg','tableBg','size'].forEach(id=>$(id).addEventListener('input', update));
+$('copy').addEventListener('click', async () => {
+ try { await navigator.clipboard.writeText($('code').value); }
+ catch { $('code').select(); document.execCommand('copy'); }
+ $('msg').textContent = 'コピーしました'; setTimeout(()=>$('msg').textContent='', 2000);
+});
+drawGrid(); update();
+</script>
+</body>
+</html>
