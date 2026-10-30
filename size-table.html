@@ -39,8 +39,9 @@ h2:not(:first-child){margin-top:18px}
 .edit .gridwrap{min-width:0}
 .colbtns{flex-direction:column;margin-top:0;flex-shrink:0}
 .left{display:flex;flex-direction:column;gap:16px;min-width:0}
-.right{position:sticky;top:16px;align-self:start} /* 左で編集中もプレビューが見えるように */
-@media(max-width:860px){.right{position:static}}
+/* 右列は左列と同じ高さまで伸ばし、コード欄で残りを埋めて下端をそろえる */
+.right>section:last-child{flex:1;display:flex;flex-direction:column}
+.right #code{flex:1;min-height:180px}
 button{padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;background:#fff;cursor:pointer;font-size:12px}
 button:hover{border-color:var(--pri2)}
 #copy{background:var(--pri2);color:#fff;border-color:var(--pri2);font-size:13px;padding:6px 14px;min-width:8.5em;transition:transform .08s,background .15s}
@@ -61,7 +62,7 @@ button:hover{border-color:var(--pri2)}
 <div class="cols">
  <div class="left">
  <section>
-  <div class="row" style="align-items:last baseline"><h2>表の中身</h2><p class="hint" style="margin:0">セルは直接書き換えられます。Excelの範囲は、タイトルのすぐ下の左端のセルに貼ると表ごと入ります。</p></div>
+  <div class="row"><h2>表の中身</h2><p class="hint" style="margin:0">セルは直接書き換えられます。Excelの範囲は、タイトルのすぐ下の左端のセルに貼ると表ごと入ります。</p></div>
   <div class="edit">
    <div class="gridwrap"><input type="text" id="title" class="titlein" size="1" value="サイズ表(単位cm)" aria-label="タイトル"><table id="grid"></table></div>
    <div class="btns colbtns"><button data-act="addCol">＋列</button><button data-act="delCol">－列</button></div>
