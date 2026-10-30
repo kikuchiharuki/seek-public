@@ -36,6 +36,8 @@ h2:not(:first-child){margin-top:18px}
 .edit .gridwrap{min-width:0}
 .colbtns{flex-direction:column;margin-top:0;flex-shrink:0}
 .left{display:flex;flex-direction:column;gap:16px;min-width:0}
+.right{position:sticky;top:16px;align-self:start} /* 左で編集中もプレビューが見えるように */
+@media(max-width:860px){.right{position:static}}
 button{padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;background:#fff;cursor:pointer;font-size:12px}
 button:hover{border-color:var(--pri2)}
 #copy{background:var(--pri2);color:#fff;border-color:var(--pri2);font-size:13px;padding:6px 14px;min-width:8.5em;transition:transform .08s,background .15s}
@@ -45,7 +47,7 @@ button:hover{border-color:var(--pri2)}
 @keyframes flash{from{background:#e3f0d6}to{background:#fff}}
 .hint{font-size:12px;color:var(--sub);margin-top:6px}
 #preview{overflow-x:auto}
-#code{width:100%;height:340px;font-family:Menlo,Consolas,monospace;font-size:12px;padding:8px;border:1px solid var(--bdr);border-radius:6px;resize:vertical}
+#code{width:100%;height:180px;font-family:Menlo,Consolas,monospace;font-size:12px;padding:8px;border:1px solid var(--bdr);border-radius:6px;resize:vertical}
 .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .row h2{margin:0}
 </style>
@@ -85,16 +87,18 @@ button:hover{border-color:var(--pri2)}
    </fieldset>
   </div>
  </section>
+ </div>
+ <div class="left right">
  <section>
   <h2>プレビュー</h2>
   <div id="preview"></div>
  </section>
- </div>
  <section>
   <div class="row"><h2>コード</h2><button id="copy">コピー</button></div>
   <textarea id="code" readonly></textarea>
   <p class="hint">出品ページの説明欄（HTML可の欄）に貼り付けてください。</p>
  </section>
+ </div>
 </div>
 <script>
 const $ = id => document.getElementById(id);
