@@ -81,6 +81,12 @@ button:hover{border-color:var(--pri2)}
     <label>文字サイズ <input type="number" id="size" min="1.4" max="4" step="0.2" value="2"></label>
     <label>上下余白 <input type="number" id="pad" min="0" max="20" value="5"> px</label>
    </fieldset>
+   <fieldset><legend>見出し</legend>
+    <label>列見出し（1行目）背景 <input type="color" id="colBg" value="#ece9d8"></label>
+    <label>文字 <input type="color" id="colFg" value="#000000"></label>
+    <label>行見出し（1列目）背景 <input type="color" id="rowBg" value="#ece9d8"></label>
+    <label>文字 <input type="color" id="rowFg" value="#000000"></label>
+   </fieldset>
    <fieldset><legend>枠線</legend>
     <label><input type="checkbox" id="border"> 内側に線を引く</label>
     <label>色 <input type="color" id="borderColor" value="#999999" disabled></label>
@@ -130,7 +136,12 @@ function makeCode(){
  const ht = +$('titleH').value > 0 ? ` height="${Math.max(0, $('titleH').value - 2*p)}"` : '';
  let h = `<table width="100%" bgcolor="${$('tableBg').value}"${bd}${pad}><tbody>`;
  h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}"${ht} align="center" style="font-size:x-small"><font color="${$('titleFg').value}" size="-3">${esc($('title').value)}</font></th></tr>`;
- for (const r of data) h += '<tr>'+r.map(c=>`<td><font size=${sz}>${esc(c)}</font></td>`).join('')+'</tr>';
+ // 見出しの色は、触ったものだけ出す（触っていなければ表の背景・黒文字のまま＝元の形）
+ const set = id => $(id).dataset.touched ? $(id).value : '';
+ const cell = (c, bg, fg) => `<td${bg ? ` bgcolor="${bg}"` : ''}><font${fg ? ` color="${fg}"` : ''} size=${sz}>${esc(c)}</font></td>`;
+ data.forEach((r,i) => {
+  h += '<tr>'+r.map((c,j) => i===0 ? cell(c, set('colBg'), set('colFg')) : j===0 ? cell(c, set('rowBg'), set('rowFg')) : cell(c)).join('')+'</tr>';
+ });
  return h + '</tbody></table>';
 }
 function update(){ $('borderColor').disabled = !$('border').checked; const c = makeCode(); $('code').value = c; $('preview').innerHTML = c; }
@@ -161,6 +172,7 @@ document.querySelector('.cols').addEventListener('click', e => {
  drawGrid(); update();
 });
 ['title','titleBg','titleFg','titleH','tableBg','size','pad','border','borderColor'].forEach(id=>$(id).addEventListener('input', update));
+['colBg','colFg','rowBg','rowFg'].forEach(id=>$(id).addEventListener('input', e=>{ e.target.dataset.touched = 1; update(); }));
 $('copy').addEventListener('click', async () => {
  try { await navigator.clipboard.writeText($('code').value); }
  catch { $('code').select(); document.execCommand('copy'); }
