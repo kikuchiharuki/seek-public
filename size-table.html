@@ -16,9 +16,9 @@ h1 a{font-size:12px;font-weight:400;color:var(--sub);margin-left:10px}
 section{background:var(--card);border-radius:var(--rad);padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);min-width:0}
 h2{font-size:14px;color:var(--pri);margin:0 0 8px}
 h2:not(:first-child){margin-top:18px}
-.opts{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center;font-size:13px}
-.opts>b{font-size:12px;color:var(--sub);font-weight:600}
-.opts>div{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.opts{display:flex;flex-direction:column;gap:12px;font-size:13px}
+.opts fieldset{border:1px solid var(--bdr);border-radius:8px;background:#faf9f6;padding:10px 12px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.opts legend{font-size:12px;font-weight:700;color:var(--pri);padding:0 6px;margin-left:-4px}
 .opts label{display:flex;align-items:center;gap:6px}
 .opts input[type=text],.opts input[type=number]{padding:4px 6px;border:1px solid var(--bdr);border-radius:6px}
 .opts input[type=text]{width:12em}
@@ -65,24 +65,21 @@ button:hover{border-color:var(--pri2)}
 
   <h2>見た目</h2>
   <div class="opts">
-   <b>タイトル</b>
-   <div>
+   <fieldset><legend>タイトル</legend>
     <input type="text" id="title" value="サイズ表(単位cm)" aria-label="タイトル">
     <label>背景 <input type="color" id="titleBg" value="#009900"></label>
     <label>文字 <input type="color" id="titleFg" value="#ffffff"></label>
     <label>枠の高さ <input type="number" id="titleH" min="0" step="2" placeholder="自動"> px</label>
-   </div>
-   <b>表</b>
-   <div>
+   </fieldset>
+   <fieldset><legend>表</legend>
     <label>背景 <input type="color" id="tableBg" value="#ece9d8"></label>
     <label>文字サイズ <input type="number" id="size" min="1.4" max="4" step="0.2" value="2"></label>
     <label>上下余白 <input type="number" id="pad" min="0" max="20" value="5"> px</label>
-   </div>
-   <b>枠線</b>
-   <div>
+   </fieldset>
+   <fieldset><legend>枠線</legend>
     <label><input type="checkbox" id="border"> 内側に線を引く</label>
     <label>色 <input type="color" id="borderColor" value="#999999" disabled></label>
-   </div>
+   </fieldset>
   </div>
  </section>
  <section>
