@@ -61,6 +61,7 @@ button:hover{border-color:var(--pri2)}
    <label>タイトル <input type="text" id="title" value="サイズ表(単位cm)"></label>
    <label>タイトル背景 <input type="color" id="titleBg" value="#009900"></label>
    <label>タイトル文字 <input type="color" id="titleFg" value="#ffffff"></label>
+   <label>タイトルの高さ <input type="number" id="titleH" min="0" step="2" placeholder="自動" style="width:5em;padding:4px 6px;border:1px solid var(--bdr);border-radius:6px"> px</label>
    <label>表の背景 <input type="color" id="tableBg" value="#ece9d8"></label>
    <label>文字サイズ <select id="size"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
    <label><input type="checkbox" id="border"> 枠線</label>
@@ -98,9 +99,11 @@ function drawGrid(){
 function makeCode(){
  const cols = Math.max(...data.map(r=>r.length));
  const sz = $('size').value;
- const bd = $('border').checked ? ` border="1" cellspacing="0" cellpadding="3" bordercolor="${$('borderColor').value}"` : '';
+ // frame="void" rules="all" で外枠なし・内側の罫線だけ
+ const bd = $('border').checked ? ` border="1" frame="void" rules="all" cellspacing="0" cellpadding="3" bordercolor="${$('borderColor').value}"` : '';
+ const ht = parseInt($('titleH').value) > 0 ? ` height="${parseInt($('titleH').value)}"` : '';
  let h = `<table width="100%" bgcolor="${$('tableBg').value}"${bd}><tbody>`;
- h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}" align="center" style="font-size:x-small"><font color="${$('titleFg').value}" size="-3">${esc($('title').value)}</font></th></tr>`;
+ h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}"${ht} align="center" style="font-size:x-small"><font color="${$('titleFg').value}" size="-3">${esc($('title').value)}</font></th></tr>`;
  for (const r of data) h += '<tr>'+r.map(c=>`<td><font size="${sz}">${esc(c)}</font></td>`).join('')+'</tr>';
  return h + '</tbody></table>';
 }
@@ -131,7 +134,7 @@ document.querySelector('.cols').addEventListener('click', e => {
  if (a==='clear') data = data.map((r,i)=>r.map((c,j)=>i&&j?'':c)); // 見出しの行・列は残す
  drawGrid(); update();
 });
-['title','titleBg','titleFg','tableBg','size','border','borderColor'].forEach(id=>$(id).addEventListener('input', update));
+['title','titleBg','titleFg','titleH','tableBg','size','border','borderColor'].forEach(id=>$(id).addEventListener('input', update));
 $('copy').addEventListener('click', async () => {
  try { await navigator.clipboard.writeText($('code').value); }
  catch { $('code').select(); document.execCommand('copy'); }
