@@ -25,6 +25,10 @@ h2:not(:first-child){margin-top:18px}
 #grid tr:first-child td,#grid td:first-child{background:#f3f3f3}
 .gridwrap{overflow-x:auto}
 .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.edit{display:flex;align-items:flex-start;gap:8px}
+.edit .gridwrap{min-width:0}
+.colbtns{flex-direction:column;margin-top:0;flex-shrink:0}
+.left{display:flex;flex-direction:column;gap:16px;min-width:0}
 button{padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;background:#fff;cursor:pointer;font-size:12px}
 button:hover{border-color:var(--pri2)}
 #copy{background:var(--pri2);color:#fff;border-color:var(--pri2);font-size:13px;padding:6px 14px}
@@ -39,12 +43,15 @@ button:hover{border-color:var(--pri2)}
 <body>
 <h1>サイズ表作成<a href="index.html">← ツール一覧</a></h1>
 <div class="cols">
+ <div class="left">
  <section>
   <h2>表の中身</h2>
-  <div class="gridwrap"><table id="grid"></table></div>
+  <div class="edit">
+   <div class="gridwrap"><table id="grid"></table></div>
+   <div class="btns colbtns"><button data-act="addCol">＋列</button><button data-act="delCol">－列</button></div>
+  </div>
   <div class="btns">
    <button data-act="addRow">＋行</button><button data-act="delRow">－行</button>
-   <button data-act="addCol">＋列</button><button data-act="delCol">－列</button>
    <button data-act="clear">中身を空にする</button>
   </div>
   <p class="hint">セルを直接書き換えられます。Excelの範囲をコピーして左上のセルに貼り付けると、表ごと入ります。</p>
@@ -56,11 +63,15 @@ button:hover{border-color:var(--pri2)}
    <label>タイトル文字 <input type="color" id="titleFg" value="#ffffff"></label>
    <label>表の背景 <input type="color" id="tableBg" value="#ece9d8"></label>
    <label>文字サイズ <select id="size"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
+   <label><input type="checkbox" id="border"> 枠線</label>
+   <label>枠線の色 <input type="color" id="borderColor" value="#999999"></label>
   </div>
-
+ </section>
+ <section>
   <h2>プレビュー</h2>
   <div id="preview"></div>
  </section>
+ </div>
  <section>
   <div class="row"><h2>コード</h2><div><span id="msg"></span> <button id="copy">コピー</button></div></div>
   <textarea id="code" readonly></textarea>
@@ -87,7 +98,8 @@ function drawGrid(){
 function makeCode(){
  const cols = Math.max(...data.map(r=>r.length));
  const sz = $('size').value;
- let h = `<table width="100%" bgcolor="${$('tableBg').value}"><tbody>`;
+ const bd = $('border').checked ? ` border="1" cellspacing="0" cellpadding="3" bordercolor="${$('borderColor').value}"` : '';
+ let h = `<table width="100%" bgcolor="${$('tableBg').value}"${bd}><tbody>`;
  h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}" align="center" style="font-size:x-small"><font color="${$('titleFg').value}" size="-3">${esc($('title').value)}</font></th></tr>`;
  for (const r of data) h += '<tr>'+r.map(c=>`<td><font size="${sz}">${esc(c)}</font></td>`).join('')+'</tr>';
  return h + '</tbody></table>';
@@ -110,7 +122,7 @@ grid.addEventListener('paste', e => {
  });
  drawGrid(); update();
 });
-document.querySelector('.btns').addEventListener('click', e => {
+document.querySelector('.cols').addEventListener('click', e => {
  const a = e.target.dataset.act; if (!a) return;
  if (a==='addRow') data.push(Array(data[0].length).fill(''));
  if (a==='delRow' && data.length>1) data.pop();
@@ -119,7 +131,7 @@ document.querySelector('.btns').addEventListener('click', e => {
  if (a==='clear') data = data.map((r,i)=>r.map((c,j)=>i&&j?'':c)); // 見出しの行・列は残す
  drawGrid(); update();
 });
-['title','titleBg','titleFg','tableBg','size'].forEach(id=>$(id).addEventListener('input', update));
+['title','titleBg','titleFg','tableBg','size','border','borderColor'].forEach(id=>$(id).addEventListener('input', update));
 $('copy').addEventListener('click', async () => {
  try { await navigator.clipboard.writeText($('code').value); }
  catch { $('code').select(); document.execCommand('copy'); }
