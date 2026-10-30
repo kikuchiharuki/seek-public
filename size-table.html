@@ -51,7 +51,8 @@ button:hover{border-color:var(--pri2)}
 .hint{font-size:12px;color:var(--sub);margin-top:6px}
 #preview{overflow-x:auto}
 #code{width:100%;height:180px;font-family:Menlo,Consolas,monospace;font-size:12px;padding:8px;border:1px solid var(--bdr);border-radius:6px;resize:vertical}
-.row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.row h2{flex-shrink:0}
 .row h2{margin:0}
 </style>
 </head>
@@ -60,7 +61,7 @@ button:hover{border-color:var(--pri2)}
 <div class="cols">
  <div class="left">
  <section>
-  <h2>表の中身</h2>
+  <div class="row"><h2>表の中身</h2><p class="hint" style="margin:0">セルは直接書き換えられます。Excelの範囲は、タイトルのすぐ下の左端のセルに貼ると表ごと入ります。</p></div>
   <div class="edit">
    <div class="gridwrap"><input type="text" id="title" class="titlein" size="1" value="サイズ表(単位cm)" aria-label="タイトル"><table id="grid"></table></div>
    <div class="btns colbtns"><button data-act="addCol">＋列</button><button data-act="delCol">－列</button></div>
@@ -69,7 +70,6 @@ button:hover{border-color:var(--pri2)}
    <button data-act="addRow">＋行</button><button data-act="delRow">－行</button>
    <button data-act="clear" style="margin-left:auto">中身を空にする</button>
   </div>
-  <p class="hint">セルを直接書き換えられます。Excelの範囲をコピーして左上のセルに貼り付けると、表ごと入ります。</p>
 
   <h2>見た目</h2>
   <div class="opts">
