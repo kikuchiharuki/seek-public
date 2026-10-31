@@ -74,7 +74,7 @@ button:hover{border-color:var(--pri2)}
   <h2>見た目</h2>
   <div class="opts">
    <fieldset><legend>タイトル</legend>
-    <label>文字サイズ <input type="number" id="titleSize" min="1" max="4" step="0.2" value="1"></label>
+    <label>文字サイズ <input type="number" id="titleSize" min="1" max="4" step="0.2" value="2"></label>
     <label>背景 <input type="color" id="titleBg" value="#009900"></label>
     <label>文字 <input type="color" id="titleFg" value="#ffffff"></label>
     <label>枠の高さ <input type="number" id="titleH" min="20" max="80" step="2" value="28"> px</label>
@@ -128,7 +128,7 @@ function makeCode(){
  const bd = $('border').checked ? ` border="1" frame="void" rules="all" cellspacing="0" bordercolor="${$('borderColor').value}"` : '';
  const p = Math.max(0, parseInt($('pad').value) || 0), pad = ` cellpadding="${p}"`;
  // height は余白を含まないので、枠の高さから上下の余白を引く（文字より低い値にはならない）
- const tv = Math.min(4, Math.max(1, +$('titleSize').value || 1));
+ const tv = Math.min(4, Math.max(1, +$('titleSize').value || 2));
  const ht = ` height="${Math.max(fontPx(tv), (+$('titleH').value || 28) - 2*p)}"`;
  let h = `<table width="100%" bgcolor="${$('tableBg').value}"${bd}${pad}><tbody>`;
  h += `<tr><th colspan="${cols}" bgcolor="${$('titleBg').value}"${ht} align="center" style="font-size:${fontPx(tv)}px"><font color="${$('titleFg').value}" size=${fontAttr(tv, 1)}>${esc($('title').value)}</font></th></tr>`;
