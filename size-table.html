@@ -27,6 +27,8 @@ h2:not(:first-child){margin-top:18px}
 .opts select{padding:3px}
 .opts label:has(:disabled){opacity:.4}
 #preview [contenteditable]{cursor:text}
+/* 列を足した直後は中身が空で幅がほぼ0になるため、空のセルだけ編集画面で幅を確保（出力コードには影響しない） */
+#preview td>font:empty{display:inline-block;min-width:3em}
 #preview [contenteditable]:hover{outline:1px dashed #c9a800;outline-offset:-2px}
 #preview [contenteditable]:focus{outline:2px solid #e0b800;outline-offset:-2px}
 .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
