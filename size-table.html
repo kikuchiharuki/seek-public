@@ -11,7 +11,7 @@
 body{font-family:-apple-system,"Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif;background:var(--bg);color:#1a1a1a;padding:20px 16px}
 h1{font-size:18px;color:var(--pri);margin-bottom:14px}
 h1 a{font-size:12px;font-weight:400;color:var(--sub);margin-left:10px}
-.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;max-width:1300px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;max-width:1300px}
 @media(max-width:860px){.cols{grid-template-columns:1fr}}
 section{background:var(--card);border-radius:var(--rad);padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);min-width:0}
 h2{font-size:14px;color:var(--pri);margin:0 0 8px}
@@ -26,22 +26,17 @@ h2:not(:first-child){margin-top:18px}
 .opts input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--bdr);border-radius:6px;background:none;cursor:pointer}
 .opts select{padding:3px}
 .opts label:has(:disabled){opacity:.4}
-#grid{border-collapse:collapse;font-size:13px}
-.gridwrap{display:flex;flex-direction:column}
-.titlein{border:1px solid #bbb;border-bottom:0;padding:5px 6px;font:inherit;font-size:13px;font-weight:700;text-align:center;background:#f3f3f3;outline:none}
-.titlein:focus{background:#fffbe0}
-#grid td{border:1px solid #bbb;min-width:48px;padding:4px 6px;outline:none}
-#grid td:focus{background:#fffbe0}
-#grid tr:first-child td,#grid td:first-child{background:#f3f3f3}
-.gridwrap{overflow-x:auto}
+#preview [contenteditable]{cursor:text}
+#preview [contenteditable]:hover{outline:1px dashed #c9a800;outline-offset:-2px}
+#preview [contenteditable]:focus{outline:2px solid #e0b800;outline-offset:-2px}
 .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .edit{display:flex;align-items:flex-start;gap:8px}
-.edit .gridwrap{min-width:0}
+.edit #preview{flex:1;min-width:0}
 .colbtns{flex-direction:column;margin-top:0;flex-shrink:0}
 .left{display:flex;flex-direction:column;gap:16px;min-width:0}
-/* 右列は左列と同じ高さまで伸ばし、コード欄で残りを埋めて下端をそろえる */
-.right>section:last-child{flex:1;display:flex;flex-direction:column}
-.right #code{flex:1;min-height:180px}
+/* コード欄は左列と同じ高さまで伸ばして下端をそろえる */
+.codebox{display:flex;flex-direction:column}
+.codebox #code{flex:1;min-height:180px}
 button{padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;background:#fff;cursor:pointer;font-size:12px}
 button:hover{border-color:var(--pri2)}
 #copy{background:var(--pri2);color:#fff;border-color:var(--pri2);font-size:13px;padding:6px 14px;min-width:8.5em;transition:transform .08s,background .15s}
@@ -62,9 +57,10 @@ button:hover{border-color:var(--pri2)}
 <div class="cols">
  <div class="left">
  <section>
-  <div class="row"><h2>表の中身</h2><p class="hint" style="margin:0">セルは直接書き換えられます。</p></div>
+  <div class="row"><h2>サイズ表</h2><p class="hint" style="margin:0">表をクリックして直接書き換えられます。</p></div>
+  <input type="hidden" id="title" value="サイズ表(単位cm)">
   <div class="edit">
-   <div class="gridwrap"><input type="text" id="title" class="titlein" size="1" value="サイズ表(単位cm)" aria-label="タイトル"><table id="grid"></table></div>
+   <div id="preview"></div>
    <div class="btns colbtns"><button data-act="addCol">＋列</button><button data-act="delCol">－列</button></div>
   </div>
   <div class="btns">
@@ -99,21 +95,14 @@ button:hover{border-color:var(--pri2)}
   </div>
  </section>
  </div>
- <div class="left right">
- <section>
-  <h2>プレビュー</h2>
-  <div id="preview"></div>
- </section>
- <section>
+ <section class="codebox">
   <div class="row"><h2>コード</h2><button id="copy">コピー</button></div>
   <textarea id="code" readonly></textarea>
   <p class="hint">出品ページの説明欄（HTML可の欄）に貼り付けてください。</p>
  </section>
- </div>
 </div>
 <script>
 const $ = id => document.getElementById(id);
-const grid = $('grid');
 let data = [
  ['参考寸法','90cm','100cm','110cm','120cm','130cm','140cm'],
  ['着丈','40','45.5','48.5','52.5','56','60'],
@@ -127,9 +116,6 @@ const fontPx = v => { const i = Math.min(3, Math.floor(v)); return +(PX[i] + (PX
 const fontAttr = (val, def) => { const v = Math.min(4, Math.max(1, +val || def)); return Number.isInteger(v) ? `"${v}"` : `"${Math.round(v)}" style="font-size:${fontPx(v)}px"`; };
 const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-function drawGrid(){
- grid.innerHTML = data.map((r,i)=>'<tr>'+r.map((c,j)=>`<td contenteditable data-r="${i}" data-c="${j}">${esc(c)}</td>`).join('')+'</tr>').join('');
-}
 // 出品先でCSSが消えることがあるため、元の出品と同じ bgcolor / font タグ形式で出す
 // th の font-size は、小さい文字が th の標準サイズの行の下側に寄るのを防ぐため（消されても見た目が少し下がるだけ）
 function makeCode(){
@@ -164,14 +150,31 @@ function load(){
  data = s.data;
  IDS.forEach(id => { const o = s.v?.[id], e = $(id); if (!o) return; e.type==='checkbox' ? e.checked = o.val : e.value = o.val; if (o.t) e.dataset.touched = 1; });
 }
-function update(){ $('borderColor').disabled = !$('border').checked; const c = makeCode(); $('code').value = c; $('preview').innerHTML = c; save(); }
+function setCode(){ $('code').value = makeCode(); save(); }
+// プレビューを描き直し、タイトルとセルをその場で書き換えられるようにする
+function update(){
+ $('borderColor').disabled = !$('border').checked; setCode();
+ const pv = $('preview'); pv.innerHTML = $('code').value;
+ pv.querySelectorAll('tr').forEach((tr,i) => [...tr.cells].forEach((td,j) => {
+  td.contentEditable = 'plaintext-only';
+  if (i === 0) td.dataset.title = 1; else { td.dataset.r = i-1; td.dataset.c = j; }
+ }));
+}
 
-grid.addEventListener('input', e => { const t=e.target; data[t.dataset.r][t.dataset.c] = t.innerText.trim(); update(); });
-grid.addEventListener('paste', e => {
- const txt = e.clipboardData.getData('text/plain');
- if (!/[\t\n]/.test(txt.trim())) { e.preventDefault(); document.execCommand('insertText', false, txt.trim()); return; }
+const pv = $('preview');
+// 入力中に描き直すとカーソルが飛ぶので、コードだけ更新する。見た目はフォーカスが表の外へ出たときに整え直す
+pv.addEventListener('input', e => {
+ const t = e.target.closest('[contenteditable]'), v = t.innerText.trim();
+ if (t.dataset.title) $('title').value = v; else data[t.dataset.r][t.dataset.c] = v;
+ setCode();
+});
+pv.addEventListener('focusout', e => { if (!pv.contains(e.relatedTarget)) update(); });
+pv.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) e.preventDefault(); });
+pv.addEventListener('paste', e => {
+ const t = e.target.closest('[contenteditable]'), txt = e.clipboardData.getData('text/plain');
+ if (t.dataset.title || !/[\t\n]/.test(txt.trim())) { e.preventDefault(); document.execCommand('insertText', false, txt.trim().replace(/\s*\n\s*/g,' ')); return; }
  e.preventDefault();
- const r0 = +e.target.dataset.r, c0 = +e.target.dataset.c;
+ const r0 = +t.dataset.r, c0 = +t.dataset.c;
  txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n').forEach((line,i)=>{
   line.split('\t').forEach((v,j)=>{
    const r=r0+i, c=c0+j;
@@ -180,7 +183,7 @@ grid.addEventListener('paste', e => {
    data[r][c] = v.trim();
   });
  });
- drawGrid(); update();
+ update();
 });
 document.querySelector('.cols').addEventListener('click', e => {
  const a = e.target.dataset.act; if (!a) return;
@@ -190,7 +193,7 @@ document.querySelector('.cols').addEventListener('click', e => {
  if (a==='delCol' && data[0].length>1) data.forEach(r=>r.pop());
  if (a==='reset') { if (!confirm('表の中身と見た目をすべて最初の状態に戻しますか？')) return; try { localStorage.removeItem(KEY); } catch {} return location.reload(); }
  if (a==='clear') data = data.map((r,i)=>r.map((c,j)=>i&&j?'':c)); // 見出しの行・列は残す
- drawGrid(); update();
+ update();
 });
 ['title','titleBg','titleFg','titleH','titleSize','tableBg','size','pad','border','borderColor'].forEach(id=>$(id).addEventListener('input', update));
 ['tableFg','colBg','colFg','rowBg','rowFg'].forEach(id=>$(id).addEventListener('input', e=>{ e.target.dataset.touched = 1; update(); }));
@@ -201,7 +204,7 @@ $('copy').addEventListener('click', async () => {
  c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); // 連続で押してももう一度光らせる
  clearTimeout(b._t); b._t = setTimeout(()=>{ b.textContent = 'コピー'; b.classList.remove('done'); }, 1500);
 });
-load(); drawGrid(); update();
+load(); update();
 </script>
 </body>
 </html>
