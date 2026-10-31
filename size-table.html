@@ -11,7 +11,8 @@
 body{font-family:-apple-system,"Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif;background:var(--bg);color:#1a1a1a;padding:20px 16px}
 h1{font-size:18px;color:var(--pri);margin-bottom:14px}
 h1 a{font-size:12px;font-weight:400;color:var(--sub);margin-left:10px}
-.cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;max-width:1020px}
+/* 左は表（575px）＋列ボタンがちょうど収まる幅、コード欄は残りの幅 */
+.cols{display:grid;grid-template-columns:minmax(0,664px) minmax(280px,1fr);gap:16px}
 @media(max-width:860px){.cols{grid-template-columns:1fr}}
 section{background:var(--card);border-radius:var(--rad);padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);min-width:0}
 h2{font-size:14px;color:var(--pri);margin:0 0 8px}
