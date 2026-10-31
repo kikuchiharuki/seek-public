@@ -69,7 +69,7 @@ button:hover{border-color:var(--pri2)}
   </div>
   <div class="btns">
    <button data-act="addRow">＋行</button><button data-act="delRow">－行</button>
-   <button data-act="clear" style="margin-left:auto">中身を空にする</button>
+   <button data-act="clear" style="margin-left:auto">中身を空にする</button><button data-act="reset">最初の状態に戻す</button>
   </div>
 
   <h2>見た目</h2>
@@ -152,7 +152,19 @@ function makeCode(){
  });
  return h + '</tbody></table>';
 }
-function update(){ $('borderColor').disabled = !$('border').checked; const c = makeCode(); $('code').value = c; $('preview').innerHTML = c; }
+// 入力内容をこのブラウザに残し、次に開いたとき続きから使えるようにする
+const KEY = 'size-table', IDS = ['title','titleSize','titleBg','titleFg','titleH','size','tableBg','tableFg','pad','colBg','colFg','rowBg','rowFg','border','borderColor'];
+function save(){
+ const v = {}; IDS.forEach(id => { const e = $(id); v[id] = { val: e.type==='checkbox' ? e.checked : e.value, t: !!e.dataset.touched }; });
+ try { localStorage.setItem(KEY, JSON.stringify({ data, v })); } catch {}
+}
+function load(){
+ let s; try { s = JSON.parse(localStorage.getItem(KEY)); } catch {}
+ if (!s || !Array.isArray(s.data)) return;
+ data = s.data;
+ IDS.forEach(id => { const o = s.v?.[id], e = $(id); if (!o) return; e.type==='checkbox' ? e.checked = o.val : e.value = o.val; if (o.t) e.dataset.touched = 1; });
+}
+function update(){ $('borderColor').disabled = !$('border').checked; const c = makeCode(); $('code').value = c; $('preview').innerHTML = c; save(); }
 
 grid.addEventListener('input', e => { const t=e.target; data[t.dataset.r][t.dataset.c] = t.innerText.trim(); update(); });
 grid.addEventListener('paste', e => {
@@ -176,6 +188,7 @@ document.querySelector('.cols').addEventListener('click', e => {
  if (a==='delRow' && data.length>1) data.pop();
  if (a==='addCol') data.forEach(r=>r.push(''));
  if (a==='delCol' && data[0].length>1) data.forEach(r=>r.pop());
+ if (a==='reset') { if (!confirm('表の中身と見た目をすべて最初の状態に戻しますか？')) return; try { localStorage.removeItem(KEY); } catch {} return location.reload(); }
  if (a==='clear') data = data.map((r,i)=>r.map((c,j)=>i&&j?'':c)); // 見出しの行・列は残す
  drawGrid(); update();
 });
@@ -188,7 +201,7 @@ $('copy').addEventListener('click', async () => {
  c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); // 連続で押してももう一度光らせる
  clearTimeout(b._t); b._t = setTimeout(()=>{ b.textContent = 'コピー'; b.classList.remove('done'); }, 1500);
 });
-drawGrid(); update();
+load(); drawGrid(); update();
 </script>
 </body>
 </html>
