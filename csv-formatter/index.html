@@ -670,7 +670,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.86</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.87</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -904,6 +904,7 @@ const CONFIG = {
     deliveryDate: ['指定納期'],
     companyName:  ['販売先会社名', '業者名'],
     contactPerson: ['窓口担当'],  // ゆうパック候補判定用（出力列ではない）
+    agent:        ['代理店名'],  // OEM発注の代理店。送り状の荷送人を invoiceCsv.agents で決める（出力列ではない）
     phone1:       ['電話番号1'],
     phone2:       ['電話番号2'],
     contactPhone: ['担当者連絡先番号', '担当者連絡先'],
@@ -1133,6 +1134,12 @@ const CONFIG = {
   invoiceCsv: {
     // 出力ファイル名（{M}=月, {D}=日。日付は出荷日）
     filenamePattern: '【福山通運】{M}月{D}日出荷CSVエントリーデータ.csv',
+    // ── 送り状を発行するアカウント（会社のルール: 製品の会社のアカウントで出す。メールの差出人ではなく製品で決まる）──
+    //    iS-2はPC1台に1アカウントなので、アカウントごとに別ファイルで保存する。
+    //    製品マスタの「アカウント」で決まる。未登録の商品は defaultAccount。
+    //    defaultAccount 以外のファイル名は accountFilenamePattern（{A}=アカウント名）
+    defaultAccount: 'ピュアライフ',
+    accountFilenamePattern: '【福山通運・{A}】{M}月{D}日出荷CSVエントリーデータ.csv',
     includeHeader: true,        // 1行目に列名行を出すか（ソフト側の取込設定に合わせる）
     encoding: 'SJIS',           // 送り状ソフトはWindows用のためShift-JIS（UTF8も指定可）
     dateFormat: 'yyyymmdd',     // 配達指定日・出荷日付・登録日付は8桁数字（iS-2でyyyy/mm/ddはエラーになる）
@@ -1170,6 +1177,20 @@ const CONFIG = {
       '輸送商品１': '', '輸送商品２': '',
     },
 
+    // ══ OEM代理店マスタ（AlritのOEM発注メールから来た行＝「代理店名」列がある行だけに使う）══
+    //    代理店名: 表記ゆれを並べる（空白は無視、(株)/（株）/株式会社 は ㈱ と同一視）
+    //    荷送人: アカウントごとの 荷送人コード と 品名記事3（製品マスタの値を上書き）
+    //    ここに無い代理店、またはそのアカウントの行が無い場合は荷送人コードを空欄にする（＝赤いセルで保存不可。登録漏れに気付ける）
+    //    値は2026年3月・10月の福山出荷データ（PLHD様）の実績から。ディーアイを荷送人にするなら荷送人コードを差し替える
+    agents: [
+      {
+        代理店名: ['㈱ディーアイ'],
+        荷送人: {
+          ピュアライフ: { 荷送人コード: '774286492', 品名記事3: '㈱ディーアイ様扱い' },
+        },
+      },
+    ],
+
     // ══ 製品マスタ（PLHD様/福山通運。2026-06-12受領の実データ）══
     //    製品と荷送人マスタ + 製品と品名記事マスタを1つの表に統合。
     //    【修正・追加はこの表を書き換えるだけ】1製品 = 1ブロック {...}。全製品が同じ項目。
@@ -1188,6 +1209,7 @@ const CONFIG = {
         製品名: ['ニオイしま栓！'],
         荷送人名: '大東建託パートナーズ株式会社',
         荷送人コード: '08002001580A',
+        アカウント: 'ピュアライフ',
         品名記事1: 'ﾆｵｲしま栓！1L10本入',
         品名記事2: '蒸発防止剤・航空機搭載可能',
         品名記事3: '取扱注意',
@@ -1206,6 +1228,7 @@ const CONFIG = {
         製品名: ['ジェット＆ディフューザー'],
         荷送人名: '大東建託リーシング株式会社',
         荷送人コード: '08002001580B',
+        アカウント: 'ピュアライフ',
         品名記事1: '抗菌ﾌﾚｸﾞﾗﾝｽｼﾞｪｯﾄ&ﾘｰﾄﾞﾃﾞｨﾌｭｰｻﾞｰ',
         品名記事2: '【航空機搭載不可】各30入ｾｯﾄ',
         品名記事3: '取扱注意',
@@ -1227,6 +1250,7 @@ const CONFIG = {
         製品名: ['ジェット＆ビーズ'],
         荷送人名: '大東建託リーシング株式会社',
         荷送人コード: '08002001580B',
+        アカウント: 'ピュアライフ',
         品名記事1: '抗菌ﾌﾚｸﾞﾗﾝｽｼﾞｪｯﾄ&ﾋﾞｰｽﾞ',
         品名記事2: '【航空機搭載不可】各30入ｾｯﾄ',
         品名記事3: '取扱注意',
@@ -1236,14 +1260,14 @@ const CONFIG = {
       },
       {
         // OEM（PLHDホームページのOEM発注メール→Alritユーザースクリプトが「ドレンジャー」に読み替えて渡す）。
-        //   値は2026年10月の福山通運出荷データ（PLHD様）の実績から。品名記事3は代理店名＋様扱い
-        //   shortcut: 品名記事3はディーアイ固定。別の代理店から来たらプレビューで手直しする（増えたら代理店ごとに持たせる）
+        //   値は2026年10月の福山通運出荷データ（PLHD様）の実績から。代理店経由の行は荷送人コード・品名記事3を上の agents で上書き
         製品名: ['ドレンジャー'],
         荷送人名: 'ピュアライフホールディングス株式会社',
         荷送人コード: '774286492',
+        アカウント: 'ピュアライフ',
         品名記事1: 'ドレンジャー1L×10本入',
         品名記事2: '蒸発防止剤・航空機搭載可能',
-        品名記事3: '㈱ディーアイ様扱い',
+        品名記事3: '取扱注意',
         まとめ梱包: 2,
         まとめ梱包の品名記事2: '2ケース1梱包',
         保険金額: '',
@@ -1252,6 +1276,7 @@ const CONFIG = {
         製品名: ['ruum REED DIFFUSER GOLD LABEL'],
         荷送人名: 'ＤＫ　ＰＯＲＴＡＬショップ',
         荷送人コード: '08002001580C',
+        アカウント: 'ピュアライフ',
         品名記事1: 'ruumﾘｰﾄﾞﾃﾞｨﾌｭｰｻﾞｰ',
         品名記事2: '(本体100ml・ｽﾃｨｯｸ5本)×30個',
         品名記事3: '取扱注意',
@@ -2329,6 +2354,13 @@ function findProductMaster(product) {
   return CONFIG.invoiceCsv.productMaster.find(m => m.製品名.some(n => norm(n) === p)) || null;
 }
 
+// OEM代理店マスタ検索（空白無視、(株)/（株）/株式会社 は ㈱ と同一視）
+function findAgent(name) {
+  const norm = s => String(s || '').replace(/[\s　]/g, '').replace(/\(株\)|（株）|株式会社/g, '㈱');
+  const a = norm(name);
+  return CONFIG.invoiceCsv.agents.find(m => m.代理店名.some(n => norm(n) === a)) || null;
+}
+
 // 変換結果1行 → 送り状CSVレコード（列名→値）の配列
 // まとめ梱包ルールがある製品は数量に応じて送り状を分割する
 // （例: ニオイしま栓！×7 → 「2ケース1梱包」個数3の1件 + 端数1ケース 個数1の1件）
@@ -2442,8 +2474,13 @@ function buildInvoiceRecords(r, shipDate, today) {
     addr2 = s ? s.rest : (r.address || '');
   }
 
+  const account = master?.アカウント || cfg.defaultAccount;
+  const agent = r.agent ? findAgent(r.agent) : null;
+  const agentShipper = agent?.荷送人?.[account] || null;  // 代理店行でこれが無ければ荷送人コードは空欄（保存不可）
+
   const make = (qty, item2) => {
     const rec = { ...cfg.fixedValues };
+    rec._account = account;
     rec['電話番号']     = r.phone1 || '';
     rec['住所']         = addr1;                        // 住所1=都道府県(+市区町村郡)
     rec['住所2']        = addr2;                        // 住所2=町名番地 or 合算住所
@@ -2453,11 +2490,12 @@ function buildInvoiceRecords(r, shipDate, today) {
     rec['郵便番号']     = r.postalCode || '';
     const baseShipperCode = master ? master.荷送人コード : '';
     const srcRule = CONFIG.fileSourceRules.find(rule => rule.source === r._fileSource);
-    rec['荷送人コード'] = (srcRule?.invoiceOverrides?.['荷送人コード']) || baseShipperCode;
+    rec['荷送人コード'] = r.agent ? (agentShipper?.荷送人コード || '')
+      : (srcRule?.invoiceOverrides?.['荷送人コード']) || baseShipperCode;
     rec['個数']         = String(qty);
     rec['品名記事1']    = master ? master.品名記事1 : '';
     rec['品名記事2']    = item2;
-    rec['品名記事3']    = master ? master.品名記事3 : '';
+    rec['品名記事3']    = agentShipper ? agentShipper.品名記事3 : master ? master.品名記事3 : '';
     rec['配達指定日']   = fmtInvoiceDate(r.deliveryDate);
     rec['出荷日付']     = fmtInvoiceDate(shipDate);
     rec['登録日付']     = fmtInvoiceDate(today);
@@ -2484,8 +2522,19 @@ function csvField(v) {
   return /[",]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
-let invoiceRows = [];      // プレビュー中のレコード（セル修正はここに書き戻される）
-let invoiceFileName = '';
+let invoiceRows = [];      // プレビュー中のレコード（セル修正はここに書き戻される）。_account=発行アカウント（CSVには出ない）
+let invoiceShipDate = null;
+
+// プレビュー中のアカウント一覧（既定アカウントが先頭）
+function invoiceAccounts() {
+  return [...new Set(invoiceRows.map(r => r._account))];
+}
+function invoiceFileNameFor(account, shipDate) {
+  const cfg = CONFIG.invoiceCsv;
+  return (account === cfg.defaultAccount ? cfg.filenamePattern : cfg.accountFilenamePattern.replace('{A}', account))
+    .replace('{M}', shipDate.getMonth() + 1)
+    .replace('{D}', shipDate.getDate());
+}
 
 function hideInvoiceSection() {
   document.getElementById('invoiceSection').classList.remove('visible');
@@ -2548,9 +2597,10 @@ async function buildInvoicePreview() {
   }
 
   invoiceRows = targetRows.flatMap(r => buildInvoiceRecords(r, shipDate, today));
-  invoiceFileName = cfg.filenamePattern
-    .replace('{M}', shipDate.getMonth() + 1)
-    .replace('{D}', shipDate.getDate());
+  // アカウントごとにまとめる（既定アカウントを先頭に。同じアカウント内は元の順）
+  const accOrder = a => a === cfg.defaultAccount ? '' : a;
+  invoiceRows.sort((a, b) => accOrder(a._account).localeCompare(accOrder(b._account)));
+  invoiceShipDate = shipDate;
 
   // 注記: 除外・まとめ梱包分割・マスタ未登録（未登録でも出力はする。該当欄が空欄になる）
   const skipped = allRows.length - targetRows.length;
@@ -2563,6 +2613,13 @@ async function buildInvoicePreview() {
   if (skipped) notes.push(`<span style="color:#e74c3c;font-weight:700;font-size:1.3em;">ゆうパック等 ${skipped}件は出力対象外</span>`);
   if (split > 0) notes.push(escapeHtml(`まとめ梱包ルールで送り状 ${split}件 分割`));
   if (noMaster.length) notes.push(escapeHtml(`⚠ マスタ未登録の商品: ${noMaster.join('、')}（荷送人コード・品名記事が空欄です）`));
+  const noAgent = [...new Set(targetRows
+    .filter(r => r.agent && !findAgent(r.agent)?.荷送人?.[findProductMaster(r.product)?.アカウント || cfg.defaultAccount])
+    .map(r => r.agent))];
+  if (noAgent.length) notes.push(`<span style="color:#e74c3c;font-weight:700;">⚠ 荷送人が未登録の代理店: ${escapeHtml(noAgent.join('、'))}（荷送人コードが空欄。手入力するか代理店マスタに追加）</span>`);
+  const accs = invoiceAccounts();
+  if (accs.length > 1) notes.push(`<span style="color:#e74c3c;font-weight:700;font-size:1.3em;">アカウント別に ${accs.length}ファイル保存されます: ${escapeHtml(accs.map(a => `${a} ${invoiceRows.filter(r => r._account === a).length}件`).join(' ／ '))}</span>`);
+  else if (accs[0] !== cfg.defaultAccount) notes.push(`<span style="color:#e74c3c;font-weight:700;font-size:1.3em;">${escapeHtml(accs[0])}アカウントの送り状です</span>`);
   if (invoiceMissingList().length) {
     notes.push('<span style="color:#e74c3c;font-weight:700;">⚠ 必須項目が空白の行があります（赤いセル）。修正しないとCSVを保存できません</span>');
   }
@@ -2571,7 +2628,7 @@ async function buildInvoicePreview() {
   }
   document.getElementById('invoiceNotes').innerHTML = notes.join(' ／ ');
   document.getElementById('invoiceNotes').style.display = notes.length ? '' : 'none';
-  document.getElementById('invoiceCount').textContent = `(${invoiceRows.length} 件 → ${invoiceFileName})`;
+  document.getElementById('invoiceCount').textContent = `(${invoiceRows.length} 件 → ${accs.map(a => invoiceFileNameFor(a, shipDate)).join(' ＋ ')})`;
 
   markUsed('btnInvoiceCsv');
   setInvoiceDownloaded(false); // プレビューを作り直したら再度ダウンロードできるように戻す
@@ -2640,11 +2697,13 @@ function invoiceCellStyle(col, val) {
 // プレビューテーブル（全セル編集可。必須項目が空白のセルは赤、文字数超過は橙）
 function renderInvoiceTable() {
   const cols = CONFIG.invoiceCsv.columns;
-  let html = '<table class="data-table"><thead><tr><th>#</th>';
+  const accs = invoiceAccounts();
+  const showAcc = accs.length > 1 || accs[0] !== CONFIG.invoiceCsv.defaultAccount;  // ピュアライフだけの日は列を出さない
+  let html = `<table class="data-table"><thead><tr><th>#</th>${showAcc ? '<th>アカウント</th>' : ''}`;
   cols.forEach(c => { html += `<th>${escapeHtml(c)}</th>`; });
   html += '</tr></thead><tbody>';
   invoiceRows.forEach((rec, i) => {
-    html += `<tr><td style="color:#999;">${i + 1}</td>`;
+    html += `<tr><td style="color:#999;">${i + 1}</td>${showAcc ? `<td style="font-weight:700;white-space:nowrap;">${escapeHtml(rec._account)}</td>` : ''}`;
     cols.forEach(c => {
       const v = String(rec[c] ?? '');
       const { bg, title } = invoiceCellStyle(c, v);
@@ -2687,9 +2746,23 @@ function downloadInvoiceCsv() {
     return false;
   }
   const cfg = CONFIG.invoiceCsv;
+  const saved = [];
+  // アカウントごとに別ファイル（iS-2はアカウントごとに別PC）
+  for (const account of invoiceAccounts()) {
+    const recs = invoiceRows.filter(r => r._account === account);
+    const name = invoiceFileNameFor(account, invoiceShipDate);
+    saveInvoiceCsvFile(recs, name);
+    saved.push(`${name}（${recs.length}件）`);
+  }
+  showToast(`送り状CSV保存: ${saved.join('、')}`, 'success');
+  setInvoiceDownloaded(true);
+  return true;
+}
+function saveInvoiceCsvFile(recs, fileName) {
+  const cfg = CONFIG.invoiceCsv;
   const lines = [];
   if (cfg.includeHeader) lines.push(cfg.columns.join(','));
-  for (const rec of invoiceRows) lines.push(cfg.columns.map(c => csvField(rec[c])).join(','));
+  for (const rec of recs) lines.push(cfg.columns.map(c => csvField(rec[c])).join(','));
   const csvText = lines.join('\r\n') + '\r\n';
 
   // Shift-JIS（CP932）で出力（送り状ソフトがWindows用のため）
@@ -2702,12 +2775,9 @@ function downloadInvoiceCsv() {
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = invoiceFileName;
+  a.download = fileName;
   a.click();
-  URL.revokeObjectURL(a.href);
-  showToast(`送り状CSV保存: ${invoiceFileName}（${invoiceRows.length}件）`, 'success');
-  setInvoiceDownloaded(true);
-  return true;
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);  // 2ファイル続けて保存するときに先のURLを早く消さない
 }
 document.getElementById('btnInvoiceDownload').addEventListener('click', () => {
   downloadInvoiceCsv();
@@ -3812,6 +3882,7 @@ function buildMappedData(f) {
     });
 
     mapped.contactPerson = f.mapping.contactPerson !== undefined ? cellText(row, f.mapping.contactPerson) : '';
+    mapped.agent = f.mapping.agent !== undefined ? cellText(row, f.mapping.agent) : '';
 
     // 電話番号統合: CONFIG.phonePriority の順でデータが入っている最初のものを採用
     mapped.phone1 = '';
