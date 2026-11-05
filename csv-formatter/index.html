@@ -670,7 +670,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.85</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.86</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -1235,6 +1235,20 @@ const CONFIG = {
         保険金額: '5',
       },
       {
+        // OEM（PLHDホームページのOEM発注メール→Alritユーザースクリプトが「ドレンジャー」に読み替えて渡す）。
+        //   値は2026年10月の福山通運出荷データ（PLHD様）の実績から。品名記事3は代理店名＋様扱い
+        //   shortcut: 品名記事3はディーアイ固定。別の代理店から来たらプレビューで手直しする（増えたら代理店ごとに持たせる）
+        製品名: ['ドレンジャー'],
+        荷送人名: 'ピュアライフホールディングス株式会社',
+        荷送人コード: '774286492',
+        品名記事1: 'ドレンジャー1L×10本入',
+        品名記事2: '蒸発防止剤・航空機搭載可能',
+        品名記事3: '㈱ディーアイ様扱い',
+        まとめ梱包: 2,
+        まとめ梱包の品名記事2: '2ケース1梱包',
+        保険金額: '',
+      },
+      {
         製品名: ['ruum REED DIFFUSER GOLD LABEL'],
         荷送人名: 'ＤＫ　ＰＯＲＴＡＬショップ',
         荷送人コード: '08002001580C',
@@ -1588,7 +1602,13 @@ let alritReply = null;
     .filter(f => f && /\.(csv|xlsx|xls)$/i.test(f.name));
   console.log('📦 Alrit連携: 添付', fileObjs.length, '件を受信', fileObjs.map(f => f.name));
   if (!fileObjs.length) return;
-  const run = () => handleFiles(fileObjs);
+  // OEMメール由来（payload.after='nextBizShip'）: 読込→変換→翌営業日で出荷日設定まで自動（出荷日は画面で変えられる）
+  const run = async () => {
+    await handleFiles(fileObjs);
+    if (payload.after !== 'nextBizShip') return;
+    await applyMappingAndPreview();
+    if (processedFiles.length) document.getElementById('btnNextBizShip').click();
+  };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
   else run();
 })();
