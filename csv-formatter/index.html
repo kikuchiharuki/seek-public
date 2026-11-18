@@ -670,7 +670,7 @@ body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; backgroun
 
 <div class="app-header">
   <!-- バージョンは修正のたびに必ず上げる -->
-  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.87</span></h1>
+  <h1>ピュアライフ出荷ツール <span style="font-size:13px;font-weight:normal;opacity:.75;">v1.88</span></h1>
   <div class="step-indicator">
     <span class="step active" id="step1">1. 読み込み</span>
     <span class="step" id="step2">2. 元データ確認</span>
@@ -1280,13 +1280,13 @@ const CONFIG = {
         品名記事1: 'ruumﾘｰﾄﾞﾃﾞｨﾌｭｰｻﾞｰ',
         品名記事2: '(本体100ml・ｽﾃｨｯｸ5本)×30個',
         品名記事3: '取扱注意',
-        まとめ梱包: 1,
-        まとめ梱包の品名記事2: '',
+        まとめ梱包: 2,  // 最大3ケースまで可だが重く危ないので2（2026-11-18 製品マスタ記入表）
+        まとめ梱包の品名記事2: '2ケース1梱包',
         保険金額: '5',
         // 航空機搭載可（ディフューザー単体・スプレー缶なし）。記事は空欄。取扱注意はジェット＆ディフューザーと同じ
         ゆうパック: {
           品名1: 'ruumﾘｰﾄﾞﾃﾞｨﾌｭｰｻﾞｰ', 品名2: '(本体100ml・ｽﾃｨｯｸ5本)×30個', 品名3: '',
-          まとめ梱包の品名2: '',
+          まとめ梱包の品名2: '２ケース１梱包',
           記事1: '', 記事2: '',
           取扱注意: ['こわれもの', 'ビン類'],
         },
